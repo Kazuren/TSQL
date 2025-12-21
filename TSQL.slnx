@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="D:/Projects/TSQL/TSQL/TSQL.csproj" />
+  <Project Path="TSQL.Generators/TSQL.Generators.csproj" />
+  <Project Path="TSQL.Tests/TSQL.Tests.csproj" Id="a700ed39-4a7c-4c1d-a98a-b4903563ebdf" />
+</Solution>
