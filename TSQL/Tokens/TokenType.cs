@@ -2,13 +2,14 @@
 {
     public enum TokenType
     {
-        IDENTIFIER, DELIMITED_IDENTIFIER,
+        IDENTIFIER,
         STRING, WHOLE_NUMBER, DECIMAL,
         PLUS, MINUS, SLASH, STAR, MODULO,
         SEMICOLON, COMMA, DOT,
         LEFT_PAREN, RIGHT_PAREN,
         EQUAL, GREATER, GREATER_EQUAL, LESS, LESS_EQUAL, NOT_EQUAL,
         NOT_LESS, NOT_GREATER, BITWISE_NOT,
+        WHITESPACE, COMMENT,
         EOF,
         // Keywords - This comment is used by a source generator to mark the keywords section, do not delete it.
         ADD, ALL, ALTER, AND, ANY, AS, ASC, AUTHORIZATION,

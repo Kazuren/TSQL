@@ -8,11 +8,11 @@ namespace TSQL
     {
         private readonly string _source;
         private readonly List<Token> _tokens = new List<Token>();
+        private readonly List<Trivia> _pendingTrivia = new List<Trivia>();
 
         private int _start = 0;
         private int _current = 0;
         private int _line = 1;
-
 
         public Scanner(string source)
         {
@@ -27,7 +27,8 @@ namespace TSQL
                 ScanToken();
             }
 
-            _tokens.Add(new Token(TokenType.EOF, "", null, _line));
+            AddToken(TokenType.EOF, null, "");
+
             return _tokens;
         }
 
@@ -49,7 +50,15 @@ namespace TSQL
                     AddToken(TokenType.DOT);
                     break;
                 case '-':
-                    AddToken(TokenType.MINUS);
+                    if (Match('-'))
+                    {
+                        // we matched a second '-' so the current line is a comment
+                        SingleLineComment();
+                    }
+                    else
+                    {
+                        AddToken(TokenType.MINUS);
+                    }
                     break;
                 case '+':
                     AddToken(TokenType.PLUS);
@@ -87,26 +96,14 @@ namespace TSQL
                     AddToken(Match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
                     break;
                 case '/':
-                    if (Match('/'))
+                    if (Match('*'))
                     {
-                        // we matched a second '/' so the current line is a comment
-                        while (Peek() != '\n' && !IsAtEnd())
-                        {
-                            Advance();
-                        }
+                        MultiLineComment();
                     }
                     else
                     {
                         AddToken(TokenType.SLASH);
                     }
-                    break;
-                case ' ':
-                case '\r':
-                case '\t':
-                    // ignore whitespace
-                    break;
-                case '\n':
-                    ++_line;
                     break;
                 case '\'':
                     String();
@@ -118,7 +115,11 @@ namespace TSQL
                     QuoteDelimitedIdentifier();
                     break;
                 default:
-                    if (IsDigit(c))
+                    if (Char.IsWhiteSpace(c))
+                    {
+                        Whitespace();
+                    }
+                    else if (IsDigit(c))
                     {
                         Number();
                     }
@@ -132,6 +133,68 @@ namespace TSQL
                     }
                     break;
             }
+        }
+
+        private void MultiLineComment()
+        {
+            int commentDepth = 1;
+            while (!IsAtEnd())
+            {
+                if (Peek() == '/' && PeekNext() == '*')
+                {
+                    Consume(2);
+                    ++commentDepth;
+                }
+                else if (Peek() == '*' && PeekNext() == '/')
+                {
+                    --commentDepth;
+                    if (commentDepth == 0)
+                    {
+                        break;
+                    }
+                }
+                else if (Peek() == '\n')
+                {
+                    AdvanceLineNumber();
+                }
+            }
+
+            if (IsAtEnd())
+            {
+                throw new Exception("Unterminated multi-line comment.");
+            }
+
+            // Consume the closing "*/" of the multi-line comment
+            Consume(2);
+
+            AddTrivia(new Trivia(_source.Substring(_start, _current - _start), TriviaType.Comment));
+        }
+
+        private void SingleLineComment()
+        {
+            while (Peek() != '\n' && !IsAtEnd())
+            {
+                Advance();
+            }
+
+            AddTrivia(new Trivia(_source.Substring(_start, _current - _start), TriviaType.Comment));
+        }
+
+        private void Whitespace()
+        {
+            char c = Peek();
+            while (char.IsWhiteSpace(c))
+            {
+                // repeating check to see if current character is a new line to increment line counter
+                if (c == '\n')
+                {
+                    AdvanceLineNumber();
+                }
+
+                Advance();
+            }
+
+            AddTrivia(new Trivia(_source.Substring(_start, _current - _start), TriviaType.Whitespace));
         }
 
         private void Number()
@@ -176,40 +239,8 @@ namespace TSQL
                 type = TokenType.IDENTIFIER;
             }
 
-            AddToken(type);
+            AddToken(type, text);
         }
-
-        //private void DelimitedIdentifier(char closingDelimiter)
-        //{
-        //    StringBuilder builder = new StringBuilder();
-
-        //    // consume characters until we hit a closing bracket
-        //    while (!IsAtEnd() && Peek() != closingDelimiter)
-        //    {
-        //        char currentChar = Peek();
-        //        if (currentChar == '\n')
-        //        {
-        //            _line++;
-        //        }
-        //        builder.Append(currentChar);
-        //        Advance();
-        //    }
-
-        //    if (IsAtEnd())
-        //    {
-        //        throw new Exception("Unterminated delimited identifier.");
-        //    }
-
-        //    // Consume the closing delimiter
-        //    Advance();
-
-        //    // Trim the delimiters
-        //    string value = _source.Substring(_start + 1, (_current - 1) - (_start + 1));
-        //    // Store as IDENTIFIER or DELIMITED_IDENTIFIER token
-        //    AddToken(TokenType.DELIMITED_IDENTIFIER, value);
-        //}
-
-
         private void BracketDelimitedIdentifier()
         {
             StringBuilder builder = new StringBuilder();
@@ -223,7 +254,7 @@ namespace TSQL
                     if (PeekNext() == ']')
                     {
                         // consume both brackets
-                        _current += 2;
+                        Consume(2);
 
                         // This is an escaped bracket, add a single bracket to the result
                         builder.Append(']');
@@ -239,7 +270,7 @@ namespace TSQL
                     char currentChar = Peek();
                     if (currentChar == '\n')
                     {
-                        _line++;
+                        AdvanceLineNumber();
                     }
                     builder.Append(currentChar);
                     Advance();
@@ -254,8 +285,7 @@ namespace TSQL
             // Consume the closing delimiter
             Advance();
 
-            // Store as DELIMITED_IDENTIFIER token
-            AddToken(TokenType.DELIMITED_IDENTIFIER, builder.ToString());
+            AddToken(TokenType.IDENTIFIER, builder.ToString());
         }
 
         private void QuoteDelimitedIdentifier()
@@ -271,7 +301,7 @@ namespace TSQL
                     if (PeekNext() == '"')
                     {
                         // consume both quotes
-                        _current += 2;
+                        Consume(2);
 
                         // This is an escaped quote, add a single quote to the result
                         builder.Append('"');
@@ -287,7 +317,7 @@ namespace TSQL
                     char currentChar = Peek();
                     if (currentChar == '\n')
                     {
-                        _line++;
+                        AdvanceLineNumber();
                     }
                     builder.Append(currentChar);
                     Advance();
@@ -302,8 +332,7 @@ namespace TSQL
             // Consume the closing delimiter
             Advance();
 
-            // Store as DELIMITED_IDENTIFIER token
-            AddToken(TokenType.DELIMITED_IDENTIFIER, builder.ToString());
+            AddToken(TokenType.IDENTIFIER, builder.ToString());
         }
 
         private void String()
@@ -319,7 +348,7 @@ namespace TSQL
                     if (PeekNext() == '\'')
                     {
                         // consume both quotes
-                        _current += 2;
+                        Consume(2);
 
                         // This is an escaped quote, add a single quote to the result
                         builder.Append('\'');
@@ -335,7 +364,7 @@ namespace TSQL
                     char currentChar = Peek();
                     if (currentChar == '\n')
                     {
-                        _line++;
+                        AdvanceLineNumber();
                     }
                     builder.Append(currentChar);
                     Advance();
@@ -345,14 +374,18 @@ namespace TSQL
 
             if (IsAtEnd())
             {
-                //Lox.Error(_line, "Unterminated string.");
-                return;
+                throw new Exception("Unterminated string.");
             }
 
             // The closing '
             Advance();
 
             AddToken(TokenType.STRING, builder.ToString());
+        }
+
+        private void AdvanceLineNumber()
+        {
+            ++_line;
         }
 
         // Character lookup
@@ -376,8 +409,7 @@ namespace TSQL
         {
             if (IsAtEnd()) { return false; }
             if (_source[_current] != expected) { return false; }
-
-            _current++;
+            Consume();
             return true;
         }
 
@@ -391,16 +423,43 @@ namespace TSQL
             return _source[_current++];
         }
 
+        private void Consume()
+        {
+            ++_current;
+        }
+
+        private void Consume(int amount)
+        {
+            System.Diagnostics.Debug.Assert(amount > 0, "Amount consumed should be greater than 0!");
+            _current += amount;
+        }
+
         private void AddToken(TokenType type)
         {
             AddToken(type, null);
         }
 
+        private void AddTrivia(Trivia trivia)
+        {
+            _pendingTrivia.Add(trivia);
+        }
+
         private void AddToken(TokenType type, object literal)
         {
             string text = _source.Substring(_start, _current - _start);
-            _tokens.Add(new Token(type, text, literal, _line));
+            AddToken(type, literal, text);
         }
+
+        private void AddToken(TokenType type, object literal, string lexeme)
+        {
+            Token token = new Token(type, lexeme, literal, _line);
+
+            token._leadingTrivia.AddRange(_pendingTrivia);
+            _pendingTrivia.Clear();
+
+            _tokens.Add(token);
+        }
+
 
         // Characterization
         private bool IsDigit(char c)

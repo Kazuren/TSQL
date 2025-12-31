@@ -9,6 +9,11 @@ namespace TSQL
         public string Lexeme { get => _lexeme; private set => _lexeme = value; }
         public object Literal { get => _literal; private set => _literal = value; }
         public int Line { get => _line; private set => _line = value; }
+        public IReadOnlyList<Trivia> LeadingTrivia { get => _leadingTrivia; }
+        public IReadOnlyList<Trivia> TrailingTrivia { get => _trailingTrivia; }
+
+        internal List<Trivia> _leadingTrivia = new List<Trivia>();
+        internal List<Trivia> _trailingTrivia = new List<Trivia>();
 
         private TokenType _type;
         private string _lexeme;
@@ -43,11 +48,7 @@ namespace TSQL
 
         public override int GetHashCode()
         {
-            int hashCode = -1171869116;
-            hashCode = hashCode * -1521134295 + Type.GetHashCode();
-            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(Lexeme);
-            hashCode = hashCode * -1521134295 + EqualityComparer<object>.Default.GetHashCode(Literal);
-            return hashCode;
+            return (Type, Lexeme, Literal).GetHashCode();
         }
 
         public static bool operator ==(Token left, Token right)
