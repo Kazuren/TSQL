@@ -167,7 +167,7 @@ namespace TSQL
             // Consume the closing "*/" of the multi-line comment
             Consume(2);
 
-            AddTrivia(new Trivia(_source.Substring(_start, _current - _start), TriviaType.Comment));
+            AddTrivia(new Comment(_source.Substring(_start, _current - _start)));
         }
 
         private void SingleLineComment()
@@ -177,7 +177,7 @@ namespace TSQL
                 Advance();
             }
 
-            AddTrivia(new Trivia(_source.Substring(_start, _current - _start), TriviaType.Comment));
+            AddTrivia(new Comment(_source.Substring(_start, _current - _start)));
         }
 
         private void Whitespace()
@@ -194,7 +194,7 @@ namespace TSQL
                 Advance();
             }
 
-            AddTrivia(new Trivia(_source.Substring(_start, _current - _start), TriviaType.Whitespace));
+            AddTrivia(new Whitespace(_source.Substring(_start, _current - _start)));
         }
 
         private void Number()
@@ -454,7 +454,7 @@ namespace TSQL
         {
             Token token = new Token(type, lexeme, literal, _line);
 
-            token._leadingTrivia.AddRange(_pendingTrivia);
+            token.AddLeadingTrivia(_pendingTrivia);
             _pendingTrivia.Clear();
 
             _tokens.Add(token);

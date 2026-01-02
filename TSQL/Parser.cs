@@ -4,6 +4,78 @@ using System.Linq;
 
 namespace TSQL
 {
+    /*
+    Legend:
+    ? -> the group before it can appear zero or one time but not more.
+    * -> the group before it can appear zero or more times.
+    + -> the group before it can appear one or more times.
+    | -> one of the following (OR) e.g. a | b = a OR b
+    () -> grouping
+
+    // We have to allow stupid shit through or else it's going to get too complicated imo
+    // who cares if we pass something silly to a TOP clause like a string when it only takes numbers?
+    // the purpose of the grammar is so there's no ambiguity in token orders and the resulting AST/CST
+    // e.g. a b c tokens could be parsed as either (a + b) + c or a + (b + c)
+
+    Grammar:
+        Statements:
+            Statement -> cte_statement | select_statement
+            cte_statement -> "WITH" cte_list select_expression
+            select_statement -> select_expression
+           
+        Expressions:
+            TODO: add "column expression" and have a seperate "object expression" for table names etc. figure that out when we get to the from
+            TODO: add a function_expression
+            TODO: add a variable_expression (starts with @ I think?)
+
+            expression -> term
+            term -> factor ( ("-" | "+") factor )*
+            factor -> unary ( ( "/" | "*") unary )*
+            unary -> ("-") scalar_subquery | scalar_subquery
+            scalar_subquery -> ( "(" select_expression ")" ) | primary
+            primary -> "NULL" | WHOLE_NUMBER | DECIMAL | STRING | column_expression | ( "(" expression ")" )
+        
+       
+
+        Syntax nodes: // not going to be Expr or Stmt classes but rather just helper classes
+            column_expression -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
+            select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | parenthesized_expression) ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)?
+            parenthesized_expression -> ( "(" select_expression | expression ")" ) 
+
+            select_list -> expression ("," expression)*
+            from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
+            where_clause -> "WHERE search_condition
+            group_by_clause -> "GROUP BY"
+            having_clause -> "HAVING"
+            order_by_clause -> "ORDER BY"
+            cte_list -> cte_definition ( "," cte_definition )*
+            cte_definition -> IDENTIFIER ( cte_column_list )? "AS" ( "(" select_expression ")" )
+            cte_column_list -> "(" IDENTIFIER ("," IDENTIFIER)* ")"
+
+            comparison_operator = ("=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "!>" | "!<" )
+
+            comparison_predicate -> expression comparison_operator expression 
+            like_predicate -> expression ("NOT")? "LIKE" expression ("ESCAPE" STRING)?
+            between_predicate -> expression ("NOT")? "BETWEEN" expression "AND" expression
+            null_predicate -> expression IS ("NOT")? "NULL"
+            contains_predicate -> "CONTAINS" "(" ( fully_qualified_identifier | "*" ) , STRING ")"
+            in_predicate -> expression ("NOT")? IN "(" ( select_expression | ( expression ("," expression)* ) ) ")"
+            quantifier_predicate -> expression comparison_operator ("ALL" | "SOME" | "ANY" ) "(" select_expression ")"
+            exists_predicate -> "EXISTS" "(" select_expression ")"
+
+
+            search_condition -> predicate
+            
+            predicate -> or_predicate
+            or_predicate ->  and_predicate ("OR" and_predicate)*
+            and_predicate -> unary_predicate ("AND" unary_predicate)*
+            unary_predicate -> ("NOT")? unary_predicate | primary_predicate
+            primary_predicate -> 
+                comparison | like_comparison | between_predicate | 
+                null_predicate | contains_predicate | in_predicate | 
+                quantifier_predicate | exists_predicate | "(" predicate ")"
+    */
+
     public class Parser
     {
         private class ParseError : Exception { }
@@ -68,7 +140,7 @@ namespace TSQL
                 Consume(TokenType.AS, "Expected AS");
                 Consume(TokenType.LEFT_PAREN, "Expected (");
 
-                cte.Query = SelectStatement();
+                cte.Query = SelectExpression();
 
                 Consume(TokenType.RIGHT_PAREN, "Expected )");
 
@@ -77,78 +149,103 @@ namespace TSQL
             } while (Match(TokenType.COMMA));
 
             // Parse main query
-            cteStmt.MainQuery = SelectStatement();
+            cteStmt.MainQuery = SelectExpression();
 
             return cteStmt;
         }
 
 
-
         private Stmt.Select SelectStatement()
         {
-            Consume(TokenType.SELECT, "Expected SELECT");
+            return new Stmt.Select(SelectExpression());
+        }
 
-            Stmt.Select stmt = new Stmt.Select();
+        private Expr.Subquery Subquery()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+            SelectExpression subquery = SelectExpression();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            return new Expr.Subquery(subquery, leftParen, rightParen);
+        }
+
+        private SelectExpression SelectExpression()
+        {
+            SelectExpression selectExpr = new SelectExpression();
+            selectExpr._selectKeyword = Consume(TokenType.SELECT, "Expected SELECT");
 
             if (Match(TokenType.DISTINCT))
-                stmt.Distinct = true;
+            {
+                selectExpr.Distinct = true;
+                selectExpr._distinctKeyword = Previous();
+            }
 
             if (Match(TokenType.TOP))
             {
-                Token topToken = Consume(TokenType.WHOLE_NUMBER, "Expected whole number after TOP");
-                stmt.Top = (int)topToken.Literal;
+                Expr expr = Expression();
+                selectExpr.Top = new TopClause(expr);
             }
 
-            stmt.Columns = SelectList();
+            do
+            {
+                SelectColumn selectColumn = SelectColumn();
 
-            Consume(TokenType.FROM, "Expected FROM");
-            stmt.From = FromClause();
+                // Check if there's a comma after this column
+                Token comma = null;
+                if (Check(TokenType.COMMA))
+                {
+                    comma = Advance(); // Capture the comma token
+                }
 
-            while (IsJoinKeyword())
-                stmt.Joins.Add(JoinClause());
+                selectExpr.Columns.Add(selectColumn, comma);
+            } while (Previous().Type == TokenType.COMMA); // Continue if we just consumed a comma
+
+
+            if (Match(TokenType.FROM))
+            {
+                Token fromToken = Previous();
+                selectExpr.From = FromClause();
+
+                while (IsJoinKeyword())
+                {
+                    selectExpr.Joins.Add(JoinClause());
+                }
+            }
 
             if (Match(TokenType.WHERE))
-                stmt.Where = Expression();
+            {
+                selectExpr.Where = Expression();
+            }
 
             if (Match(TokenType.GROUP))
             {
                 Consume(TokenType.BY, "Expected BY after GROUP");
-                stmt.GroupBy = new List<Expr>();
                 do
                 {
-                    stmt.GroupBy.Add(Expression());
+                    selectExpr.GroupBy.Add(Expression());
                 } while (Match(TokenType.COMMA));
             }
 
             if (Match(TokenType.HAVING))
-                stmt.Having = Expression();
+            {
+                selectExpr.Having = Expression();
+            }
 
             if (Match(TokenType.ORDER))
             {
                 Consume(TokenType.BY, "Expected BY after ORDER");
-                stmt.OrderBy = new List<OrderByItem>();
                 do
                 {
                     Expr expr = Expression();
                     bool desc = Match(TokenType.DESC);
                     if (!desc) Match(TokenType.ASC);
-                    stmt.OrderBy.Add(new OrderByItem() { Expression = expr, Descending = desc });
+                    selectExpr.OrderBy.Add(new OrderByItem() { Expression = expr, Descending = desc });
                 } while (Match(TokenType.COMMA));
             }
 
-            return stmt;
+            return selectExpr;
         }
 
-
-        private List<SelectColumn> SelectList()
-        {
-            List<SelectColumn> columns = new List<SelectColumn>();
-            do
-            {
-                columns.Add(SelectColumn());
-            } while (Match(TokenType.COMMA));
-            return columns;
-        }
 
         private SelectColumn SelectColumn()
         {
@@ -166,15 +263,13 @@ namespace TSQL
         {
             if (Check(TokenType.LEFT_PAREN))
             {
-                Consume(TokenType.LEFT_PAREN, "Expected (");
-                Stmt.Select subquery = SelectStatement();
-                Consume(TokenType.RIGHT_PAREN, "Expected )");
+                Expr.Subquery subquery = Subquery();
 
                 string alias = null;
                 if (Match(TokenType.AS))
                     alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
 
-                return new FromClause() { Subquery = subquery, Alias = alias };
+                return new FromClause() { TableSource = new SubqueryReference() { Subquery = subquery }, Alias = alias };
             }
 
             string tableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme;
@@ -183,7 +278,7 @@ namespace TSQL
             if (Check(TokenType.IDENTIFIER))
                 tableAlias = Advance().Lexeme;
 
-            return new FromClause() { TableName = tableName, Alias = tableAlias };
+            return new FromClause() { TableSource = new TableReference() { TableName = tableName }, Alias = tableAlias };
         }
 
 
@@ -202,16 +297,14 @@ namespace TSQL
 
             if (Check(TokenType.LEFT_PAREN))
             {
-                Consume(TokenType.LEFT_PAREN, "Expected (");
-                join.Subquery = SelectStatement();
-                Consume(TokenType.RIGHT_PAREN, "Expected )");
+                join.TableSource = new SubqueryReference() { Subquery = Subquery() };
 
                 if (Match(TokenType.AS))
                     join.Alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
             }
             else
             {
-                join.TableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme;
+                join.TableSource = new TableReference() { TableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme };
                 if (Check(TokenType.IDENTIFIER))
                     join.Alias = Advance().Lexeme;
             }
@@ -311,29 +404,39 @@ namespace TSQL
             return expr;
         }
 
+        private Expr Grouping()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+            Expr expr = Expression();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            return new Expr.Grouping(expr, leftParen, rightParen);
+        }
+
         private Expr Primary()
         {
             if (Match(TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING))
-                return new Expr.Literal() { Value = Previous().Literal };
-
-            if (Match(TokenType.LEFT_PAREN))
             {
-                if (Check(TokenType.SELECT))
+                return new Expr.Literal(Previous());
+            }
+
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                if (CheckNext(TokenType.SELECT))
                 {
-                    Stmt.Select subquery = SelectStatement();
-                    Consume(TokenType.RIGHT_PAREN, "Expected )");
-                    return new Expr.Subquery { Query = subquery };
+                    Expr.Subquery subquery = Subquery();
+                    return subquery;
                 }
 
-                Expr expr = Expression();
-                Consume(TokenType.RIGHT_PAREN, "Expected )");
-                return expr;
+                return Grouping();
             }
 
             if (Match(TokenType.STAR))
-                return new Expr.Column() { ColumnName = "*" };
+            {
+                return new Expr.Identifier("*");
+            }
 
-            if (Check(TokenType.IDENTIFIER))
+            if (Check(TokenType.IDENTIFIER, TokenType.STAR))
             {
                 string name = Advance().Lexeme;
 
@@ -353,11 +456,13 @@ namespace TSQL
 
                 if (Match(TokenType.DOT))
                 {
-                    string column = Consume(TokenType.IDENTIFIER, "Expected column").Lexeme;
-                    return new Expr.Column() { TableAlias = name, ColumnName = column };
+                    // TODO fix: this will break if we have stuff like tablename.* because * is not considered an IDENTIFIER
+                    Token column = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected column name or '*'");
+                    // TODO add name as part of the identifier, in a loop probably
+                    return new Expr.Identifier(column);
                 }
 
-                return new Expr.Column() { ColumnName = name };
+                return new Expr.Identifier(name);
             }
 
             throw new Exception($"Unexpected token: {Peek()}");
@@ -374,6 +479,16 @@ namespace TSQL
         private Token Consume(TokenType type, string message)
         {
             if (Check(type)) { return Advance(); }
+
+            throw Error(Peek(), message);
+        }
+
+        private Token Consume(TokenType[] types, string message)
+        {
+            foreach (TokenType type in types)
+            {
+                if (Check(type)) { return Advance(); }
+            }
 
             throw Error(Peek(), message);
         }
@@ -417,6 +532,13 @@ namespace TSQL
             return types.Contains(Peek().Type);
         }
 
+        private bool CheckNext(TokenType type)
+        {
+            Token token = PeekNext();
+            if (token == null) { return false; }
+
+            return token.Type == type;
+        }
 
         private bool IsAtEnd()
         {
@@ -426,6 +548,16 @@ namespace TSQL
         private Token Peek()
         {
             return _tokens[_current];
+        }
+
+        private Token PeekNext()
+        {
+            if (_current + 1 >= _tokens.Count)
+            {
+                return null;
+            }
+
+            return _tokens[_current + 1];
         }
 
         private Token Previous()

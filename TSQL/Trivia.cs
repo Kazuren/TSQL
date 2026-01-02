@@ -1,26 +1,32 @@
 ﻿namespace TSQL
 {
-    public readonly struct Trivia
+    public interface Trivia
     {
-        public string Content { get; }
-        internal TriviaType TriviaType { get; }
-
-        public Trivia(string content)
-        {
-            Content = content;
-            TriviaType = TriviaType.Whitespace;
-        }
-
-        internal Trivia(string content, TriviaType type)
-        {
-            Content = content;
-            TriviaType = type;
-        }
+        string Content { get; }
     }
 
-    public enum TriviaType
+    public readonly struct Whitespace : Trivia
     {
-        Whitespace,
-        Comment
+        public string Content { get; }
+        public Whitespace(string content)
+        {
+            System.Diagnostics.Debug.Assert(!string.IsNullOrEmpty(content), "Content should not be null or empty.");
+            System.Diagnostics.Debug.Assert(string.IsNullOrWhiteSpace(content), "Content should only contain whitespace.");
+            Content = content;
+        }
+    }
+    public readonly struct Comment : Trivia
+    {
+        public string Content { get; }
+        public Comment(string content)
+        {
+            System.Diagnostics.Debug.Assert(
+                (content.StartsWith("/*") && content.EndsWith("*/")) ||
+                (content.StartsWith("--") && !content.Contains("\n")),
+                "Content should be a comment"
+            );
+
+            Content = content;
+        }
     }
 }

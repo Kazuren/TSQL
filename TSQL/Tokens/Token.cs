@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace TSQL
 {
@@ -12,13 +13,13 @@ namespace TSQL
         public IReadOnlyList<Trivia> LeadingTrivia { get => _leadingTrivia; }
         public IReadOnlyList<Trivia> TrailingTrivia { get => _trailingTrivia; }
 
-        internal List<Trivia> _leadingTrivia = new List<Trivia>();
-        internal List<Trivia> _trailingTrivia = new List<Trivia>();
-
         private TokenType _type;
         private string _lexeme;
         private object _literal;
         private int _line;
+
+        private readonly List<Trivia> _leadingTrivia = new List<Trivia>();
+        private readonly List<Trivia> _trailingTrivia = new List<Trivia>();
 
         public Token(TokenType type, string lexeme, object literal, int line)
         {
@@ -59,6 +60,50 @@ namespace TSQL
         public static bool operator !=(Token left, Token right)
         {
             return !(left == right);
+        }
+
+        internal void AddLeadingTrivia(params Trivia[] trivia)
+        {
+            _leadingTrivia.AddRange(trivia);
+        }
+        internal void AddLeadingTrivia(IEnumerable<Trivia> trivia)
+        {
+            _leadingTrivia.AddRange(trivia);
+        }
+        internal void AddLeadingTrivia(Trivia trivia)
+        {
+            _leadingTrivia.Add(trivia);
+        }
+
+        internal void AddTrailingTrivia(params Trivia[] trivia)
+        {
+            _trailingTrivia.AddRange(trivia);
+        }
+        internal void AddTrailingTrivia(IEnumerable<Trivia> trivia)
+        {
+            _trailingTrivia.AddRange(trivia);
+        }
+        internal void AddTrailingTrivia(Trivia trivia)
+        {
+            _trailingTrivia.Add(trivia);
+        }
+
+        public string ToSource()
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (Trivia trivia in LeadingTrivia)
+            {
+                sb.Append(trivia.Content);
+            }
+
+            sb.Append(Lexeme);
+
+            foreach (Trivia trivia in TrailingTrivia)
+            {
+                sb.Append(trivia.Content);
+            }
+
+            return sb.ToString();
         }
     }
 }
