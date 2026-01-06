@@ -34,8 +34,6 @@ namespace TSQL
                 }
             }
         }
-
-
     }
 
     public class Cte : SyntaxElement

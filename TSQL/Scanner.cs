@@ -86,6 +86,12 @@ namespace TSQL
                     if (Match('='))
                     {
                         AddToken(TokenType.NOT_EQUAL);
+                    } else if (Match('<'))
+                    {
+                        AddToken(TokenType.NOT_LESS);   
+                    } else if (Match('>'))
+                    {
+                        AddToken(TokenType.NOT_GREATER);
                     }
                     break;
                 case '<':
@@ -124,6 +130,9 @@ namespace TSQL
                 case '"':
                     QuoteDelimitedIdentifier();
                     break;
+                case '@':
+                    Variable();
+                    break;
                 default:
                     if (Char.IsWhiteSpace(c))
                     {
@@ -143,6 +152,17 @@ namespace TSQL
                     }
                     break;
             }
+        }
+
+        private void Variable()
+        { 
+            while (IsAlphaNumeric(Peek()))
+            {
+                Advance();
+            }
+
+            StringSlice slice = new StringSlice(_source, _start, _current - _start);
+            AddToken(TokenType.VARIABLE, null, slice);
         }
 
         private void MultiLineComment()

@@ -585,22 +585,6 @@ namespace TSQL
             return false;
         }
 
-        private bool Match(TokenType[] types, out Token token)
-        {
-            foreach (TokenType type in types)
-            {
-                if (Check(type))
-                {
-                    token = Advance();
-                    return true;
-                }
-            }
-
-            token = null;
-            return false;
-        }
-
-
         // Overloads to avoid params array allocations for common cases
         private bool Match(TokenType type)
         {
@@ -629,20 +613,6 @@ namespace TSQL
                 Advance();
                 return true;
             }
-            return false;
-        }
-
-        private bool Match(params TokenType[] types)
-        {
-            foreach (TokenType type in types)
-            {
-                if (Check(type))
-                {
-                    Advance();
-                    return true;
-                }
-            }
-
             return false;
         }
 

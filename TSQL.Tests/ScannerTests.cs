@@ -28,7 +28,9 @@
                 { "!=", TokenType.NOT_EQUAL },
                 { "<>", TokenType.NOT_EQUAL },
                 { "<=", TokenType.LESS_EQUAL },
-                { ">=", TokenType.GREATER_EQUAL }
+                { ">=", TokenType.GREATER_EQUAL },
+                { "!<", TokenType.NOT_LESS },
+                { "!>", TokenType.NOT_GREATER }
             };
         }
 
@@ -188,6 +190,27 @@
                 new ExpectedToken(TokenType.IDENTIFIER, "price"),
                 new ExpectedToken(TokenType.GREATER, ">"),
                 new ExpectedToken(TokenType.DECIMAL, "19.99", 19.99),
+                new ExpectedToken(TokenType.EOF, "")
+            });
+        }
+
+        [Fact]
+        public void ScanTokens_VariableColumn_ScannedCorrectly()
+        {
+            Scanner scanner = new Scanner("SELECT @P0, @P1 FROM products WHERE @P0 > @P1");
+            List<SourceToken> tokens = scanner.ScanTokens();
+            tokens.Should().MatchExpectedTokens(new[]
+            {
+                new ExpectedToken(TokenType.SELECT, "SELECT"),
+                new ExpectedToken(TokenType.VARIABLE, "@P0"),
+                new ExpectedToken(TokenType.COMMA, ","),
+                new ExpectedToken(TokenType.VARIABLE, "@P1"),
+                new ExpectedToken(TokenType.FROM, "FROM"),
+                new ExpectedToken(TokenType.IDENTIFIER, "products"),
+                new ExpectedToken(TokenType.WHERE, "WHERE"),
+                new ExpectedToken(TokenType.VARIABLE, "@P0"),
+                new ExpectedToken(TokenType.GREATER, ">"),
+                new ExpectedToken(TokenType.VARIABLE, "@P1"),
                 new ExpectedToken(TokenType.EOF, "")
             });
         }

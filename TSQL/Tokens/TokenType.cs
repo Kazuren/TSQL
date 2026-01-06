@@ -4,6 +4,7 @@
     {
         NONE,
         IDENTIFIER,
+        VARIABLE,
         STRING, WHOLE_NUMBER, DECIMAL,
         PLUS, MINUS, SLASH, STAR, MODULO,
         SEMICOLON, COMMA, DOT,
