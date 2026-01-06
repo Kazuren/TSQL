@@ -405,7 +405,7 @@ namespace TSQL
 
         private Expr Primary()
         {
-            if (Match(new TokenType[] { TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING }, out Token literalToken))
+            if (Match(TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING, out Token literalToken))
             {
                 return new Expr.Literal(literalToken);
             }
@@ -423,7 +423,7 @@ namespace TSQL
             if (Check(TokenType.IDENTIFIER, TokenType.STAR))
             {
                 // Collect all the parts separated by dots
-                List<IdentifierPart> parts = CollectIdentifierParts();
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
 
                 if (Check(TokenType.LEFT_PAREN))
                 {
@@ -503,6 +503,30 @@ namespace TSQL
         private bool Match(TokenType type, out Token token)
         {
             if (Check(type))
+            {
+                token = Advance();
+                return true;
+            }
+
+            token = null;
+            return false;
+        }
+
+        private bool Match(TokenType type1, TokenType type2, out Token token)
+        {
+            if (Check(type1) || Check(type2))
+            {
+                token = Advance();
+                return true;
+            }
+
+            token = null;
+            return false;
+        }
+
+        private bool Match(TokenType type1, TokenType type2, TokenType type3, out Token token)
+        {
+            if (Check(type1) || Check(type2) || Check(type3))
             {
                 token = Advance();
                 return true;
@@ -651,8 +675,7 @@ namespace TSQL
             return new ParseError();
         }
 
-
-        private ObjectIdentifier FunctionIdentifier(List<IdentifierPart> parts)
+        private ObjectIdentifier FunctionIdentifier(IdentifierPartsBuffer parts)
         {
             if (IsPattern_Object(parts))
             {
@@ -699,7 +722,7 @@ namespace TSQL
             }
         }
 
-        private ColumnIdentifier ColumnIdentifier(List<IdentifierPart> parts)
+        private ColumnIdentifier ColumnIdentifier(IdentifierPartsBuffer parts)
         {
             // Pattern match against all valid formats
             if (IsPattern_Column(parts))
@@ -796,79 +819,77 @@ namespace TSQL
             return identifier;
         }
 
-        private bool IsPattern_Object(List<IdentifierPart> parts)
+        private bool IsPattern_Object(IdentifierPartsBuffer parts)
         {
             return parts.Count == 1;
         }
-        private bool IsPattern_SchemaObject(List<IdentifierPart> parts)
+        private bool IsPattern_SchemaObject(IdentifierPartsBuffer parts)
         {
             return parts.Count == 2
-                && parts[0] is IdentifierPart
-                && parts[1] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && !parts[1].IsSkipped;
         }
 
-        private bool IsPattern_DatabaseSchemaObject(List<IdentifierPart> parts)
+        private bool IsPattern_DatabaseSchemaObject(IdentifierPartsBuffer parts)
         {
             return parts.Count == 3
-                && parts[0] is IdentifierPart
-                && parts[1] is IdentifierPart
-                && parts[2] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && !parts[1].IsSkipped
+                && !parts[2].IsSkipped;
         }
 
-        private bool IsPattern_ServerDatabaseSchemaObject(List<IdentifierPart> parts)
+        private bool IsPattern_ServerDatabaseSchemaObject(IdentifierPartsBuffer parts)
         {
             return parts.Count == 4
-                && parts[0] is IdentifierPart
-                && parts[1] is IdentifierPart
-                && parts[2] is IdentifierPart
-                && parts[3] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && !parts[1].IsSkipped
+                && !parts[2].IsSkipped
+                && !parts[3].IsSkipped;
         }
 
         // Pattern recognition methods - these make the valid patterns explicit
-        private bool IsPattern_Column(List<IdentifierPart> parts)
+        private bool IsPattern_Column(IdentifierPartsBuffer parts)
         {
             return parts.Count == 1;
         }
 
-        private bool IsPattern_ObjectColumn(List<IdentifierPart> parts)
+        private bool IsPattern_ObjectColumn(IdentifierPartsBuffer parts)
         {
             return parts.Count == 2
-                && parts[0] is IdentifierPart
-                && parts[1] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && !parts[1].IsSkipped;
         }
 
-
-
-        private bool IsPattern_SchemaObjectColumn(List<IdentifierPart> parts)
+        private bool IsPattern_SchemaObjectColumn(IdentifierPartsBuffer parts)
         {
             return parts.Count == 3
-                && parts[0] is IdentifierPart
-                && parts[1] is IdentifierPart
-                && parts[2] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && !parts[1].IsSkipped
+                && !parts[2].IsSkipped;
         }
 
-        private bool IsPattern_DatabaseSchemaObjectColumn(List<IdentifierPart> parts)
+        private bool IsPattern_DatabaseSchemaObjectColumn(IdentifierPartsBuffer parts)
         {
             return parts.Count == 4
-                && parts[0] is IdentifierPart
-                && parts[1] is IdentifierPart
-                && parts[2] is IdentifierPart
-                && parts[3] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && !parts[1].IsSkipped
+                && !parts[2].IsSkipped
+                && !parts[3].IsSkipped;
         }
 
-        private bool IsPattern_DatabaseObjectColumn_WithSkippedSchema(List<IdentifierPart> parts)
+        private bool IsPattern_DatabaseObjectColumn_WithSkippedSchema(IdentifierPartsBuffer parts)
         {
             return parts.Count == 4
-                && parts[0] is IdentifierPart
-                && parts[1] is SkippedPart
-                && parts[2] is IdentifierPart
-                && parts[3] is IdentifierPart;
+                && !parts[0].IsSkipped
+                && parts[1].IsSkipped
+                && !parts[2].IsSkipped
+                && !parts[3].IsSkipped;
         }
 
 
-        private List<IdentifierPart> CollectIdentifierParts()
+        private IdentifierPartsBuffer CollectIdentifierParts()
         {
-            List<IdentifierPart> parts = new List<IdentifierPart>();
+            IdentifierPartsBuffer parts = new IdentifierPartsBuffer();
 
             // Get the first part
             Token first = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected identifier or '*' for column reference");
@@ -901,6 +922,7 @@ namespace TSQL
         {
             public Token Token { get; }
             public Token DotBefore { get; }
+            public virtual bool IsSkipped => false;
 
             public IdentifierPart(Token token, Token dotBefore)
             {
@@ -911,8 +933,53 @@ namespace TSQL
 
         private class SkippedPart : IdentifierPart
         {
+            public override bool IsSkipped => true;
+
             public SkippedPart(Token dotBefore) : base(null, dotBefore)
             {
+            }
+        }
+
+        /// <summary>
+        /// A fixed-size buffer for identifier parts (max 4: database.schema.object.column).
+        /// Avoids heap allocation for the common case.
+        /// </summary>
+        private struct IdentifierPartsBuffer
+        {
+            private IdentifierPart _part0;
+            private IdentifierPart _part1;
+            private IdentifierPart _part2;
+            private IdentifierPart _part3;
+            private int _count;
+
+            public int Count => _count;
+
+            public IdentifierPart this[int index]
+            {
+                get
+                {
+                    switch (index)
+                    {
+                        case 0: return _part0;
+                        case 1: return _part1;
+                        case 2: return _part2;
+                        case 3: return _part3;
+                        default: throw new System.IndexOutOfRangeException();
+                    }
+                }
+            }
+
+            public void Add(IdentifierPart part)
+            {
+                switch (_count)
+                {
+                    case 0: _part0 = part; break;
+                    case 1: _part1 = part; break;
+                    case 2: _part2 = part; break;
+                    case 3: _part3 = part; break;
+                    default: throw new System.InvalidOperationException("Buffer full");
+                }
+                _count++;
             }
         }
     }
