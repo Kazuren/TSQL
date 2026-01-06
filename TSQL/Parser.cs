@@ -5,7 +5,12 @@ using static TSQL.Expr;
 
 namespace TSQL
 {
-    // TODO: maybe have the CTE statements as part of the SELECT statement? as we do with the other clauses
+    // UNSUPPORTED:
+    // ## @variable.function_call
+    //  - reason: @variable must be a CLR user-defined type, something that's rare and not worth implementing unless needed
+
+    // TODO: implement VARIABLE expression
+    // dollar sign ($) columns need no unique handling, column identifier already handles them just fine
     /*
     Legend:
     ? -> the group before it can appear zero or one time but not more.
@@ -35,7 +40,7 @@ namespace TSQL
             factor -> unary ( ( "/" | "*") unary )*
             unary -> ("-") scalar_subquery | scalar_subquery
             scalar_subquery -> ( "(" select_expression ")" ) | primary
-            primary -> "NULL" | WHOLE_NUMBER | DECIMAL | STRING | column_expression | ( "(" expression ")" )
+            primary -> "NULL" | WHOLE_NUMBER | DECIMAL | STRING | column_expression | ( "(" expression ")" ) | VARIABLE
         
 
         Syntax nodes: // not going to be Expr or Stmt classes but rather just helper classes
@@ -55,6 +60,7 @@ namespace TSQL
 
             comparison_operator = ("=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "!>" | "!<" )
 
+            ---------------- WHERE ---------------
             comparison_predicate -> expression comparison_operator expression 
             like_predicate -> expression ("NOT")? "LIKE" expression ("ESCAPE" STRING)?
             between_predicate -> expression ("NOT")? "BETWEEN" expression "AND" expression
@@ -75,11 +81,27 @@ namespace TSQL
                 comparison | like_comparison | between_predicate | 
                 null_predicate | contains_predicate | in_predicate | 
                 quantifier_predicate | exists_predicate | "(" predicate ")"
+            ---------------- WHERE ---------------
+
+
+            ---------------- FROM ---------------
+            table_source -> 
+
+            table_variable -> VARIABLE ( ("AS")? IDENTIFIER) 
+                
+            ---------------- FROM ---------------
+            variable -> VARIABLE
     */
 
     public class Parser
     {
-        private class ParseError : Exception { }
+        private class ParseError : Exception
+        {
+            public ParseError(string message) : base(message)
+            {
+
+            }
+        }
 
         private readonly List<Token> _tokens;
         private int _current = 0;
@@ -103,13 +125,20 @@ namespace TSQL
             //    return CteStatement();
             //}
 
-            return SelectStatement();
+            return ParseSelect();
         }
 
         public Stmt.Select ParseSelect()
         {
             Reset();
-            return SelectStatement();
+            Stmt.Select selectStmt = SelectStatement();
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected valid token.");
+            }
+
+            return selectStmt;
         }
 
         //private Stmt.Cte CteStatement()
@@ -259,10 +288,24 @@ namespace TSQL
 
         private SelectColumn SelectColumn()
         {
-            Expr expr = Expression();
-            Alias alias = Alias();
+            // Check for alternate alias syntax: alias = expression
+            if (Check(TokenType.IDENTIFIER) && CheckNext(TokenType.EQUAL))
+            {
+                Token aliasToken = Advance();
+                Token equalToken = Advance();
+                Expr expr = Expression();
 
-            return new SelectColumn(expr, alias);
+                PrefixAlias alias = new PrefixAlias(aliasToken);
+                alias._equalsToken = equalToken;
+
+                return new SelectColumn(expr, alias);
+            }
+
+            // Standard parsing: expression [AS] alias
+            Expr expression = Expression();
+            Alias alias2 = Alias();
+
+            return new SelectColumn(expression, alias2);
         }
 
         private FromClause FromClause()
@@ -279,13 +322,15 @@ namespace TSQL
                 Alias alias = null;
                 if (Match(TokenType.AS, out Token asToken))
                 {
-                    alias = new Alias(Consume(TokenType.IDENTIFIER, "Expected alias"));
-                    alias._asKeyword = asToken;
+                    SuffixAlias suffixAlias = new SuffixAlias(Consume(TokenType.IDENTIFIER, "Expected alias"));
+                    suffixAlias._asKeyword = asToken;
+                    alias = suffixAlias;
                 }
                 else if (Match(TokenType.IDENTIFIER, out Token aliasToken))
                 {
-                    alias = new Alias(aliasToken);
-                    alias._asKeyword = ConcreteToken.Empty;
+                    SuffixAlias suffixAlias = new SuffixAlias(aliasToken);
+                    suffixAlias._asKeyword = ConcreteToken.Empty;
+                    alias = suffixAlias;
                 }
 
                 return new FromClause(fromToken) { TableSource = new SubqueryReference() { Subquery = subquery }, Alias = alias };
@@ -310,14 +355,14 @@ namespace TSQL
         {
             if (Match(TokenType.AS, out Token asToken))
             {
-                Alias alias = new Alias(Consume(TokenType.IDENTIFIER, "Expected alias"));
+                SuffixAlias alias = new SuffixAlias(Consume(TokenType.IDENTIFIER, "Expected alias"));
                 alias._asKeyword = asToken;
 
                 return alias;
             }
             else if (Match(TokenType.IDENTIFIER, out Token aliasToken))
             {
-                Alias alias = new Alias(aliasToken);
+                SuffixAlias alias = new SuffixAlias(aliasToken);
                 alias._asKeyword = ConcreteToken.Empty;
                 return alias;
             }
@@ -420,6 +465,10 @@ namespace TSQL
                 return Grouping();
             }
 
+            // TODO: have 3 type of identifiers instead of just ColumnIdentifier
+            // have some kind of STARIdentifier -> "*"
+            // have some kind of ObjectSTARIdentifier -> "server.schema.object.*"
+            // have the regular old ColumnIdentifier for everything else
             if (Check(TokenType.IDENTIFIER, TokenType.STAR))
             {
                 // Collect all the parts separated by dots
@@ -672,7 +721,19 @@ namespace TSQL
 
         private ParseError Error(Token token, string message)
         {
-            return new ParseError();
+            if (token is SourceToken sourceToken)
+            {
+                int line = sourceToken.Line;
+                int columnStart = sourceToken.StartPosition;
+                int columnEnd = sourceToken.EndPosition;
+                string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {columnStart}:{columnEnd}";
+                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}");
+            }
+            else
+            {
+                string where = token.Type == TokenType.EOF ? "at end" : $"at '{token.Lexeme}'";
+                return new ParseError($"Error {where}: {message}");
+            }
         }
 
         private ObjectIdentifier FunctionIdentifier(IdentifierPartsBuffer parts)

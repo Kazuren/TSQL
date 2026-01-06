@@ -13,6 +13,10 @@ namespace TSQL
         private readonly int _start;
         private readonly int _length;
 
+        internal int Start { get => _start; }
+        internal int End { get => _start + _length - 1; }
+        internal string Source { get => _source; }
+
         public StringSlice(string source, int start, int length)
         {
             _source = source;
@@ -67,40 +71,40 @@ namespace TSQL
         }
 
         public bool Equals(string other)
+        {
+            if (other == null) return _source == null;
+            if (_length != other.Length) return false;
+            for (int i = 0; i < _length; i++)
             {
-                if (other == null) return _source == null;
-                if (_length != other.Length) return false;
-                for (int i = 0; i < _length; i++)
-                {
-                    if (_source[_start + i] != other[i])
-                        return false;
-                }
-                return true;
+                if (_source[_start + i] != other[i])
+                    return false;
             }
+            return true;
+        }
 
-            /// <summary>
-            /// Case-insensitive comparison with a string (assumes the other string is lowercase).
-            /// </summary>
-            public bool EqualsIgnoreCase(string other)
+        /// <summary>
+        /// Case-insensitive comparison with a string (assumes the other string is lowercase).
+        /// </summary>
+        public bool EqualsIgnoreCase(string other)
+        {
+            if (other == null) return _source == null;
+            if (_length != other.Length) return false;
+            for (int i = 0; i < _length; i++)
             {
-                if (other == null) return _source == null;
-                if (_length != other.Length) return false;
-                for (int i = 0; i < _length; i++)
-                {
-                    char c = _source[_start + i];
-                    // Convert to lowercase for comparison
-                    if (c >= 'A' && c <= 'Z')
-                        c = (char)(c + 32);
-                    if (c != other[i])
-                        return false;
-                }
-                return true;
+                char c = _source[_start + i];
+                // Convert to lowercase for comparison
+                if (c >= 'A' && c <= 'Z')
+                    c = (char)(c + 32);
+                if (c != other[i])
+                    return false;
             }
+            return true;
+        }
 
-            public override bool Equals(object obj)
-            {
-                if (obj is StringSlice slice) return Equals(slice);
-                if (obj is string str) return Equals(str);
+        public override bool Equals(object obj)
+        {
+            if (obj is StringSlice slice) return Equals(slice);
+            if (obj is string str) return Equals(str);
             return false;
         }
 

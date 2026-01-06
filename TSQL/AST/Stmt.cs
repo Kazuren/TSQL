@@ -108,27 +108,47 @@ namespace TSQL
 
         public override IEnumerable<Token> DescendantTokens()
         {
-            foreach (Token token in Expression.DescendantTokens())
+            if (Alias is PrefixAlias prefixAlias)
             {
-                yield return token;
-            }
-
-            if (Alias != null)
-            {
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in prefixAlias.DescendantTokens())
                 {
                     yield return token;
+                }
+
+                foreach (Token token in Expression.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+            else
+            {
+                foreach (Token token in Expression.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (Alias is SuffixAlias suffixAlias)
+                {
+                    foreach (Token token in suffixAlias.DescendantTokens())
+                    {
+                        yield return token;
+                    }
                 }
             }
         }
     }
 
-    public class Alias : SyntaxElement
+    public interface Alias
+    {
+        Token Name { get; }
+        IEnumerable<Token> DescendantTokens();
+    }
+
+    internal class SuffixAlias : SyntaxElement, Alias
     {
         public Token Name { get; }
-
         internal Token _asKeyword;
-        public Alias(Token name)
+        public SuffixAlias(Token name)
         {
             Name = name;
         }
@@ -141,6 +161,22 @@ namespace TSQL
             }
 
             yield return Name;
+        }
+    }
+
+    internal class PrefixAlias : SyntaxElement, Alias
+    {
+        public Token Name { get; }
+        internal Token _equalsToken;
+        public PrefixAlias(Token name)
+        {
+            Name = name;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return Name;
+            yield return _equalsToken;
         }
     }
 

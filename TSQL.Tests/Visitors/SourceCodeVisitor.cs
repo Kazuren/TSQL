@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using TSQL.StandardLibrary.Visitors;
+﻿using TSQL.StandardLibrary.Visitors;
 
 namespace TSQL.Tests.Visitors
 {
@@ -12,12 +11,38 @@ namespace TSQL.Tests.Visitors
             Scanner scanner = new Scanner(source);
             Parser parser = new Parser(scanner.ScanTokens());
 
-
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
             Stmt stmt = parser.Parse();
-            stopwatch.Stop();
 
+            SourceCodeVisitor sourceCodeVisitor = new SourceCodeVisitor();
+            string sql = stmt.Accept(sourceCodeVisitor);
+
+            Assert.Equal(source, sql);
+        }
+
+
+        [Fact]
+        public void SourceCodeVisitor_RegeneratesSourceAccurately_Alias()
+        {
+            string source = "SELECT a, b AS bAlias FROM T";
+            Scanner scanner = new Scanner(source);
+            Parser parser = new Parser(scanner.ScanTokens());
+
+            Stmt stmt = parser.Parse();
+
+            SourceCodeVisitor sourceCodeVisitor = new SourceCodeVisitor();
+            string sql = stmt.Accept(sourceCodeVisitor);
+
+            Assert.Equal(source, sql);
+        }
+
+        [Fact]
+        public void SourceCodeVisitor_RegeneratesSourceAccurately_AliasAlternate()
+        {
+            string source = "SELECT a, bAlias = b FROM T";
+            Scanner scanner = new Scanner(source);
+            Parser parser = new Parser(scanner.ScanTokens());
+
+            Stmt stmt = parser.Parse();
 
             SourceCodeVisitor sourceCodeVisitor = new SourceCodeVisitor();
             string sql = stmt.Accept(sourceCodeVisitor);
