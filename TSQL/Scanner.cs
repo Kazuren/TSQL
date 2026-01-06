@@ -4,11 +4,15 @@ using System.Text;
 
 namespace TSQL
 {
+
+    // TODO: support !< and !>
     public partial class Scanner
     {
         private readonly string _source;
-        private readonly List<Token> _tokens = new List<Token>();
-        private readonly List<Trivia> _pendingTrivia = new List<Trivia>();
+        private readonly List<SourceToken> _tokens;
+        private readonly List<Trivia> _pendingTrivia;
+
+        private SourceToken _previousToken;
 
         private int _start = 0;
         private int _current = 0;
@@ -17,9 +21,14 @@ namespace TSQL
         public Scanner(string source)
         {
             _source = source;
+            // Pre-allocate capacity: estimate ~1 token per 4 characters, minimum 16
+            int estimatedTokens = Math.Max(16, source.Length / 4);
+            _tokens = new List<SourceToken>(estimatedTokens);
+            // Trivia list typically holds 1-2 items at a time
+            _pendingTrivia = new List<Trivia>(2);
         }
 
-        public List<Token> ScanTokens()
+        public List<SourceToken> ScanTokens()
         {
             while (!IsAtEnd())
             {
@@ -152,10 +161,19 @@ namespace TSQL
                     {
                         break;
                     }
+                    else
+                    {
+                        Consume(2);
+                    }
                 }
                 else if (Peek() == '\n')
                 {
-                    AdvanceLineNumber();
+                    IncrementLineNumber();
+                    Advance();
+                }
+                else
+                {
+                    Advance();
                 }
             }
 
@@ -188,10 +206,11 @@ namespace TSQL
                 // repeating check to see if current character is a new line to increment line counter
                 if (c == '\n')
                 {
-                    AdvanceLineNumber();
+                    IncrementLineNumber();
                 }
 
                 Advance();
+                c = Peek();
             }
 
             AddTrivia(new Whitespace(_source.Substring(_start, _current - _start)));
@@ -270,7 +289,7 @@ namespace TSQL
                     char currentChar = Peek();
                     if (currentChar == '\n')
                     {
-                        AdvanceLineNumber();
+                        IncrementLineNumber();
                     }
                     builder.Append(currentChar);
                     Advance();
@@ -317,7 +336,7 @@ namespace TSQL
                     char currentChar = Peek();
                     if (currentChar == '\n')
                     {
-                        AdvanceLineNumber();
+                        IncrementLineNumber();
                     }
                     builder.Append(currentChar);
                     Advance();
@@ -364,7 +383,7 @@ namespace TSQL
                     char currentChar = Peek();
                     if (currentChar == '\n')
                     {
-                        AdvanceLineNumber();
+                        IncrementLineNumber();
                     }
                     builder.Append(currentChar);
                     Advance();
@@ -383,7 +402,7 @@ namespace TSQL
             AddToken(TokenType.STRING, builder.ToString());
         }
 
-        private void AdvanceLineNumber()
+        private void IncrementLineNumber()
         {
             ++_line;
         }
@@ -452,14 +471,19 @@ namespace TSQL
 
         private void AddToken(TokenType type, object literal, string lexeme)
         {
-            Token token = new Token(type, lexeme, literal, _line);
+            SourceToken token = new SourceToken(type, lexeme, literal, _line);
+
+            if (_previousToken != null)
+            {
+                _previousToken.AddTrailingTrivia(_pendingTrivia);
+            }
 
             token.AddLeadingTrivia(_pendingTrivia);
             _pendingTrivia.Clear();
 
             _tokens.Add(token);
+            _previousToken = token;
         }
-
 
         // Characterization
         private bool IsDigit(char c)

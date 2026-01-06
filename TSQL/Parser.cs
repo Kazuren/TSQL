@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using static TSQL.Expr;
 
 namespace TSQL
 {
+    // TODO: maybe have the CTE statements as part of the SELECT statement? as we do with the other clauses
     /*
     Legend:
     ? -> the group before it can appear zero or one time but not more.
@@ -35,7 +37,6 @@ namespace TSQL
             scalar_subquery -> ( "(" select_expression ")" ) | primary
             primary -> "NULL" | WHOLE_NUMBER | DECIMAL | STRING | column_expression | ( "(" expression ")" )
         
-       
 
         Syntax nodes: // not going to be Expr or Stmt classes but rather just helper classes
             column_expression -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
@@ -83,76 +84,83 @@ namespace TSQL
         private readonly List<Token> _tokens;
         private int _current = 0;
 
-        public Parser(List<Token> tokens)
+        public Parser(IEnumerable<Token> tokens)
         {
-            _tokens = tokens;
+            _tokens = tokens.ToList();
+        }
+
+        private void Reset()
+        {
+            _current = 0;
         }
 
         public Stmt Parse()
         {
+            Reset();
             // Check if query starts with WITH (CTE)
-            if (Check(TokenType.WITH))
-            {
-                return CteStatement();
-            }
+            //if (Check(TokenType.WITH))
+            //{
+            //    return CteStatement();
+            //}
 
             return SelectStatement();
         }
 
         public Stmt.Select ParseSelect()
         {
+            Reset();
             return SelectStatement();
         }
 
-        private Stmt.Cte CteStatement()
-        {
-            Consume(TokenType.WITH, "Expected WITH");
+        //private Stmt.Cte CteStatement()
+        //{
+        //    Consume(TokenType.WITH, "Expected WITH");
 
-            Stmt.Cte cteStmt = new Stmt.Cte();
+        //    Stmt.Cte cteStmt = new Stmt.Cte();
 
-            // Parse CTE definitions
-            do
-            {
-                CteDefinition cte = new CteDefinition();
-                cte.Name = Consume(TokenType.IDENTIFIER, "Expected CTE name").Lexeme;
+        //    // Parse CTE definitions
+        //    do
+        //    {
+        //        CteDefinition cte = new CteDefinition();
+        //        cte.Name = Consume(TokenType.IDENTIFIER, "Expected CTE name").Lexeme;
 
-                // Optional column list
-                if (Match(TokenType.LEFT_PAREN))
-                {
-                    // Check if this is the AS clause subquery or column list
-                    if (Check(TokenType.SELECT))
-                    {
-                        // It's the subquery, back up
-                        _current--;
-                    }
-                    else
-                    {
-                        cte.ColumnNames = new List<string>();
-                        do
-                        {
-                            cte.ColumnNames.Add(Consume(TokenType.IDENTIFIER, "Expected column name").Lexeme);
-                        } while (Match(TokenType.COMMA));
+        //        // Optional column list
+        //        if (Match(TokenType.LEFT_PAREN))
+        //        {
+        //            // Check if this is the AS clause subquery or column list
+        //            if (Check(TokenType.SELECT))
+        //            {
+        //                // It's the subquery, back up
+        //                _current--;
+        //            }
+        //            else
+        //            {
+        //                cte.ColumnNames = new List<string>();
+        //                do
+        //                {
+        //                    cte.ColumnNames.Add(Consume(TokenType.IDENTIFIER, "Expected column name").Lexeme);
+        //                } while (Match(TokenType.COMMA));
 
-                        Consume(TokenType.RIGHT_PAREN, "Expected )");
-                    }
-                }
+        //                Consume(TokenType.RIGHT_PAREN, "Expected )");
+        //            }
+        //        }
 
-                Consume(TokenType.AS, "Expected AS");
-                Consume(TokenType.LEFT_PAREN, "Expected (");
+        //        Consume(TokenType.AS, "Expected AS");
+        //        Consume(TokenType.LEFT_PAREN, "Expected (");
 
-                cte.Query = SelectExpression();
+        //        cte.Query = SelectExpression();
 
-                Consume(TokenType.RIGHT_PAREN, "Expected )");
+        //        Consume(TokenType.RIGHT_PAREN, "Expected )");
 
-                cteStmt.Ctes.Add(cte);
+        //        cteStmt.Ctes.Add(cte);
 
-            } while (Match(TokenType.COMMA));
+        //    } while (Match(TokenType.COMMA));
 
-            // Parse main query
-            cteStmt.MainQuery = SelectExpression();
+        //    // Parse main query
+        //    cteStmt.MainQuery = SelectExpression();
 
-            return cteStmt;
-        }
+        //    return cteStmt;
+        //}
 
 
         private Stmt.Select SelectStatement()
@@ -200,48 +208,50 @@ namespace TSQL
                 selectExpr.Columns.Add(selectColumn, comma);
             } while (Previous().Type == TokenType.COMMA); // Continue if we just consumed a comma
 
+            selectExpr.From = FromClause();
 
-            if (Match(TokenType.FROM))
-            {
-                Token fromToken = Previous();
-                selectExpr.From = FromClause();
+            //while (IsJoinKeyword())
+            //{
+            //    selectExpr.Joins.Add(JoinClause());
+            //}
 
-                while (IsJoinKeyword())
-                {
-                    selectExpr.Joins.Add(JoinClause());
-                }
-            }
+            //if (Match(TokenType.FROM))
+            //{
+            //    Token fromToken = Previous();
+            //    selectExpr.From = FromClause();
 
-            if (Match(TokenType.WHERE))
-            {
-                selectExpr.Where = Expression();
-            }
+            //}
 
-            if (Match(TokenType.GROUP))
-            {
-                Consume(TokenType.BY, "Expected BY after GROUP");
-                do
-                {
-                    selectExpr.GroupBy.Add(Expression());
-                } while (Match(TokenType.COMMA));
-            }
+            //if (Match(TokenType.WHERE))
+            //{
+            //    selectExpr.Where = Expression();
+            //}
 
-            if (Match(TokenType.HAVING))
-            {
-                selectExpr.Having = Expression();
-            }
+            //if (Match(TokenType.GROUP))
+            //{
+            //    Consume(TokenType.BY, "Expected BY after GROUP");
+            //    do
+            //    {
+            //        selectExpr.GroupBy.Add(Expression());
+            //    } while (Match(TokenType.COMMA));
+            //}
 
-            if (Match(TokenType.ORDER))
-            {
-                Consume(TokenType.BY, "Expected BY after ORDER");
-                do
-                {
-                    Expr expr = Expression();
-                    bool desc = Match(TokenType.DESC);
-                    if (!desc) Match(TokenType.ASC);
-                    selectExpr.OrderBy.Add(new OrderByItem() { Expression = expr, Descending = desc });
-                } while (Match(TokenType.COMMA));
-            }
+            //if (Match(TokenType.HAVING))
+            //{
+            //    selectExpr.Having = Expression();
+            //}
+
+            //if (Match(TokenType.ORDER))
+            //{
+            //    Consume(TokenType.BY, "Expected BY after ORDER");
+            //    do
+            //    {
+            //        Expr expr = Expression();
+            //        bool desc = Match(TokenType.DESC);
+            //        if (!desc) Match(TokenType.ASC);
+            //        selectExpr.OrderBy.Add(new OrderByItem() { Expression = expr, Descending = desc });
+            //    } while (Match(TokenType.COMMA));
+            //}
 
             return selectExpr;
         }
@@ -250,130 +260,110 @@ namespace TSQL
         private SelectColumn SelectColumn()
         {
             Expr expr = Expression();
-            string alias = null;
+            Alias alias = Alias();
 
-            if (Match(TokenType.AS))
-                alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
-
-            return new SelectColumn() { Expression = expr, Alias = alias };
+            return new SelectColumn(expr, alias);
         }
-
 
         private FromClause FromClause()
         {
+            if (!Match(TokenType.FROM, out Token fromToken))
+            {
+                return null;
+            }
+
             if (Check(TokenType.LEFT_PAREN))
             {
                 Expr.Subquery subquery = Subquery();
 
-                string alias = null;
-                if (Match(TokenType.AS))
-                    alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
+                Alias alias = null;
+                if (Match(TokenType.AS, out Token asToken))
+                {
+                    alias = new Alias(Consume(TokenType.IDENTIFIER, "Expected alias"));
+                    alias._asKeyword = asToken;
+                }
+                else if (Match(TokenType.IDENTIFIER, out Token aliasToken))
+                {
+                    alias = new Alias(aliasToken);
+                    alias._asKeyword = ConcreteToken.Empty;
+                }
 
-                return new FromClause() { TableSource = new SubqueryReference() { Subquery = subquery }, Alias = alias };
-            }
-
-            string tableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme;
-            string tableAlias = null;
-
-            if (Check(TokenType.IDENTIFIER))
-                tableAlias = Advance().Lexeme;
-
-            return new FromClause() { TableSource = new TableReference() { TableName = tableName }, Alias = tableAlias };
-        }
-
-
-        private JoinClause JoinClause()
-        {
-            JoinClause join = new JoinClause();
-
-            if (Match(TokenType.INNER)) join.JoinType = "INNER";
-            else if (Match(TokenType.LEFT)) join.JoinType = "LEFT";
-            else if (Match(TokenType.RIGHT)) join.JoinType = "RIGHT";
-            else if (Match(TokenType.FULL)) join.JoinType = "FULL";
-            else if (Match(TokenType.CROSS)) join.JoinType = "CROSS";
-
-            Match(TokenType.OUTER);
-            Consume(TokenType.JOIN, "Expected JOIN");
-
-            if (Check(TokenType.LEFT_PAREN))
-            {
-                join.TableSource = new SubqueryReference() { Subquery = Subquery() };
-
-                if (Match(TokenType.AS))
-                    join.Alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
+                return new FromClause(fromToken) { TableSource = new SubqueryReference() { Subquery = subquery }, Alias = alias };
             }
             else
             {
-                join.TableSource = new TableReference() { TableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme };
-                if (Check(TokenType.IDENTIFIER))
-                    join.Alias = Advance().Lexeme;
+                Token tableName = Consume(TokenType.IDENTIFIER, "Expected table name");
+                Alias tableAlias = Alias();
+
+                return new FromClause(fromToken)
+                {
+                    TableSource = new TableReference()
+                    {
+                        TableName = tableName
+                    },
+                    Alias = tableAlias
+                };
+            }
+        }
+
+        private Alias Alias()
+        {
+            if (Match(TokenType.AS, out Token asToken))
+            {
+                Alias alias = new Alias(Consume(TokenType.IDENTIFIER, "Expected alias"));
+                alias._asKeyword = asToken;
+
+                return alias;
+            }
+            else if (Match(TokenType.IDENTIFIER, out Token aliasToken))
+            {
+                Alias alias = new Alias(aliasToken);
+                alias._asKeyword = ConcreteToken.Empty;
+                return alias;
             }
 
-            if (Match(TokenType.ON))
-                join.OnCondition = Expression();
-
-            return join;
+            return null;
         }
+
+
+        //private JoinClause JoinClause()
+        //{
+        //    JoinClause join = new JoinClause();
+
+        //    if (Match(TokenType.INNER)) join.JoinType = "INNER";
+        //    else if (Match(TokenType.LEFT)) join.JoinType = "LEFT";
+        //    else if (Match(TokenType.RIGHT)) join.JoinType = "RIGHT";
+        //    else if (Match(TokenType.FULL)) join.JoinType = "FULL";
+        //    else if (Match(TokenType.CROSS)) join.JoinType = "CROSS";
+
+        //    Match(TokenType.OUTER);
+        //    Consume(TokenType.JOIN, "Expected JOIN");
+
+        //    if (Check(TokenType.LEFT_PAREN))
+        //    {
+        //        join.TableSource = new SubqueryReference() { Subquery = Subquery() };
+
+        //        if (Match(TokenType.AS))
+        //        {
+        //            join.Alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
+        //        }
+        //    }
+        //    else
+        //    {
+        //        join.TableSource = new TableReference() { TableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme };
+        //        if (Check(TokenType.IDENTIFIER))
+        //            join.Alias = Advance().Lexeme;
+        //    }
+
+        //    if (Match(TokenType.ON))
+        //        join.OnCondition = Expression();
+
+        //    return join;
+        //}
 
         private Expr Expression()
         {
-            return Or();
-        }
-
-        private Expr Or()
-        {
-            Expr expr = And();
-
-            while (Match(TokenType.OR))
-            {
-                Token op = Previous();
-                Expr right = And();
-                expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
-            }
-
-            return expr;
-        }
-
-        private Expr And()
-        {
-            Expr expr = Equality();
-
-            while (Match(TokenType.AND))
-            {
-                Token op = Previous();
-                Expr right = Equality();
-                expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
-            }
-
-            return expr;
-        }
-
-        private Expr Equality()
-        {
-            Expr expr = Comparison();
-
-            while (Match(TokenType.EQUAL, TokenType.NOT_EQUAL))
-            {
-                Token op = Previous();
-                Expr right = Comparison();
-                expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
-            }
-
-            return expr;
-        }
-
-        private Expr Comparison()
-        {
-            Expr expr = Term();
-
-            while (Match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL))
-            {
-                Token op = Previous();
-                Expr right = Term();
-                expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
-            }
-
-            return expr;
+            return Term();
         }
 
         private Expr Term()
@@ -415,65 +405,82 @@ namespace TSQL
 
         private Expr Primary()
         {
-            if (Match(TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING))
+            if (Match(new TokenType[] { TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING }, out Token literalToken))
             {
-                return new Expr.Literal(Previous());
+                return new Expr.Literal(literalToken);
             }
 
             if (Check(TokenType.LEFT_PAREN))
             {
                 if (CheckNext(TokenType.SELECT))
                 {
-                    Expr.Subquery subquery = Subquery();
-                    return subquery;
+                    return Subquery();
                 }
 
                 return Grouping();
             }
 
-            if (Match(TokenType.STAR))
-            {
-                return new Expr.Identifier("*");
-            }
-
             if (Check(TokenType.IDENTIFIER, TokenType.STAR))
             {
-                string name = Advance().Lexeme;
+                // Collect all the parts separated by dots
+                List<IdentifierPart> parts = CollectIdentifierParts();
 
-                if (Match(TokenType.LEFT_PAREN))
+                if (Check(TokenType.LEFT_PAREN))
                 {
-                    Expr.Function func = new Expr.Function() { Name = name };
-                    if (!Check(TokenType.RIGHT_PAREN))
+                    if (Previous().Type == TokenType.STAR)
                     {
-                        do
-                        {
-                            func.Arguments.Add(Expression());
-                        } while (Match(TokenType.COMMA));
+                        Error(Peek(), "Can't call '*'");
                     }
-                    Consume(TokenType.RIGHT_PAREN, "Expected )");
-                    return func;
-                }
 
-                if (Match(TokenType.DOT))
+                    ObjectIdentifier functionIdentifier = FunctionIdentifier(parts);
+                    return FinishCall(functionIdentifier);
+                }
+                else
                 {
-                    // TODO fix: this will break if we have stuff like tablename.* because * is not considered an IDENTIFIER
-                    Token column = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected column name or '*'");
-                    // TODO add name as part of the identifier, in a loop probably
-                    return new Expr.Identifier(column);
+                    return ColumnIdentifier(parts);
                 }
-
-                return new Expr.Identifier(name);
             }
 
             throw new Exception($"Unexpected token: {Peek()}");
         }
+
+        private Expr.FunctionCall FinishCall(ObjectIdentifier callee)
+        {
+            Token leftParen = Advance();
+
+            SyntaxElementList<Expr> arguments = new SyntaxElementList<Expr>();
+            if (!Check(TokenType.RIGHT_PAREN))
+            {
+                do
+                {
+                    Expr expr = Expression();
+
+                    // Check if there's a comma after this argument
+                    Token comma = null;
+                    if (Check(TokenType.COMMA))
+                    {
+                        comma = Advance(); // capture the comma token
+                    }
+
+                    arguments.Add(expr, comma);
+                } while (Previous().Type == TokenType.COMMA);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
+
+            Expr.FunctionCall functionCall = new FunctionCall(callee, arguments);
+            functionCall._leftParen = leftParen;
+            functionCall._rightParen = rightParen;
+
+            return functionCall;
+        }
+
 
         private bool IsJoinKeyword()
         {
             return Check(TokenType.INNER, TokenType.LEFT, TokenType.RIGHT,
                          TokenType.FULL, TokenType.CROSS, TokenType.JOIN);
         }
-
 
 
         private Token Consume(TokenType type, string message)
@@ -491,6 +498,65 @@ namespace TSQL
             }
 
             throw Error(Peek(), message);
+        }
+
+        private bool Match(TokenType type, out Token token)
+        {
+            if (Check(type))
+            {
+                token = Advance();
+                return true;
+            }
+
+            token = null;
+            return false;
+        }
+
+        private bool Match(TokenType[] types, out Token token)
+        {
+            foreach (TokenType type in types)
+            {
+                if (Check(type))
+                {
+                    token = Advance();
+                    return true;
+                }
+            }
+
+            token = null;
+            return false;
+        }
+
+
+        // Overloads to avoid params array allocations for common cases
+        private bool Match(TokenType type)
+        {
+            if (Check(type))
+            {
+                Advance();
+                return true;
+            }
+            return false;
+        }
+
+        private bool Match(TokenType type1, TokenType type2)
+        {
+            if (Check(type1) || Check(type2))
+            {
+                Advance();
+                return true;
+            }
+            return false;
+        }
+
+        private bool Match(TokenType type1, TokenType type2, TokenType type3)
+        {
+            if (Check(type1) || Check(type2) || Check(type3))
+            {
+                Advance();
+                return true;
+            }
+            return false;
         }
 
         private bool Match(params TokenType[] types)
@@ -524,6 +590,21 @@ namespace TSQL
                 return false;
             }
             return Peek().Type == type;
+        }
+
+        // Overloads to avoid params array allocations for common cases
+        private bool Check(TokenType type1, TokenType type2)
+        {
+            if (IsAtEnd()) return false;
+            var currentType = Peek().Type;
+            return currentType == type1 || currentType == type2;
+        }
+
+        private bool Check(TokenType type1, TokenType type2, TokenType type3)
+        {
+            if (IsAtEnd()) return false;
+            var currentType = Peek().Type;
+            return currentType == type1 || currentType == type2 || currentType == type3;
         }
 
         private bool Check(params TokenType[] types)
@@ -568,6 +649,271 @@ namespace TSQL
         private ParseError Error(Token token, string message)
         {
             return new ParseError();
+        }
+
+
+        private ObjectIdentifier FunctionIdentifier(List<IdentifierPart> parts)
+        {
+            if (IsPattern_Object(parts))
+            {
+                return new ObjectIdentifier(
+                    new ObjectName(parts[0].Token)
+                );
+            }
+            else if (IsPattern_SchemaObject(parts))
+            {
+                ObjectIdentifier objectIdentifier = new ObjectIdentifier(
+                    new SchemaName(parts[0].Token),
+                    new ObjectName(parts[1].Token)
+                );
+                objectIdentifier._schemaToObjectDot = parts[1].DotBefore;
+                return objectIdentifier;
+            }
+            else if (IsPattern_DatabaseSchemaObject(parts))
+            {
+                ObjectIdentifier objectIdentifier = new ObjectIdentifier(
+                    new DatabaseName(parts[0].Token),
+                    new SchemaName(parts[1].Token),
+                    new ObjectName(parts[2].Token)
+                );
+                objectIdentifier._databaseToSchemaDot = parts[1].DotBefore;
+                objectIdentifier._schemaToObjectDot = parts[2].DotBefore;
+                return objectIdentifier;
+            }
+            else if (IsPattern_ServerDatabaseSchemaObject(parts))
+            {
+                ObjectIdentifier objectIdentifier = new ObjectIdentifier(
+                    new ServerName(parts[0].Token),
+                    new DatabaseName(parts[1].Token),
+                    new SchemaName(parts[2].Token),
+                    new ObjectName(parts[3].Token)
+                );
+                objectIdentifier._serverToDatabaseDot = parts[1].DotBefore;
+                objectIdentifier._databaseToSchemaDot = parts[2].DotBefore;
+                objectIdentifier._schemaToObjectDot = parts[3].DotBefore;
+                return objectIdentifier;
+            }
+            else
+            {
+                throw Error(Peek(), "Invalid function identifier format");
+            }
+        }
+
+        private ColumnIdentifier ColumnIdentifier(List<IdentifierPart> parts)
+        {
+            // Pattern match against all valid formats
+            if (IsPattern_Column(parts))
+            {
+                // Pattern: column
+                return new ColumnIdentifier(
+                    new ColumnName(parts[0].Token));
+            }
+            else if (IsPattern_ObjectColumn(parts))
+            {
+                // Pattern: object.column
+                return CreateObjectColumn(parts[0], parts[1]);
+            }
+            else if (IsPattern_SchemaObjectColumn(parts))
+            {
+                // Pattern: schema.object.column
+                return CreateSchemaObjectColumn(parts[0], parts[1], parts[2]);
+            }
+            else if (IsPattern_DatabaseSchemaObjectColumn(parts))
+            {
+                // Pattern: database.schema.object.column
+                return CreateDatabaseSchemaObjectColumn(parts[0], parts[1], parts[2], parts[3]);
+            }
+            else if (IsPattern_DatabaseObjectColumn_WithSkippedSchema(parts))
+            {
+                // Pattern: database..object.column (schema is skipped)
+                return CreateDatabaseObjectColumn(parts[0], (SkippedPart)parts[1], parts[2], parts[3]);
+            }
+            else
+            {
+                throw Error(Peek(), "Invalid column identifier format");
+            }
+        }
+
+        // Creation methods for each pattern
+        private ColumnIdentifier CreateObjectColumn(IdentifierPart obj, IdentifierPart col)
+        {
+            var identifier = new ColumnIdentifier(
+                new ObjectName(obj.Token),
+                new ColumnName(col.Token)
+            );
+            identifier._objectToColumnDot = col.DotBefore;
+            return identifier;
+        }
+
+        private ColumnIdentifier CreateSchemaObjectColumn(
+            IdentifierPart schema,
+            IdentifierPart obj,
+            IdentifierPart col)
+        {
+            var identifier = new ColumnIdentifier(
+                new SchemaName(schema.Token),
+                new ObjectName(obj.Token),
+                new ColumnName(col.Token)
+            );
+            identifier._schemaToObjectDot = obj.DotBefore;
+            identifier._objectToColumnDot = col.DotBefore;
+            return identifier;
+        }
+
+        private ColumnIdentifier CreateDatabaseSchemaObjectColumn(
+            IdentifierPart db,
+            IdentifierPart schema,
+            IdentifierPart obj,
+            IdentifierPart col)
+        {
+            var identifier = new ColumnIdentifier(
+                new DatabaseName(db.Token),
+                new SchemaName(schema.Token),
+                new ObjectName(obj.Token),
+                new ColumnName(col.Token)
+            );
+            identifier._databaseToSchemaDot = schema.DotBefore;
+            identifier._schemaToObjectDot = obj.DotBefore;
+            identifier._objectToColumnDot = col.DotBefore;
+            return identifier;
+        }
+
+        private ColumnIdentifier CreateDatabaseObjectColumn(
+            IdentifierPart db,
+            SkippedPart skipped,
+            IdentifierPart obj,
+            IdentifierPart col)
+        {
+            var identifier = new ColumnIdentifier(
+                new DatabaseName(db.Token),
+                new ObjectName(obj.Token),
+                new ColumnName(col.Token)
+            );
+            // The double-dot pattern uses the first dot for database-to-schema
+            // and we skip over the second dot of the ".."
+            identifier._databaseToSchemaDot = skipped.DotBefore;
+            identifier._objectToColumnDot = col.DotBefore;
+            return identifier;
+        }
+
+        private bool IsPattern_Object(List<IdentifierPart> parts)
+        {
+            return parts.Count == 1;
+        }
+        private bool IsPattern_SchemaObject(List<IdentifierPart> parts)
+        {
+            return parts.Count == 2
+                && parts[0] is IdentifierPart
+                && parts[1] is IdentifierPart;
+        }
+
+        private bool IsPattern_DatabaseSchemaObject(List<IdentifierPart> parts)
+        {
+            return parts.Count == 3
+                && parts[0] is IdentifierPart
+                && parts[1] is IdentifierPart
+                && parts[2] is IdentifierPart;
+        }
+
+        private bool IsPattern_ServerDatabaseSchemaObject(List<IdentifierPart> parts)
+        {
+            return parts.Count == 4
+                && parts[0] is IdentifierPart
+                && parts[1] is IdentifierPart
+                && parts[2] is IdentifierPart
+                && parts[3] is IdentifierPart;
+        }
+
+        // Pattern recognition methods - these make the valid patterns explicit
+        private bool IsPattern_Column(List<IdentifierPart> parts)
+        {
+            return parts.Count == 1;
+        }
+
+        private bool IsPattern_ObjectColumn(List<IdentifierPart> parts)
+        {
+            return parts.Count == 2
+                && parts[0] is IdentifierPart
+                && parts[1] is IdentifierPart;
+        }
+
+
+
+        private bool IsPattern_SchemaObjectColumn(List<IdentifierPart> parts)
+        {
+            return parts.Count == 3
+                && parts[0] is IdentifierPart
+                && parts[1] is IdentifierPart
+                && parts[2] is IdentifierPart;
+        }
+
+        private bool IsPattern_DatabaseSchemaObjectColumn(List<IdentifierPart> parts)
+        {
+            return parts.Count == 4
+                && parts[0] is IdentifierPart
+                && parts[1] is IdentifierPart
+                && parts[2] is IdentifierPart
+                && parts[3] is IdentifierPart;
+        }
+
+        private bool IsPattern_DatabaseObjectColumn_WithSkippedSchema(List<IdentifierPart> parts)
+        {
+            return parts.Count == 4
+                && parts[0] is IdentifierPart
+                && parts[1] is SkippedPart
+                && parts[2] is IdentifierPart
+                && parts[3] is IdentifierPart;
+        }
+
+
+        private List<IdentifierPart> CollectIdentifierParts()
+        {
+            var parts = new List<IdentifierPart>();
+
+            // Get the first part
+            Token first = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected identifier or '*' for column reference");
+            parts.Add(new IdentifierPart(first, dotBefore: null));
+
+            if (first.Type == TokenType.STAR) { return parts; }
+
+            // Collect remaining parts separated by dots
+            while (Check(TokenType.DOT) && parts.Count < 4)
+            {
+                Token dot = Advance();
+
+                // Check for double-dot pattern (..)
+                if (Check(TokenType.DOT))
+                {
+                    parts.Add(new SkippedPart(dot));
+                    continue;
+                }
+
+                Token next = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected identifier or '*' after dot");
+                parts.Add(new IdentifierPart(next, dotBefore: dot));
+
+                if (next.Type == TokenType.STAR) { break; }
+            }
+
+            return parts;
+        }
+
+        private class IdentifierPart
+        {
+            public Token Token { get; }
+            public Token DotBefore { get; }
+
+            public IdentifierPart(Token token, Token dotBefore)
+            {
+                Token = token;
+                DotBefore = dotBefore;
+            }
+        }
+
+        private class SkippedPart : IdentifierPart
+        {
+            public SkippedPart(Token dotBefore) : base(null, dotBefore)
+            {
+            }
         }
     }
 }

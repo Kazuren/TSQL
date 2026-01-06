@@ -6,9 +6,8 @@
         public void TestParser()
         {
             // Arrange
-            Scanner scanner = new Scanner("SELECT * FROM T");
-            List<Token> tokens = scanner.ScanTokens();
-
+            Scanner scanner = new Scanner("  /*te st*/ SELECT * FROM T");
+            List<SourceToken> tokens = scanner.ScanTokens();
             Parser parser = new Parser(tokens);
 
             // Act

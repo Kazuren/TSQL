@@ -1,21 +1,19 @@
 ﻿using System.Collections.Generic;
-using System.Text;
+using static TSQL.Expr;
 
 namespace TSQL
 {
     public abstract class Stmt : SyntaxElement
     {
-        public abstract T Accept<T>(Visitor<T> visitor) where T : Stmt;
-
-        public interface Visitor<T> where T : Stmt
+        public abstract T Accept<T>(Visitor<T> visitor);
+        public interface Visitor<T>
         {
             T VisitSelectStmt(Stmt.Select stmt);
-            T VisitCteStmt(Stmt.Cte stmt);
         }
 
         public class Select : Stmt
         {
-
+            public Cte CteStmt;
             public SelectExpression SelectExpression;
 
             public Select(SelectExpression selectExpression)
@@ -28,49 +26,121 @@ namespace TSQL
                 return visitor.VisitSelectStmt(this);
             }
 
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                return SelectExpression.ToSource();
+                foreach (Token token in SelectExpression.DescendantTokens())
+                {
+                    yield return token;
+                }
             }
         }
 
-        public class Cte : Stmt
+
+    }
+
+    public class Cte : SyntaxElement
+    {
+        public SyntaxElementList<CteDefinition> Ctes { get; set; } = new SyntaxElementList<CteDefinition>();
+
+        internal Token _withToken;
+        public override IEnumerable<Token> DescendantTokens()
         {
-            public List<CteDefinition> Ctes { get; set; } = new List<CteDefinition>();
-            public SelectExpression MainQuery { get; set; }
+            yield return _withToken;
 
-            public override T Accept<T>(Stmt.Visitor<T> visitor)
+            foreach (Token token in Ctes.DescendantTokens())
             {
-                return visitor.VisitCteStmt(this);
-            }
-
-            public override string ToSource()
-            {
-                throw new System.NotImplementedException();
+                yield return token;
             }
         }
     }
 
     public class CteDefinition : SyntaxElement
     {
-        public string Name { get; set; }
-        public List<string> ColumnNames { get; set; }
-        public Stmt.Select Query { get; set; }
+        public Token Name { get; set; }
+        public CteColumnNames ColumnNames { get; set; }
+        public Expr.Subquery Query { get; set; }
 
-        public override string ToSource()
+        public override IEnumerable<Token> DescendantTokens()
         {
-            throw new System.NotImplementedException();
+            yield return Name;
+
+            foreach (Token token in ColumnNames.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            foreach (Token token in Query.DescendantTokens())
+            {
+                yield return token;
+            }
+        }
+    }
+
+    public class CteColumnNames : SyntaxElement
+    {
+        public SyntaxElementList<ColumnName> ColumnNames { get; set; }
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _leftParen;
+
+            foreach (Token token in ColumnNames.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            yield return _rightParen;
         }
     }
 
     public class SelectColumn : SyntaxElement
     {
-        public Expr Expression { get; set; }
-        public string Alias { get; set; }
+        public Expr Expression { get; }
+        public Alias Alias { get; }
 
-        public override string ToSource()
+        public SelectColumn(Expr expression, Alias alias)
         {
-            throw new System.NotImplementedException();
+            Expression = expression;
+            Alias = alias;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in Expression.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            if (Alias != null)
+            {
+                foreach (Token token in Alias.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+    }
+
+    public class Alias : SyntaxElement
+    {
+        public Token Name { get; }
+
+        internal Token _asKeyword;
+        public Alias(Token name)
+        {
+            Name = name;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            if (_asKeyword != null)
+            {
+                yield return _asKeyword;
+            }
+
+            yield return Name;
         }
     }
 
@@ -84,26 +154,56 @@ namespace TSQL
         }
 
         internal Token _topKeyword;
+        internal Token _leftParen;
+        internal Token _rightParen;
 
-        public override string ToSource()
+        public override IEnumerable<Token> DescendantTokens()
         {
-            StringBuilder sb = new StringBuilder();
+            yield return _topKeyword;
+            if (_leftParen != null)
+            {
+                yield return _leftParen;
+            }
 
-            sb.Append(_topKeyword?.ToSource() ?? "TOP");
-            sb.Append(Expression.ToSource());
+            foreach (Token token in Expression.DescendantTokens())
+            {
+                yield return token;
+            }
 
-            return sb.ToString();
+            if (_rightParen != null)
+            {
+                yield return _rightParen;
+            }
         }
     }
 
     public class FromClause : SyntaxElement
     {
         public TableSource TableSource { get; set; }
-        public string Alias { get; set; }
+        public Alias Alias { get; set; }
 
-        public override string ToSource()
+        internal Token _fromToken;
+        internal FromClause(Token fromToken)
         {
-            throw new System.NotImplementedException();
+            _fromToken = fromToken;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _fromToken;
+
+            foreach (Token token in TableSource.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            if (Alias != null)
+            {
+                foreach (Token token in Alias.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
         }
     }
 
@@ -111,10 +211,10 @@ namespace TSQL
     {
         public string JoinType { get; set; } // INNER, LEFT, RIGHT, FULL, CROSS
         public TableSource TableSource { get; set; }
-        public string Alias { get; set; }
+        public Alias Alias { get; set; }
         public Expr OnCondition { get; set; }
 
-        public override string ToSource()
+        public override IEnumerable<Token> DescendantTokens()
         {
             throw new System.NotImplementedException();
         }
@@ -126,24 +226,36 @@ namespace TSQL
         public Expr Expression { get; set; }
         public bool Descending { get; set; }
 
-        public override string ToSource()
+
+        // ASC, DESC
+        public Token _orderToken;
+
+        public override IEnumerable<Token> DescendantTokens()
         {
-            throw new System.NotImplementedException();
+            foreach (Token token in Expression.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            if (_orderToken != null)
+            {
+                yield return _orderToken;
+            }
         }
     }
 
     public abstract class TableSource : SyntaxElement
     {
-        public string Alias { get; set; }
+        public Alias Alias { get; set; }
     }
 
     public class TableReference : TableSource
     {
-        public string TableName { get; set; }
+        public Token TableName { get; set; }
 
-        public override string ToSource()
+        public override IEnumerable<Token> DescendantTokens()
         {
-            throw new System.NotImplementedException();
+            yield return TableName;
         }
     }
 
@@ -151,10 +263,12 @@ namespace TSQL
     {
         public Expr.Subquery Subquery { get; set; }
 
-        public override string ToSource()
+        public override IEnumerable<Token> DescendantTokens()
         {
-            throw new System.NotImplementedException();
+            foreach (Token token in Subquery.DescendantTokens())
+            {
+                yield return token;
+            }
         }
     }
-
 }

@@ -1,28 +1,20 @@
 ﻿using BenchmarkDotNet.Attributes;
 using Microsoft.VSDiagnostics;
-using System;
-using System.Security.Cryptography;
 
 namespace TSQL.Benchmarks
 {
     // For more information on the VS BenchmarkDotNet Diagnosers see https://learn.microsoft.com/visualstudio/profiling/profiling-with-benchmark-dotnet
     [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
     public class Benchmarks
     {
-        private SHA256 sha256 = SHA256.Create();
-        private byte[] data;
-
-        [GlobalSetup]
-        public void Setup()
-        {
-            data = new byte[10000];
-            new Random(42).NextBytes(data);
-        }
-
         [Benchmark]
-        public byte[] Sha256()
+        public Stmt ParseSelectWithColumns()
         {
-            return sha256.ComputeHash(data);
+            var scanner = new Scanner("SELECT Id, Name, Email FROM Users");
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
         }
     }
 }

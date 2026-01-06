@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 
 namespace TSQL
 {
@@ -43,31 +42,25 @@ namespace TSQL
             return null;
         }
 
-        public override string ToSource()
-        {
-            StringBuilder sb = new StringBuilder();
-
-            for (int i = 0; i < _items.Count; i++)
-            {
-                sb.Append(_items[i].ToSource());
-
-                if (i < _items.Count - 1)
-                {
-                    if (i < _separators.Count && _separators[i] != null)
-                    {
-                        sb.Append(_separators[i].ToSource());
-                    }
-                    else
-                    {
-                        sb.Append(", ");
-                    }
-                }
-            }
-
-            return sb.ToString();
-        }
-
         public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            for (int i = 0; i < _items.Count; i++)
+            {
+                // Yield all tokens from the item
+                foreach (Token token in _items[i].DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                // Yield the separator (comma) if present
+                if (i < _separators.Count && _separators[i] != null)
+                {
+                    yield return _separators[i];
+                }
+            }
+        }
     }
 }

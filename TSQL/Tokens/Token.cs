@@ -4,29 +4,49 @@ using System.Text;
 
 namespace TSQL
 {
-    public class Token : IEquatable<Token>
+
+
+    public class ConcreteToken : Token
     {
+        public static ConcreteToken Empty = new ConcreteToken(TokenType.NONE, null, null);
+        public ConcreteToken(TokenType type, string lexeme, object literal) : base(type, lexeme, literal)
+        {
+
+        }
+    }
+
+    public class SourceToken : Token
+    {
+        public int Line { get => _line; private set => _line = value; }
+        private int _line;
+        public SourceToken(TokenType type, string lexeme, object literal, int line) : base(type, lexeme, literal)
+        {
+            _line = line;
+        }
+    }
+
+    public abstract class Token : IEquatable<Token>
+    {
+        private static readonly IReadOnlyList<Trivia> EmptyTrivia = Array.Empty<Trivia>();
+
         public TokenType Type { get => _type; private set => _type = value; }
         public string Lexeme { get => _lexeme; private set => _lexeme = value; }
         public object Literal { get => _literal; private set => _literal = value; }
-        public int Line { get => _line; private set => _line = value; }
-        public IReadOnlyList<Trivia> LeadingTrivia { get => _leadingTrivia; }
-        public IReadOnlyList<Trivia> TrailingTrivia { get => _trailingTrivia; }
+        public IReadOnlyList<Trivia> LeadingTrivia { get => _leadingTrivia ?? EmptyTrivia; }
+        public IReadOnlyList<Trivia> TrailingTrivia { get => _trailingTrivia ?? EmptyTrivia; }
 
         private TokenType _type;
         private string _lexeme;
         private object _literal;
-        private int _line;
 
-        private readonly List<Trivia> _leadingTrivia = new List<Trivia>();
-        private readonly List<Trivia> _trailingTrivia = new List<Trivia>();
+        private List<Trivia> _leadingTrivia;
+        private List<Trivia> _trailingTrivia;
 
-        public Token(TokenType type, string lexeme, object literal, int line)
+        public Token(TokenType type, string lexeme, object literal)
         {
             _type = type;
             _lexeme = lexeme;
             _literal = literal;
-            _line = line;
         }
 
         public override string ToString()
@@ -64,27 +84,33 @@ namespace TSQL
 
         internal void AddLeadingTrivia(params Trivia[] trivia)
         {
+            if (_leadingTrivia == null) _leadingTrivia = new List<Trivia>(trivia.Length);
             _leadingTrivia.AddRange(trivia);
         }
         internal void AddLeadingTrivia(IEnumerable<Trivia> trivia)
         {
+            if (_leadingTrivia == null) _leadingTrivia = new List<Trivia>();
             _leadingTrivia.AddRange(trivia);
         }
         internal void AddLeadingTrivia(Trivia trivia)
         {
+            if (_leadingTrivia == null) _leadingTrivia = new List<Trivia>(2);
             _leadingTrivia.Add(trivia);
         }
 
         internal void AddTrailingTrivia(params Trivia[] trivia)
         {
+            if (_trailingTrivia == null) _trailingTrivia = new List<Trivia>(trivia.Length);
             _trailingTrivia.AddRange(trivia);
         }
         internal void AddTrailingTrivia(IEnumerable<Trivia> trivia)
         {
+            if (_trailingTrivia == null) _trailingTrivia = new List<Trivia>();
             _trailingTrivia.AddRange(trivia);
         }
         internal void AddTrailingTrivia(Trivia trivia)
         {
+            if (_trailingTrivia == null) _trailingTrivia = new List<Trivia>(2);
             _trailingTrivia.Add(trivia);
         }
 
@@ -97,11 +123,6 @@ namespace TSQL
             }
 
             sb.Append(Lexeme);
-
-            foreach (Trivia trivia in TrailingTrivia)
-            {
-                sb.Append(trivia.Content);
-            }
 
             return sb.ToString();
         }

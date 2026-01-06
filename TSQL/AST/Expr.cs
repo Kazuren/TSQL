@@ -1,32 +1,37 @@
 ﻿using System;
-using System.Text;
+using System.Collections.Generic;
 
 namespace TSQL
 {
     public abstract partial class Expr : SyntaxElement
     {
-        public abstract T Accept<T>(Visitor<T> visitor) where T : Expr;
+        public abstract T Accept<T>(Visitor<T> visitor);
 
-        public interface Visitor<T> where T : Expr
+        public interface Visitor<T>
         {
             T VisitBinaryExpr(Binary expr);
             T VisitLiteralExpr(Literal expr);
             T VisitColumnIdentifierExpr(ColumnIdentifier expr);
             T VisitUnaryExpr(Unary expr);
             T VisitGroupingExpr(Grouping expr);
-            T VisitSubquery(Subquery expr);
+            T VisitSubqueryExpr(Subquery expr);
+            T VisitFunctionCallExpr(FunctionCall expr);
         }
 
 
         public abstract class SqlIdentifier : Expr { }
         public class ObjectIdentifier : SqlIdentifier
         {
-            public string ServerName { get; }
-            public string DatabaseName { get; }
-            public string SchemaName { get; }
-            public string ObjectName { get; }
+            public ServerName ServerName { get; }
+            public DatabaseName DatabaseName { get; }
+            public SchemaName SchemaName { get; }
+            public ObjectName ObjectName { get; }
 
-            public ObjectIdentifier(string serverName, string databaseName, string schemaName, string objectName)
+            internal Token _serverToDatabaseDot;
+            internal Token _databaseToSchemaDot;
+            internal Token _schemaToObjectDot;
+
+            public ObjectIdentifier(ServerName serverName, DatabaseName databaseName, SchemaName schemaName, ObjectName objectName)
             {
                 ServerName = serverName;
                 DatabaseName = databaseName;
@@ -34,20 +39,20 @@ namespace TSQL
                 ObjectName = objectName;
             }
 
-            public ObjectIdentifier(string databaseName, string schemaName, string objectName)
+            public ObjectIdentifier(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName)
             {
                 DatabaseName = databaseName;
                 SchemaName = schemaName;
                 ObjectName = objectName;
             }
 
-            public ObjectIdentifier(string schemaName, string objectName)
+            public ObjectIdentifier(SchemaName schemaName, ObjectName objectName)
             {
                 SchemaName = schemaName;
                 ObjectName = objectName;
             }
 
-            public ObjectIdentifier(string objectName)
+            public ObjectIdentifier(ObjectName objectName)
             {
                 ObjectName = objectName;
             }
@@ -57,18 +62,64 @@ namespace TSQL
                 throw new System.NotImplementedException();
             }
 
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                throw new System.NotImplementedException();
+                if (ServerName != null)
+                {
+                    foreach (Token token in ServerName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+
+                if (ServerName != null)
+                {
+                    yield return _serverToDatabaseDot;
+                }
+
+                if (DatabaseName != null)
+                {
+                    foreach (Token token in DatabaseName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+
+                if (ServerName != null || DatabaseName != null)
+                {
+                    yield return _databaseToSchemaDot;
+                }
+
+                if (SchemaName != null)
+                {
+                    foreach (Token token in SchemaName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+
+                if (ServerName != null || DatabaseName != null || SchemaName != null)
+                {
+                    yield return _schemaToObjectDot;
+                }
+
+                foreach (Token token in ObjectName.DescendantTokens())
+                {
+                    yield return token;
+                }
             }
         }
 
         public class ColumnIdentifier : SqlIdentifier
         {
-            public Nullable<DatabaseName> DatabaseName { get; }
-            public Nullable<SchemaName> SchemaName { get; }
-            public Nullable<ObjectName> ObjectName { get; }
+            public DatabaseName DatabaseName { get; }
+            public SchemaName SchemaName { get; }
+            public ObjectName ObjectName { get; }
             public ColumnName ColumnName { get; }
+
+            internal Token _databaseToSchemaDot;
+            internal Token _schemaToObjectDot;
+            internal Token _objectToColumnDot;
 
             #region Constructors
             public ColumnIdentifier(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName, ColumnName columnName)
@@ -110,9 +161,129 @@ namespace TSQL
                 throw new System.NotImplementedException();
             }
 
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                throw new System.NotImplementedException();
+                if (DatabaseName != null && SchemaName != null && ObjectName != null)
+                {
+                    foreach (Token token in DatabaseName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _databaseToSchemaDot;
+
+                    foreach (Token token in SchemaName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _schemaToObjectDot;
+
+                    foreach (Token token in ObjectName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _objectToColumnDot;
+
+                    foreach (Token token in ColumnName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+                else if (SchemaName != null && ObjectName != null)
+                {
+                    foreach (Token token in SchemaName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _schemaToObjectDot;
+
+                    foreach (Token token in ObjectName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _objectToColumnDot;
+
+                    foreach (Token token in ColumnName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+                else if (ObjectName != null)
+                {
+                    foreach (Token token in ObjectName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _objectToColumnDot;
+
+                    foreach (Token token in ColumnName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+                else if (DatabaseName != null && SchemaName == null && ObjectName != null)
+                {
+                    foreach (Token token in DatabaseName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _databaseToSchemaDot;
+                    yield return _schemaToObjectDot;
+
+                    foreach (Token token in ObjectName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _objectToColumnDot;
+
+                    foreach (Token token in ColumnName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+                else
+                {
+                    foreach (Token token in ColumnName.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+            }
+        }
+
+        public class FunctionCall : Expr
+        {
+            public ObjectIdentifier Callee { get; set; }
+            public SyntaxElementList<Expr> Arguments { get; set; }
+
+            internal Token _leftParen;
+            internal Token _rightParen;
+
+            public FunctionCall(ObjectIdentifier callee, SyntaxElementList<Expr> args)
+            {
+                Callee = callee;
+                Arguments = args;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitFunctionCallExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                foreach (Token token in Callee.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return _leftParen;
+
+                foreach (Token token in Arguments.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return _rightParen;
             }
         }
 
@@ -126,10 +297,19 @@ namespace TSQL
             {
                 return visitor.VisitBinaryExpr(this);
             }
-
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                return $"{Left.ToSource()}{Operator.ToSource()}{Right.ToSource()}";
+                foreach (Token token in Left.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return Operator;
+
+                foreach (Token token in Right.DescendantTokens())
+                {
+                    yield return token;
+                }
             }
         }
 
@@ -142,15 +322,15 @@ namespace TSQL
             {
                 if (value is string)
                 {
-                    _token = new Token(TokenType.STRING, "", value, 0);
+                    _token = new ConcreteToken(TokenType.STRING, "", value);
                 }
                 else if (value is int)
                 {
-                    _token = new Token(TokenType.WHOLE_NUMBER, "", value, 0);
+                    _token = new ConcreteToken(TokenType.WHOLE_NUMBER, "", value);
                 }
                 else if (value is double || value is decimal || value is float)
                 {
-                    _token = new Token(TokenType.DECIMAL, "", value, 0);
+                    _token = new ConcreteToken(TokenType.DECIMAL, "", value);
                 }
 
                 throw new ArgumentException($"Expected literal to be either a string, int, double, float or decimal but got: {value.GetType().FullName}", nameof(value));
@@ -164,24 +344,9 @@ namespace TSQL
             {
                 return visitor.VisitLiteralExpr(this);
             }
-
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                if (_token != null)
-                {
-                    return _token.ToSource();
-                }
-                else
-                {
-                    if (_token.Type == TokenType.STRING)
-                    {
-                        return $"'{_token.Literal}'";
-                    }
-                    else
-                    {
-                        return _token.Literal.ToString();
-                    }
-                }
+                yield return _token;
             }
         }
 
@@ -201,10 +366,13 @@ namespace TSQL
             {
                 return visitor.VisitUnaryExpr(this);
             }
-
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                return $"{Operator.ToSource()}{Right.ToSource()}";
+                yield return Operator;
+                foreach (Token token in Right.DescendantTokens())
+                {
+                    yield return token;
+                }
             }
         }
 
@@ -232,14 +400,16 @@ namespace TSQL
                 return visitor.VisitGroupingExpr(this);
             }
 
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                StringBuilder sb = new StringBuilder();
-                sb.Append(_leftParen?.ToSource() ?? "(");
-                sb.Append(Expression.ToSource());
-                sb.Append(_rightParen?.ToSource() ?? ")");
+                yield return _leftParen;
 
-                return sb.ToString();
+                foreach (Token token in Expression.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return _rightParen;
             }
         }
 
@@ -258,17 +428,19 @@ namespace TSQL
 
             public override T Accept<T>(Visitor<T> visitor)
             {
-                return visitor.VisitSubquery(this);
+                return visitor.VisitSubqueryExpr(this);
             }
 
-            public override string ToSource()
+            public override IEnumerable<Token> DescendantTokens()
             {
-                StringBuilder sb = new StringBuilder();
-                sb.Append(_leftParen?.ToSource() ?? "(");
-                sb.Append(SelectExpression.ToSource());
-                sb.Append(_rightParen?.ToSource() ?? ")");
+                yield return _leftParen;
 
-                return sb.ToString();
+                foreach (Token token in SelectExpression.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return _rightParen;
             }
         }
     }
@@ -288,98 +460,147 @@ namespace TSQL
         // Original tokens
         internal Token _selectKeyword;
         internal Token _distinctKeyword;
-
-        public override string ToSource()
+        public override IEnumerable<Token> DescendantTokens()
         {
-            StringBuilder sb = new StringBuilder();
+            yield return _selectKeyword;
 
-            if (_selectKeyword != null)
+            if (_distinctKeyword != null)
             {
-                sb.Append(_selectKeyword.ToSource());
+                yield return _distinctKeyword;
             }
-            else
-            {
-                sb.Append("SELECT");
-            }
-
-            if (Distinct)
-                sb.Append(" DISTINCT");
 
             if (Top != null)
-                sb.Append(Top.ToSource());
+            {
+                foreach (Token token in Top.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
 
-            sb.Append(" ");
-            sb.Append(Columns.ToSource());
+            foreach (Token token in Columns.DescendantTokens())
+            {
+                yield return token;
+            }
 
             if (From != null)
             {
-                sb.Append(" FROM ");
-                sb.Append(From.ToSource());
+                foreach (Token token in From.DescendantTokens())
+                {
+                    yield return token;
+                }
             }
-
-            foreach (var join in Joins)
-            {
-                sb.Append(" ");
-                sb.Append(join.ToSource());
-            }
-
-            if (Where != null)
-            {
-                sb.Append(" WHERE ");
-                sb.Append(Where.ToSource());
-            }
-
-            if (GroupBy?.Count > 0)
-            {
-                sb.Append(" GROUP BY ");
-                sb.Append(GroupBy.ToSource()); // Handles commas!
-            }
-
-            if (Having != null)
-            {
-                sb.Append(" HAVING ");
-                sb.Append(Having.ToSource());
-            }
-
-            if (OrderBy?.Count > 0)
-            {
-                sb.Append(" ORDER BY ");
-            }
-
-            return sb.ToString();
         }
     }
 
-    public readonly struct DatabaseName
+    public class ServerName : SyntaxElement
     {
         public string Name { get; }
+        private readonly Token _token;
+
+        public ServerName(string name)
+        {
+            Name = name;
+        }
+
+        internal ServerName(Token token)
+        {
+            Name = token.Literal.ToString();
+            _token = token;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _token;
+        }
+    }
+    public class DatabaseName : SyntaxElement
+    {
+        public string Name { get; }
+        private readonly Token _token;
+
         public DatabaseName(string name)
         {
             Name = name;
         }
+
+        internal DatabaseName(Token token)
+        {
+            Name = token.Literal.ToString();
+            _token = token;
+        }
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _token;
+        }
     }
-    public readonly struct SchemaName
+    public class SchemaName : SyntaxElement
     {
         public string Name { get; }
+        private readonly Token _token;
+
         public SchemaName(string name)
         {
             Name = name;
         }
+
+        internal SchemaName(Token token)
+        {
+            Name = token.Literal.ToString();
+            _token = token;
+        }
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _token;
+        }
     }
-    public readonly struct ObjectName
+    public class ObjectName : SyntaxElement
     {
         public string Name { get; }
+        private readonly Token _token;
+
         public ObjectName(string name)
         {
             Name = name;
         }
+
+        internal ObjectName(Token token)
+        {
+            Name = token.Literal.ToString();
+            _token = token;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _token;
+        }
     }
-    public readonly struct ColumnName
+    public class ColumnName : SyntaxElement
     {
         public string Name { get; }
+        private readonly Token _token;
+
         public ColumnName(string name)
         {
             Name = name;
+        }
+
+        internal ColumnName(Token token)
+        {
+            if (token.Type == TokenType.IDENTIFIER)
+            {
+                Name = token.Literal.ToString();
+            }
+            else if (token.Type == TokenType.STAR)
+            {
+                Name = token.Lexeme;
+            }
+
+            _token = token;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _token;
         }
     }
 }

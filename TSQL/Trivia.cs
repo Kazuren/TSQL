@@ -5,7 +5,7 @@
         string Content { get; }
     }
 
-    public readonly struct Whitespace : Trivia
+    public class Whitespace : Trivia
     {
         public string Content { get; }
         public Whitespace(string content)
@@ -15,7 +15,7 @@
             Content = content;
         }
     }
-    public readonly struct Comment : Trivia
+    public class Comment : Trivia
     {
         public string Content { get; }
         public Comment(string content)

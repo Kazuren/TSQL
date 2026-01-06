@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace TSQL.AST
+﻿namespace TSQL.AST
 {
     public abstract class Predicate : SyntaxElement
     {
@@ -14,11 +12,6 @@ namespace TSQL.AST
                 Left = left;
                 Operator = @operator;
                 Right = right;
-            }
-
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
             }
         }
         public class Like : Predicate
@@ -36,11 +29,6 @@ namespace TSQL.AST
                 EscapeCharacter = escapeCharacter;
                 Negated = negated;
             }
-
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
         }
 
         public class Between : Predicate
@@ -57,10 +45,6 @@ namespace TSQL.AST
                 HighRangeExpr = highRangeExpr;
                 Negated = negated;
             }
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
         }
 
         public class Null : Predicate
@@ -73,43 +57,26 @@ namespace TSQL.AST
                 Expr = expr;
                 Negated = negated;
             }
-
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
         }
 
         public class Contains : Predicate
         {
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
+
         }
 
         public class In : Predicate
         {
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
+
         }
 
         public class Quantifier : Predicate
         {
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
+
         }
 
         public class Exists : Predicate
         {
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
+
         }
 
         public class Grouping : Predicate
@@ -119,10 +86,7 @@ namespace TSQL.AST
             {
                 Predicate = predicate;
             }
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
+
         }
 
         public class And : Predicate
@@ -136,10 +100,7 @@ namespace TSQL.AST
                 Right = right;
             }
 
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
+
         }
 
         public class Or : Predicate
@@ -152,11 +113,6 @@ namespace TSQL.AST
                 Left = left;
                 Right = right;
             }
-
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
-            }
         }
 
         public class Not : Predicate
@@ -165,11 +121,6 @@ namespace TSQL.AST
             public Not(Predicate predicate)
             {
                 Predicate = predicate;
-            }
-
-            public override string ToSource()
-            {
-                throw new NotImplementedException();
             }
         }
     }

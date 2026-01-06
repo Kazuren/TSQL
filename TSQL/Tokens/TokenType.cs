@@ -2,6 +2,7 @@
 {
     public enum TokenType
     {
+        NONE,
         IDENTIFIER,
         STRING, WHOLE_NUMBER, DECIMAL,
         PLUS, MINUS, SLASH, STAR, MODULO,

@@ -2,7 +2,7 @@ namespace TSQL.Tests
 {
     public static class TokenAssertionExtensions
     {
-        public static TokenAssertion Should(this List<Token> tokens)
+        public static TokenAssertion Should(this IEnumerable<Token> tokens)
         {
             return new TokenAssertion(tokens);
         }
@@ -12,9 +12,9 @@ namespace TSQL.Tests
     {
         private readonly List<Token> _tokens;
 
-        public TokenAssertion(List<Token> tokens)
+        public TokenAssertion(IEnumerable<Token> tokens)
         {
-            _tokens = tokens;
+            _tokens = tokens.ToList();
         }
 
         public TokenAssertion MatchExpectedTokens(ExpectedToken[] expected)
