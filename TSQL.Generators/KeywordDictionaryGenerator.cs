@@ -66,6 +66,42 @@ namespace TSQL.Generators
             }
 
             sb.AppendLine("        };");
+            sb.AppendLine();
+
+            // Generate a TryGetKeyword method that works with StringSlice
+            sb.AppendLine("        /// <summary>");
+            sb.AppendLine("        /// Attempts to match a StringSlice to a keyword without allocating a string.");
+            sb.AppendLine("        /// </summary>");
+            sb.AppendLine("        private static bool TryGetKeyword(StringSlice slice, out TokenType tokenType)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            switch (slice.Length)");
+            sb.AppendLine("            {");
+
+            // Group keywords by length for efficient lookup
+            var keywordsByLength = new Dictionary<int, List<string>>();
+            foreach (var keyword in keywords)
+            {
+                if (!keywordsByLength.ContainsKey(keyword.Length))
+                    keywordsByLength[keyword.Length] = new List<string>();
+                keywordsByLength[keyword.Length].Add(keyword);
+            }
+
+            foreach (var kvp in keywordsByLength)
+            {
+                sb.AppendLine($"                case {kvp.Key}:");
+                foreach (var keyword in kvp.Value)
+                {
+                    var lowercaseKeyword = keyword.ToLowerInvariant();
+                    sb.AppendLine($"                    if (slice.EqualsIgnoreCase(\"{lowercaseKeyword}\")) {{ tokenType = TokenType.{keyword}; return true; }}");
+                }
+                sb.AppendLine("                    break;");
+            }
+
+            sb.AppendLine("            }");
+            sb.AppendLine("            tokenType = default;");
+            sb.AppendLine("            return false;");
+            sb.AppendLine("        }");
+
             sb.AppendLine("    }");
             sb.AppendLine("}");
 

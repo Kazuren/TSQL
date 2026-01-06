@@ -4,54 +4,103 @@ using System.Text;
 
 namespace TSQL
 {
+    /// <summary>
+    /// Public interface for tokens, exposing Lexeme as string for external consumption.
+    /// </summary>
+    public interface IToken
+    {
+        TokenType Type { get; }
+        string Lexeme { get; }
+        object Literal { get; }
+        IReadOnlyList<Trivia> LeadingTrivia { get; }
+        IReadOnlyList<Trivia> TrailingTrivia { get; }
+    }
 
-
+    /// <summary>
+    /// A token created programmatically (not from source parsing). Stores lexeme as string.
+    /// </summary>
     public class ConcreteToken : Token
     {
         public static ConcreteToken Empty = new ConcreteToken(TokenType.NONE, null, null);
-        public ConcreteToken(TokenType type, string lexeme, object literal) : base(type, lexeme, literal)
-        {
 
+        private readonly string _lexeme;
+
+        public ConcreteToken(TokenType type, string lexeme, object literal) : base(type, literal)
+        {
+            _lexeme = lexeme;
         }
+
+        public override string Lexeme => _lexeme;
     }
 
+    /// <summary>
+    /// A token parsed from source code. Stores lexeme as StringSlice for deferred allocation.
+    /// </summary>
     public class SourceToken : Token
     {
-        public int Line { get => _line; private set => _line = value; }
-        private int _line;
-        public SourceToken(TokenType type, string lexeme, object literal, int line) : base(type, lexeme, literal)
+        private readonly StringSlice _lexemeSlice;
+        private string _lexemeCache;
+
+        public int Line { get; }
+
+        /// <summary>
+        /// Creates a SourceToken with a pre-allocated lexeme string.
+        /// </summary>
+        public SourceToken(TokenType type, string lexeme, object literal, int line) : base(type, literal)
         {
-            _line = line;
+            _lexemeSlice = StringSlice.FromString(lexeme);
+            _lexemeCache = lexeme; // Already allocated, cache it
+            Line = line;
+        }
+
+        /// <summary>
+        /// Internal constructor for creating tokens with deferred string allocation.
+        /// </summary>
+        internal SourceToken(TokenType type, StringSlice lexemeSlice, object literal, int line) : base(type, literal)
+        {
+            _lexemeSlice = lexemeSlice;
+            Line = line;
+        }
+
+        public override string Lexeme
+        {
+            get
+            {
+                // Lazy allocation: only create string when actually accessed
+                if (_lexemeCache == null)
+                {
+                    _lexemeCache = _lexemeSlice.ToString();
+                }
+                return _lexemeCache;
+            }
         }
     }
 
-    public abstract class Token : IEquatable<Token>
+    /// <summary>
+    /// Abstract base class for tokens with shared functionality.
+    /// </summary>
+    public abstract class Token : IToken, IEquatable<Token>
     {
         private static readonly IReadOnlyList<Trivia> EmptyTrivia = Array.Empty<Trivia>();
 
-        public TokenType Type { get => _type; private set => _type = value; }
-        public string Lexeme { get => _lexeme; private set => _lexeme = value; }
-        public object Literal { get => _literal; private set => _literal = value; }
-        public IReadOnlyList<Trivia> LeadingTrivia { get => _leadingTrivia ?? EmptyTrivia; }
-        public IReadOnlyList<Trivia> TrailingTrivia { get => _trailingTrivia ?? EmptyTrivia; }
-
-        private TokenType _type;
-        private string _lexeme;
-        private object _literal;
+        public TokenType Type { get; }
+        public abstract string Lexeme { get; }
+        public object Literal { get; }
+        public IReadOnlyList<Trivia> LeadingTrivia => _leadingTrivia ?? EmptyTrivia;
+        public IReadOnlyList<Trivia> TrailingTrivia => _trailingTrivia ?? EmptyTrivia;
 
         private List<Trivia> _leadingTrivia;
         private List<Trivia> _trailingTrivia;
 
-        public Token(TokenType type, string lexeme, object literal)
+        protected Token(TokenType type, object literal)
         {
-            _type = type;
-            _lexeme = lexeme;
-            _literal = literal;
+            Type = type;
+            Literal = literal;
         }
 
         public override string ToString()
         {
-            return $"{_type} {_lexeme} {_literal}";
+            return $"{Type} {Lexeme} {Literal}";
         }
 
         public override bool Equals(object obj)

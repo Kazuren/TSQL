@@ -36,7 +36,7 @@ namespace TSQL
                 ScanToken();
             }
 
-            AddToken(TokenType.EOF, null, "");
+            AddTokenWithString(TokenType.EOF, null, "");
 
             return _tokens;
         }
@@ -246,10 +246,11 @@ namespace TSQL
                 Advance();
             }
 
-            string text = _source.Substring(_start, _current - _start);
+            // Use StringSlice for keyword lookup and token creation - no string allocation
+            StringSlice slice = new StringSlice(_source, _start, _current - _start);
 
             TokenType type;
-            if (_keywords.TryGetValue(text, out TokenType value))
+            if (TryGetKeyword(slice, out TokenType value))
             {
                 type = value;
             }
@@ -258,7 +259,8 @@ namespace TSQL
                 type = TokenType.IDENTIFIER;
             }
 
-            AddToken(type, text);
+            // Pass the slice directly - string allocation is deferred until Lexeme is accessed
+            AddToken(type, null, slice);
         }
         private void BracketDelimitedIdentifier()
         {
@@ -304,6 +306,7 @@ namespace TSQL
             // Consume the closing delimiter
             Advance();
 
+            // lexeme = full source text including brackets, literal = content without brackets
             AddToken(TokenType.IDENTIFIER, builder.ToString());
         }
 
@@ -351,6 +354,7 @@ namespace TSQL
             // Consume the closing delimiter
             Advance();
 
+            // lexeme = full source text including quotes, literal = content without quotes
             AddToken(TokenType.IDENTIFIER, builder.ToString());
         }
 
@@ -399,7 +403,9 @@ namespace TSQL
             // The closing '
             Advance();
 
-            AddToken(TokenType.STRING, builder.ToString());
+            // lexeme = full source text including quotes, literal = content without quotes
+            string value = builder.ToString();
+            AddToken(TokenType.STRING, value);
         }
 
         private void IncrementLineNumber()
@@ -465,13 +471,27 @@ namespace TSQL
 
         private void AddToken(TokenType type, object literal)
         {
-            string text = _source.Substring(_start, _current - _start);
-            AddToken(type, literal, text);
+            StringSlice slice = new StringSlice(_source, _start, _current - _start);
+            AddTokenCore(type, literal, slice);
         }
 
-        private void AddToken(TokenType type, object literal, string lexeme)
+        private void AddToken(TokenType type, object literal, StringSlice lexemeSlice)
         {
-            SourceToken token = new SourceToken(type, lexeme, literal, _line);
+            AddTokenCore(type, literal, lexemeSlice);
+        }
+
+        /// <summary>
+        /// Overload for tokens where the lexeme is built dynamically (e.g., escaped strings).
+        /// Wraps the string in a StringSlice so it won't allocate again when Lexeme is accessed.
+        /// </summary>
+        private void AddTokenWithString(TokenType type, object literal, string lexeme)
+        {
+            AddTokenCore(type, literal, StringSlice.FromString(lexeme));
+        }
+
+        private void AddTokenCore(TokenType type, object literal, StringSlice lexemeSlice)
+        {
+            SourceToken token = new SourceToken(type, lexemeSlice, literal, _line);
 
             if (_previousToken != null)
             {

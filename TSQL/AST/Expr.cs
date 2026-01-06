@@ -574,33 +574,34 @@ namespace TSQL
             yield return _token;
         }
     }
-    public class ColumnName : SyntaxElement
-    {
-        public string Name { get; }
-        private readonly Token _token;
-
-        public ColumnName(string name)
+        public class ColumnName : SyntaxElement
         {
-            Name = name;
-        }
+            public string Name { get; }
+            private readonly Token _token;
 
-        internal ColumnName(Token token)
-        {
-            if (token.Type == TokenType.IDENTIFIER)
+            public ColumnName(string name)
             {
-                Name = token.Literal.ToString();
-            }
-            else if (token.Type == TokenType.STAR)
-            {
-                Name = token.Lexeme;
+                Name = name;
             }
 
-            _token = token;
-        }
+            internal ColumnName(Token token)
+            {
+                if (token.Type == TokenType.IDENTIFIER)
+                {
+                    // Use Lexeme instead of Literal - the identifier text is the lexeme
+                    Name = token.Lexeme;
+                }
+                else if (token.Type == TokenType.STAR)
+                {
+                    Name = token.Lexeme;
+                }
 
-        public override IEnumerable<Token> DescendantTokens()
-        {
-            yield return _token;
+                _token = token;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _token;
+            }
         }
     }
-}

@@ -737,7 +737,7 @@ namespace TSQL
         // Creation methods for each pattern
         private ColumnIdentifier CreateObjectColumn(IdentifierPart obj, IdentifierPart col)
         {
-            var identifier = new ColumnIdentifier(
+            ColumnIdentifier identifier = new ColumnIdentifier(
                 new ObjectName(obj.Token),
                 new ColumnName(col.Token)
             );
@@ -750,7 +750,7 @@ namespace TSQL
             IdentifierPart obj,
             IdentifierPart col)
         {
-            var identifier = new ColumnIdentifier(
+            ColumnIdentifier identifier = new ColumnIdentifier(
                 new SchemaName(schema.Token),
                 new ObjectName(obj.Token),
                 new ColumnName(col.Token)
@@ -766,7 +766,7 @@ namespace TSQL
             IdentifierPart obj,
             IdentifierPart col)
         {
-            var identifier = new ColumnIdentifier(
+            ColumnIdentifier identifier = new ColumnIdentifier(
                 new DatabaseName(db.Token),
                 new SchemaName(schema.Token),
                 new ObjectName(obj.Token),
@@ -784,7 +784,7 @@ namespace TSQL
             IdentifierPart obj,
             IdentifierPart col)
         {
-            var identifier = new ColumnIdentifier(
+            ColumnIdentifier identifier = new ColumnIdentifier(
                 new DatabaseName(db.Token),
                 new ObjectName(obj.Token),
                 new ColumnName(col.Token)
@@ -868,7 +868,7 @@ namespace TSQL
 
         private List<IdentifierPart> CollectIdentifierParts()
         {
-            var parts = new List<IdentifierPart>();
+            List<IdentifierPart> parts = new List<IdentifierPart>();
 
             // Get the first part
             Token first = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected identifier or '*' for column reference");
