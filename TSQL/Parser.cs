@@ -493,6 +493,19 @@ namespace TSQL
                 return Grouping();
             }
 
+            // Handle COALESCE keyword - uses standard function call syntax
+            if (Match(TokenType.COALESCE, out Token coalesceToken))
+            {
+                ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(coalesceToken));
+                return FinishCall(callee);
+            }
+
+            // Handle OPENXML keyword - has optional WITH clause
+            if (Match(TokenType.OPENXML, out Token openXmlToken))
+            {
+                return FinishOpenXml(openXmlToken);
+            }
+
             // TODO: add special handling for keywords COALESCE and OPENXML, possibly others too.
             // make new parse functions for them, similar to FinishCall and check/Match for COALESCE & OPENXML tokens
             if (Check(TokenType.IDENTIFIER))
@@ -512,6 +525,25 @@ namespace TSQL
             }
 
             throw Error(Peek(), $"Unexpected token");
+        }
+
+
+        /// <summary>
+        /// Parses OPENXML(idoc, rowpattern [, flags]) [WITH (SchemaDeclaration | TableName)]
+        /// </summary>
+        private Expr FinishOpenXml(Token openXmlToken)
+        {
+            ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(openXmlToken));
+            Expr.FunctionCall functionCall = FinishCall(callee);
+
+            // TODO: Handle optional WITH clause
+            // if (Match(TokenType.WITH))
+            // {
+            //     Parse SchemaDeclaration or TableName
+            //     Return a new OpenXmlExpr that wraps the function call + WITH clause
+            // }
+
+            return functionCall;
         }
 
         private Expr.FunctionCall FinishCall(ObjectIdentifier callee)
