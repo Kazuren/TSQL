@@ -455,16 +455,27 @@ namespace TSQL
 
         private Expr Factor()
         {
-            Expr expr = Primary();
+            Expr expr = Unary();
 
-            while (Match(TokenType.STAR, TokenType.SLASH))
+            while (Match(TokenType.STAR, TokenType.SLASH, out Token op))
             {
-                Token op = Previous();
-                Expr right = Primary();
+                Expr right = Unary();
                 expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
             }
 
             return expr;
+        }
+
+        private Expr Unary()
+        {
+            if (Match(TokenType.MINUS, out Token minus))
+            {
+                return new Expr.Unary(minus, Primary());
+            }
+            else
+            {
+                return Primary();
+            }
         }
 
         private Expr Grouping()
