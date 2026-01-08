@@ -93,7 +93,11 @@ namespace TSQL
         }
     }
 
-    public class SelectColumn : SyntaxElement
+    public interface SelectItem : ISyntaxElement
+    {
+    }
+
+    public class SelectColumn : SyntaxElement, SelectItem
     {
         public Expr Expression { get; }
         public Alias Alias { get; }
@@ -136,10 +140,9 @@ namespace TSQL
         }
     }
 
-    public interface Alias
+    public interface Alias : ISyntaxElement
     {
         Token Name { get; }
-        IEnumerable<Token> DescendantTokens();
     }
 
     internal class SuffixAlias : SyntaxElement, Alias
@@ -166,9 +169,10 @@ namespace TSQL
     {
         public Token Name { get; }
         internal Token _equalsToken;
-        public PrefixAlias(Token name)
+        public PrefixAlias(Token name, Token equalsToken)
         {
             Name = name;
+            _equalsToken = equalsToken;
         }
 
         public override IEnumerable<Token> DescendantTokens()

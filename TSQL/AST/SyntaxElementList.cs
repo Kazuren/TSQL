@@ -7,7 +7,7 @@ namespace TSQL
     /// A list of syntax nodes separated by tokens (like commas).
     /// Preserves the separator tokens to maintain trivia.
     /// </summary>
-    public class SyntaxElementList<T> : SyntaxElement, IEnumerable<T> where T : SyntaxElement
+    public class SyntaxElementList<T> : SyntaxElement, IEnumerable<T> where T : ISyntaxElement
     {
         public int Count => _items.Count;
         public T this[int index] => _items[index];

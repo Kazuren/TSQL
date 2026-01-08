@@ -1,9 +1,21 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace TSQL
 {
-    public abstract class SyntaxElement
+    public interface ISyntaxElement
+    {
+        SyntaxElement Parent { get; }
+        SyntaxElement SiblingLeft { get; }
+        SyntaxElement SiblingRight { get; }
+
+        IEnumerable<Token> DescendantTokens();
+        string ToSource();
+    }
+
+    public abstract class SyntaxElement : ISyntaxElement
     {
         /// <summary>
         /// Returns all tokens under this node in document order.
@@ -18,11 +30,19 @@ namespace TSQL
         public string ToSource()
         {
             StringBuilder sb = new StringBuilder();
-            foreach (Token token in DescendantTokens())
+            try
             {
-                sb.Append(token.ToSource());
+                foreach (Token token in DescendantTokens())
+                {
+                    sb.Append(token.ToSource());
+                }
+                return sb.ToString();
             }
-            return sb.ToString();
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.ToString());
+                return sb.ToString();
+            }
         }
 
         public SyntaxElement Parent { get; internal set; }

@@ -86,10 +86,12 @@ namespace TSQL
                     if (Match('='))
                     {
                         AddToken(TokenType.NOT_EQUAL);
-                    } else if (Match('<'))
+                    }
+                    else if (Match('<'))
                     {
-                        AddToken(TokenType.NOT_LESS);   
-                    } else if (Match('>'))
+                        AddToken(TokenType.NOT_LESS);
+                    }
+                    else if (Match('>'))
                     {
                         AddToken(TokenType.NOT_GREATER);
                     }
@@ -155,7 +157,7 @@ namespace TSQL
         }
 
         private void Variable()
-        { 
+        {
             while (IsAlphaNumeric(Peek()))
             {
                 Advance();
@@ -281,7 +283,7 @@ namespace TSQL
             }
 
             // Pass the slice directly - string allocation is deferred until Lexeme is accessed
-            AddToken(type, null, slice);
+            AddToken(type, slice.ToString(), slice);
         }
         private void BracketDelimitedIdentifier()
         {

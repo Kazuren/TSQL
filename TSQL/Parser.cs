@@ -47,8 +47,11 @@ namespace TSQL
             column_expression -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
             select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | parenthesized_expression) ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)?
             parenthesized_expression -> ( "(" select_expression | expression ")" ) 
+            wildcard -> STAR
+            qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
+            select_item -> wildcard | qualified_wildcard | expression
+            select_list -> select_item ("," select_item)*
 
-            select_list -> expression ("," expression)*
             from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
             where_clause -> "WHERE search_condition
             group_by_clause -> "GROUP BY"
@@ -225,7 +228,7 @@ namespace TSQL
 
             do
             {
-                SelectColumn selectColumn = SelectColumn();
+                SelectItem selectColumn = SelectItem();
 
                 // Check if there's a comma after this column
                 Token comma = null;
@@ -286,26 +289,51 @@ namespace TSQL
         }
 
 
-        private SelectColumn SelectColumn()
+        private SelectItem SelectItem()
         {
+            if (Match(TokenType.STAR, out Token wildcardToken))
+            {
+                return new Wildcard(wildcardToken);
+            }
+
             // Check for alternate alias syntax: alias = expression
+            Alias alias = null;
             if (Check(TokenType.IDENTIFIER) && CheckNext(TokenType.EQUAL))
             {
                 Token aliasToken = Advance();
                 Token equalToken = Advance();
-                Expr expr = Expression();
-
-                PrefixAlias alias = new PrefixAlias(aliasToken);
-                alias._equalsToken = equalToken;
-
-                return new SelectColumn(expr, alias);
+                alias = new PrefixAlias(aliasToken, equalToken);
             }
 
-            // Standard parsing: expression [AS] alias
             Expr expression = Expression();
-            Alias alias2 = Alias();
 
-            return new SelectColumn(expression, alias2);
+            if (alias == null)
+            {
+                Token token = Previous();
+                if (token.Type == TokenType.STAR)
+                {
+                    // if we haven't started this select item with a prefix alias, and the previous token is a star
+                    // that this expression has been parsed as a column identifier
+                    ColumnIdentifier columnIdentifier = (ColumnIdentifier)expression;
+
+                    QualifiedWildcard qualifiedWildCard = new QualifiedWildcard(
+                        columnIdentifier.DatabaseName,
+                        columnIdentifier.SchemaName,
+                        columnIdentifier.ObjectName,
+                        token
+                    );
+                    qualifiedWildCard._databaseToSchemaDot = columnIdentifier._databaseToSchemaDot;
+                    qualifiedWildCard._schemaToObjectDot = columnIdentifier._schemaToObjectDot;
+                    qualifiedWildCard._objectToStarDot = columnIdentifier._objectToColumnDot;
+                    return qualifiedWildCard;
+                }
+                else
+                {
+                    alias = Alias();
+                }
+            }
+
+            return new SelectColumn(expression, alias);
         }
 
         private FromClause FromClause()
@@ -465,22 +493,15 @@ namespace TSQL
                 return Grouping();
             }
 
-            // TODO: have 3 type of identifiers instead of just ColumnIdentifier
-            // have some kind of STARIdentifier -> "*"
-            // have some kind of ObjectSTARIdentifier -> "server.schema.object.*"
-            // have the regular old ColumnIdentifier for everything else
-            if (Check(TokenType.IDENTIFIER, TokenType.STAR))
+            // TODO: add special handling for keywords COALESCE and OPENXML, possibly others too.
+            // make new parse functions for them, similar to FinishCall and check/Match for COALESCE & OPENXML tokens
+            if (Check(TokenType.IDENTIFIER))
             {
                 // Collect all the parts separated by dots
                 IdentifierPartsBuffer parts = CollectIdentifierParts();
 
                 if (Check(TokenType.LEFT_PAREN))
                 {
-                    if (Previous().Type == TokenType.STAR)
-                    {
-                        Error(Peek(), "Can't call '*'");
-                    }
-
                     ObjectIdentifier functionIdentifier = FunctionIdentifier(parts);
                     return FinishCall(functionIdentifier);
                 }
@@ -490,7 +511,7 @@ namespace TSQL
                 }
             }
 
-            throw new Exception($"Unexpected token: {Peek()}");
+            throw Error(Peek(), $"Unexpected token");
         }
 
         private Expr.FunctionCall FinishCall(ObjectIdentifier callee)
@@ -696,13 +717,67 @@ namespace TSQL
                 int line = sourceToken.Line;
                 int columnStart = sourceToken.StartPosition;
                 int columnEnd = sourceToken.EndPosition;
-                string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {columnStart}:{columnEnd}";
+                string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {columnStart}:{columnEnd}. Token: {sourceToken.Type}";
                 return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}");
             }
             else
             {
                 string where = token.Type == TokenType.EOF ? "at end" : $"at '{token.Lexeme}'";
                 return new ParseError($"Error {where}: {message}");
+            }
+        }
+
+
+        private QualifiedWildcard QualifiedWildcardIdentifier(IdentifierPartsBuffer parts)
+        {
+            if (IsPattern_ObjectColumn(parts))
+            {
+                QualifiedWildcard wildcardIdentifier = new QualifiedWildcard(
+                     new ObjectName(parts[0].Token),
+                     parts[1].Token
+                );
+                wildcardIdentifier._objectToStarDot = parts[1].DotBefore;
+                return wildcardIdentifier;
+            }
+            else if (IsPattern_SchemaObjectColumn(parts))
+            {
+                QualifiedWildcard wildcardIdentifier = new QualifiedWildcard(
+                     new SchemaName(parts[0].Token),
+                     new ObjectName(parts[1].Token),
+                     parts[2].Token
+                );
+                wildcardIdentifier._schemaToObjectDot = parts[1].DotBefore;
+                wildcardIdentifier._objectToStarDot = parts[2].DotBefore;
+                return wildcardIdentifier;
+            }
+            else if (IsPattern_DatabaseSchemaObjectColumn(parts))
+            {
+                QualifiedWildcard wildcardIdentifier = new QualifiedWildcard(
+                    new DatabaseName(parts[0].Token),
+                    new SchemaName(parts[1].Token),
+                    new ObjectName(parts[2].Token),
+                    parts[3].Token
+                );
+                wildcardIdentifier._databaseToSchemaDot = parts[1].DotBefore;
+                wildcardIdentifier._schemaToObjectDot = parts[2].DotBefore;
+                wildcardIdentifier._objectToStarDot = parts[3].DotBefore;
+                return wildcardIdentifier;
+            }
+            else if (IsPattern_DatabaseObjectColumn_WithSkippedSchema(parts))
+            {
+                QualifiedWildcard wildcardIdentifier = new QualifiedWildcard(
+                    new DatabaseName(parts[0].Token),
+                    new ObjectName(parts[2].Token),
+                    parts[3].Token
+                );
+                wildcardIdentifier._databaseToSchemaDot = parts[1].DotBefore;
+                wildcardIdentifier._schemaToObjectDot = parts[2].DotBefore;
+                wildcardIdentifier._objectToStarDot = parts[3].DotBefore;
+                return wildcardIdentifier;
+            }
+            else
+            {
+                throw Error(Peek(), "Invalid wildcard identifier format");
             }
         }
 
@@ -843,9 +918,8 @@ namespace TSQL
                 new ObjectName(obj.Token),
                 new ColumnName(col.Token)
             );
-            // The double-dot pattern uses the first dot for database-to-schema
-            // and we skip over the second dot of the ".."
             identifier._databaseToSchemaDot = skipped.DotBefore;
+            identifier._schemaToObjectDot = obj.DotBefore;
             identifier._objectToColumnDot = col.DotBefore;
             return identifier;
         }
