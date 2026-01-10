@@ -81,7 +81,7 @@ namespace TSQL
             and_predicate -> unary_predicate ("AND" unary_predicate)*
             unary_predicate -> ("NOT")? unary_predicate | primary_predicate
             primary_predicate -> 
-                comparison | like_comparison | between_predicate | 
+                comparison_predicate | like_comparison | between_predicate | 
                 null_predicate | contains_predicate | in_predicate | 
                 quantifier_predicate | exists_predicate | "(" predicate ")"
             ---------------- WHERE ---------------
@@ -489,6 +489,11 @@ namespace TSQL
 
         private Expr Primary()
         {
+            if (Match(TokenType.VARIABLE, out Token variableToken))
+            {
+                return new Expr.Variable(variableToken);
+            }
+
             if (Match(TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING, out Token literalToken))
             {
                 return new Expr.Literal(literalToken);

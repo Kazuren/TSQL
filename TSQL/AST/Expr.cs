@@ -16,6 +16,7 @@ namespace TSQL
             T VisitGroupingExpr(Grouping expr);
             T VisitSubqueryExpr(Subquery expr);
             T VisitFunctionCallExpr(FunctionCall expr);
+            T VisitVariableExpr(Variable expr);
         }
 
 
@@ -446,6 +447,27 @@ namespace TSQL
                 {
                     yield return token;
                 }
+            }
+        }
+
+        public class Variable : Expr
+        {
+            public string Name { get => _token.Lexeme; }
+            private readonly Token _token;
+
+            internal Variable(Token token)
+            {
+                _token = token;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitVariableExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _token;
             }
         }
 

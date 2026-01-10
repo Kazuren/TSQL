@@ -41,5 +41,10 @@
         {
             return expr.ToSource();
         }
+
+        public string VisitVariableExpr(Expr.Variable expr)
+        {
+            return expr.ToSource();
+        }
     }
 }

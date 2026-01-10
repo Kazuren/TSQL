@@ -4,9 +4,6 @@ using System.Text;
 
 namespace TSQL
 {
-
-    // TODO: support !< and !>
-    // TODO: support VARIABLE TOKEN (starts with @)
     public partial class Scanner
     {
         private readonly string _source;

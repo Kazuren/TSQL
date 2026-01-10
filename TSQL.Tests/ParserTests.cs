@@ -146,6 +146,20 @@
         }
 
         [Fact]
+        public void Parse_Variable_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT @P0 FROM T");
+
+            // Assert
+            Assert.Single(select.SelectExpression.Columns);
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var columnVariable = Assert.IsType<Expr.Variable>(item.Expression);
+            Assert.Equal("@P0", columnVariable.Name);
+            Assert.Null(item.Alias);
+        }
+
+        [Fact]
         public void Parse_MultipleColumns_HasCorrectCount()
         {
             // Arrange & Act
@@ -410,6 +424,8 @@
         [InlineData("SELECT alias = a FROM T")]
         [InlineData("SELECT GETDATE() FROM T")]
         [InlineData("SELECT COALESCE(a, b) FROM T")]
+        [InlineData("SELECT @P0 FROM T")]
+
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
         {
             // Arrange
