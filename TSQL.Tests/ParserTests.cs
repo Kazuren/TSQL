@@ -1,4 +1,4 @@
-﻿namespace TSQL.Tests
+namespace TSQL.Tests
 {
     public class ParserTests
     {
@@ -427,6 +427,285 @@
         [InlineData("SELECT @P0 FROM T")]
 
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
+        {
+            // Arrange
+            Scanner scanner = new Scanner(source);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+
+            // Act
+            Stmt stmt = parser.Parse();
+
+            // Assert
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        #endregion
+
+        #region Window Function Tests
+
+        // === Basic Ranking Functions ===
+
+        [Fact]
+        public void Parse_RowNumber_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT ROW_NUMBER() OVER (ORDER BY id) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal("ROW_NUMBER", windowFunc.Function.Callee.ObjectName.Name);
+            Assert.NotNull(windowFunc.Over);
+            Assert.NotNull(windowFunc.Over.OrderBy);
+            Assert.Single(windowFunc.Over.OrderBy);
+        }
+
+        [Fact]
+        public void Parse_RankWithPartition_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT RANK() OVER (PARTITION BY dept ORDER BY salary DESC) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal("RANK", windowFunc.Function.Callee.ObjectName.Name);
+            Assert.NotNull(windowFunc.Over.PartitionBy);
+            Assert.Single(windowFunc.Over.PartitionBy);
+            Assert.NotNull(windowFunc.Over.OrderBy);
+            Assert.Single(windowFunc.Over.OrderBy);
+            Assert.True(windowFunc.Over.OrderBy[0].Descending);
+        }
+
+        [Fact]
+        public void Parse_DenseRank_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT DENSE_RANK() OVER (ORDER BY score) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal("DENSE_RANK", windowFunc.Function.Callee.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_Ntile_HasCorrectArgument()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT NTILE(4) OVER (ORDER BY val) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal("NTILE", windowFunc.Function.Callee.ObjectName.Name);
+            Assert.Single(windowFunc.Function.Arguments);
+            var arg = Assert.IsType<Expr.Literal>(windowFunc.Function.Arguments[0]);
+            Assert.Equal(4, arg.Value);
+        }
+
+        // === Aggregates with OVER ===
+
+        [Fact]
+        public void Parse_SumWithOver_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT SUM(amount) OVER (PARTITION BY customer_id) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal("SUM", windowFunc.Function.Callee.ObjectName.Name);
+            Assert.NotNull(windowFunc.Over.PartitionBy);
+            Assert.Null(windowFunc.Over.OrderBy);
+        }
+
+        [Fact]
+        public void Parse_AggregateWithEmptyOver_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT AVG(price) OVER () FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal("AVG", windowFunc.Function.Callee.ObjectName.Name);
+            Assert.Null(windowFunc.Over.PartitionBy);
+            Assert.Null(windowFunc.Over.OrderBy);
+            Assert.Null(windowFunc.Over.Frame);
+        }
+
+        // === Frame Clauses ===
+
+        [Fact]
+        public void Parse_RowsUnboundedPreceding_HasCorrectFrame()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS UNBOUNDED PRECEDING) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.NotNull(windowFunc.Over.Frame);
+            Assert.Equal(WindowFrameType.Rows, windowFunc.Over.Frame.FrameType);
+            Assert.Equal(WindowFrameBoundType.UnboundedPreceding, windowFunc.Over.Frame.Start.BoundType);
+            Assert.Null(windowFunc.Over.Frame.End); // Short syntax
+        }
+
+        [Fact]
+        public void Parse_RowsNPreceding_HasCorrectFrame()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS 3 PRECEDING) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.NotNull(windowFunc.Over.Frame);
+            Assert.Equal(WindowFrameType.Rows, windowFunc.Over.Frame.FrameType);
+            Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
+            var offset = Assert.IsType<Expr.Literal>(windowFunc.Over.Frame.Start.Offset);
+            Assert.Equal(3, offset.Value);
+        }
+
+        [Fact]
+        public void Parse_RowsBetween_HasCorrectFrame()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.NotNull(windowFunc.Over.Frame);
+            Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
+            var offset = Assert.IsType<Expr.Literal>(windowFunc.Over.Frame.Start.Offset);
+            Assert.Equal(2, offset.Value);
+            Assert.Equal(WindowFrameBoundType.CurrentRow, windowFunc.Over.Frame.End.BoundType);
+        }
+
+        [Fact]
+        public void Parse_RangeBetween_HasCorrectFrame()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT SUM(x) OVER (ORDER BY y RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal(WindowFrameType.Range, windowFunc.Over.Frame.FrameType);
+            Assert.Equal(WindowFrameBoundType.CurrentRow, windowFunc.Over.Frame.Start.BoundType);
+            Assert.Equal(WindowFrameBoundType.UnboundedFollowing, windowFunc.Over.Frame.End.BoundType);
+        }
+
+        [Fact]
+        public void Parse_RowsBetweenNPrecedingAndNFollowing_HasCorrectFrame()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
+            Assert.Equal(WindowFrameBoundType.Following, windowFunc.Over.Frame.End.BoundType);
+        }
+
+        // === Contextual Keywords as Identifiers ===
+
+        [Fact]
+        public void Parse_RowsAsColumnAlias_ParsesAsIdentifier()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT 1 AS ROWS FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            Assert.NotNull(item.Alias);
+            Assert.Equal("ROWS", item.Alias.Name.Lexeme);
+        }
+
+        [Fact]
+        public void Parse_RankAsColumnName_ParsesAsIdentifier()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT RANK FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            Assert.Equal("RANK", columnId.ColumnName.Name);
+        }
+
+        [Fact]
+        public void Parse_PartitionAsColumnName_ParsesAsIdentifier()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT PARTITION FROM T");
+
+            // Assert
+            var item = Assert.IsType<SelectColumn>(select.SelectExpression.Columns[0]);
+            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            Assert.Equal("PARTITION", columnId.ColumnName.Name);
+        }
+
+        [Fact]
+        public void Parse_MultipleContextualKeywordsAsColumns_ParsesCorrectly()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT PARTITION, ROWS, PRECEDING FROM T");
+
+            // Assert
+            Assert.Equal(3, select.SelectExpression.Columns.Count);
+        }
+
+        // === Error Cases ===
+
+        [Fact]
+        public void Parse_RowNumberWithoutOver_ThrowsParseError()
+        {
+            // Arrange
+            Scanner scanner = new Scanner("SELECT ROW_NUMBER() FROM T");
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+
+            // Act & Assert
+            Assert.ThrowsAny<Exception>(() => parser.Parse());
+        }
+
+        [Fact]
+        public void Parse_FrameWithoutOrderBy_ThrowsParseError()
+        {
+            // Arrange
+            Scanner scanner = new Scanner("SELECT SUM(x) OVER (ROWS UNBOUNDED PRECEDING) FROM T");
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+
+            // Act & Assert
+            Assert.ThrowsAny<Exception>(() => parser.Parse());
+        }
+
+        // === Round-Trip Tests ===
+
+        [Theory]
+        [InlineData("SELECT ROW_NUMBER() OVER (ORDER BY id) FROM T")]
+        [InlineData("SELECT RANK() OVER (PARTITION BY dept ORDER BY salary DESC) FROM T")]
+        [InlineData("SELECT DENSE_RANK() OVER (ORDER BY score) FROM T")]
+        [InlineData("SELECT NTILE(4) OVER (ORDER BY val) FROM T")]
+        [InlineData("SELECT SUM(amount) OVER (PARTITION BY customer_id) FROM T")]
+        [InlineData("SELECT AVG(price) OVER () FROM T")]
+        [InlineData("SELECT SUM(x) OVER (ORDER BY y ROWS UNBOUNDED PRECEDING) FROM T")]
+        [InlineData("SELECT SUM(x) OVER (ORDER BY y ROWS 3 PRECEDING) FROM T")]
+        [InlineData("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM T")]
+        [InlineData("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM T")]
+        [InlineData("SELECT SUM(x) OVER (ORDER BY y RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) FROM T")]
+        [InlineData("SELECT 1 AS ROWS FROM T")]
+        [InlineData("SELECT ROWS FROM T")]
+        [InlineData("SELECT RANK FROM T")]
+        [InlineData("SELECT PARTITION, ROWS, PRECEDING FROM T")]
+        [InlineData("SELECT ROW_NUMBER() OVER (PARTITION BY a, b ORDER BY c ASC, d DESC) FROM T")]
+        public void Parse_WindowFunction_RoundTripsCorrectly(string source)
         {
             // Arrange
             Scanner scanner = new Scanner(source);

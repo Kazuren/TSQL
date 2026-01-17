@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace TSQL
@@ -17,6 +17,7 @@ namespace TSQL
             T VisitSubqueryExpr(Subquery expr);
             T VisitFunctionCallExpr(FunctionCall expr);
             T VisitVariableExpr(Variable expr);
+            T VisitWindowFunctionExpr(WindowFunction expr);
         }
 
 
@@ -601,7 +602,220 @@ namespace TSQL
                 yield return _rightParen;
             }
         }
+
+        /// <summary>
+        /// Represents a window function: function_call OVER (...)
+        /// </summary>
+        public class WindowFunction : Expr
+        {
+            public FunctionCall Function { get; }
+            public OverClause Over { get; }
+
+            public WindowFunction(FunctionCall function, OverClause over)
+            {
+                Function = function;
+                Over = over;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitWindowFunctionExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                foreach (Token token in Function.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                foreach (Token token in Over.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
     }
+
+    #region Window Function Support
+
+    /// <summary>
+    /// Frame type for window functions: ROWS or RANGE
+    /// </summary>
+    public enum WindowFrameType
+    {
+        Rows,
+        Range
+    }
+
+    /// <summary>
+    /// Bound type for window frame specifications
+    /// </summary>
+    public enum WindowFrameBoundType
+    {
+        UnboundedPreceding,
+        UnboundedFollowing,
+        CurrentRow,
+        Preceding,   // N PRECEDING
+        Following    // N FOLLOWING
+    }
+
+    /// <summary>
+    /// Represents a single frame boundary (e.g., UNBOUNDED PRECEDING, CURRENT ROW, 3 PRECEDING)
+    /// </summary>
+    public class WindowFrameBound : SyntaxElement
+    {
+        public WindowFrameBoundType BoundType { get; }
+        public Expr Offset { get; }  // For N PRECEDING/FOLLOWING (null otherwise)
+
+        internal Token _unboundedToken;   // UNBOUNDED (if applicable)
+        internal Token _currentToken;     // CURRENT (if applicable)
+        internal Token _rowToken;         // ROW in CURRENT ROW (if applicable)
+        internal Token _precedingToken;   // PRECEDING (if applicable)
+        internal Token _followingToken;   // FOLLOWING (if applicable)
+
+        public WindowFrameBound(WindowFrameBoundType boundType, Expr offset = null)
+        {
+            BoundType = boundType;
+            Offset = offset;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            switch (BoundType)
+            {
+                case WindowFrameBoundType.UnboundedPreceding:
+                    yield return _unboundedToken;
+                    yield return _precedingToken;
+                    break;
+                case WindowFrameBoundType.UnboundedFollowing:
+                    yield return _unboundedToken;
+                    yield return _followingToken;
+                    break;
+                case WindowFrameBoundType.CurrentRow:
+                    yield return _currentToken;
+                    yield return _rowToken;
+                    break;
+                case WindowFrameBoundType.Preceding:
+                    foreach (Token token in Offset.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _precedingToken;
+                    break;
+                case WindowFrameBoundType.Following:
+                    foreach (Token token in Offset.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                    yield return _followingToken;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Represents a window frame clause: ROWS/RANGE [BETWEEN bound AND bound | bound]
+    /// </summary>
+    public class WindowFrame : SyntaxElement
+    {
+        public WindowFrameType FrameType { get; }
+        public WindowFrameBound Start { get; }
+        public WindowFrameBound End { get; }  // null if short syntax (not BETWEEN)
+
+        internal Token _rowsOrRangeToken;
+        internal Token _betweenToken;  // null if short syntax
+        internal Token _andToken;      // null if short syntax
+
+        public WindowFrame(WindowFrameType frameType, WindowFrameBound start, WindowFrameBound end = null)
+        {
+            FrameType = frameType;
+            Start = start;
+            End = end;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _rowsOrRangeToken;
+
+            if (_betweenToken != null)
+            {
+                yield return _betweenToken;
+                foreach (Token token in Start.DescendantTokens())
+                {
+                    yield return token;
+                }
+                yield return _andToken;
+                foreach (Token token in End.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+            else
+            {
+                foreach (Token token in Start.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Represents the OVER clause: OVER (PARTITION BY ... ORDER BY ... ROWS/RANGE ...)
+    /// </summary>
+    public class OverClause : SyntaxElement
+    {
+        public SyntaxElementList<Expr> PartitionBy { get; set; }
+        public SyntaxElementList<OrderByItem> OrderBy { get; set; }
+        public WindowFrame Frame { get; set; }
+
+        internal Token _overKeyword;
+        internal Token _leftParen;
+        internal Token _rightParen;
+        internal Token _partitionKeyword;
+        internal Token _partitionByKeyword;
+        internal Token _orderKeyword;
+        internal Token _orderByKeyword;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _overKeyword;
+            yield return _leftParen;
+
+            if (PartitionBy != null && PartitionBy.Count > 0)
+            {
+                yield return _partitionKeyword;
+                yield return _partitionByKeyword;
+                foreach (Token token in PartitionBy.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (OrderBy != null && OrderBy.Count > 0)
+            {
+                yield return _orderKeyword;
+                yield return _orderByKeyword;
+                foreach (Token token in OrderBy.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (Frame != null)
+            {
+                foreach (Token token in Frame.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            yield return _rightParen;
+        }
+    }
+
+    #endregion
 
     public class SelectExpression : SyntaxElement
     {
@@ -662,7 +876,8 @@ namespace TSQL
 
         internal ServerName(Token token)
         {
-            Name = token.Literal.ToString();
+            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
+            Name = token.Lexeme;
             _token = token;
         }
 
@@ -683,7 +898,8 @@ namespace TSQL
 
         internal DatabaseName(Token token)
         {
-            Name = token.Literal.ToString();
+            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
+            Name = token.Lexeme;
             _token = token;
         }
         public override IEnumerable<Token> DescendantTokens()
@@ -703,7 +919,8 @@ namespace TSQL
 
         internal SchemaName(Token token)
         {
-            Name = token.Literal.ToString();
+            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
+            Name = token.Lexeme;
             _token = token;
         }
         public override IEnumerable<Token> DescendantTokens()
@@ -723,7 +940,8 @@ namespace TSQL
 
         internal ObjectName(Token token)
         {
-            Name = token.Literal.ToString();
+            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
+            Name = token.Lexeme;
             _token = token;
         }
 
@@ -744,16 +962,8 @@ namespace TSQL
 
         internal ColumnName(Token token)
         {
-            if (token.Type == TokenType.IDENTIFIER)
-            {
-                // Use Lexeme instead of Literal - the identifier text is the lexeme
-                Name = token.Lexeme;
-            }
-            else if (token.Type == TokenType.STAR)
-            {
-                Name = token.Lexeme;
-            }
-
+            // Use Lexeme for the name - works for IDENTIFIER, STAR, and contextual keywords
+            Name = token.Lexeme;
             _token = token;
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using static TSQL.Expr;
@@ -9,7 +9,6 @@ namespace TSQL
     // ## @variable.function_call
     //  - reason: @variable must be a CLR user-defined type, something that's rare and not worth implementing unless needed
 
-    // TODO: implement VARIABLE expression
     // dollar sign ($) columns need no unique handling, column identifier already handles them just fine
     /*
     Legend:
@@ -19,10 +18,9 @@ namespace TSQL
     | -> one of the following (OR) e.g. a | b = a OR b
     () -> grouping
 
-    // We have to allow stupid shit through or else it's going to get too complicated imo
-    // who cares if we pass something silly to a TOP clause like a string when it only takes numbers?
-    // the purpose of the grammar is so there's no ambiguity in token orders and the resulting AST/CST
-    // e.g. a b c tokens could be parsed as either (a + b) + c or a + (b + c)
+    // TODO: think if we should make TOP NOT support NULL / DECIMAL / STRING
+    // maybe we can do that by parsing the Expression 
+    // and check the previous Token and if it was NULL / DECIMAL / STRING to throw an error
 
     Grammar:
         Statements:
@@ -31,10 +29,6 @@ namespace TSQL
             select_statement -> select_expression
            
         Expressions:
-            TODO: add "column expression" and have a seperate "object expression" for table names etc. figure that out when we get to the from
-            TODO: add a function_expression
-            TODO: add a variable_expression (starts with @ I think?)
-
             expression -> term
             term -> factor ( ("-" | "+") factor )*
             factor -> unary ( ( "/" | "*") unary )*
@@ -43,7 +37,7 @@ namespace TSQL
             primary -> "NULL" | WHOLE_NUMBER | DECIMAL | STRING | column_expression | ( "(" expression ")" ) | VARIABLE
         
 
-        Syntax nodes: // not going to be Expr or Stmt classes but rather just helper classes
+        Syntax nodes:
             column_expression -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
             select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | parenthesized_expression) ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)?
             parenthesized_expression -> ( "(" select_expression | expression ")" ) 
@@ -94,6 +88,21 @@ namespace TSQL
                 
             ---------------- FROM ---------------
             variable -> VARIABLE
+
+            ---------------- WINDOW FUNCTIONS ---------------
+            window_function -> function_call over_clause
+            over_clause -> "OVER" "(" (partition_by_clause)? (order_by_clause)? (frame_clause)? ")"
+            partition_by_clause -> "PARTITION" "BY" expression ("," expression)*
+            order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
+            order_by_item -> expression ("ASC" | "DESC")?
+            frame_clause -> ("ROWS" | "RANGE") frame_extent
+            frame_extent -> frame_bound | "BETWEEN" frame_bound "AND" frame_bound
+            frame_bound -> "UNBOUNDED" "PRECEDING" 
+                         | "UNBOUNDED" "FOLLOWING"
+                         | "CURRENT" "ROW"
+                         | WHOLE_NUMBER "PRECEDING"
+                         | WHOLE_NUMBER "FOLLOWING"
+            ---------------- WINDOW FUNCTIONS ---------------
     */
 
     public class Parser
@@ -108,6 +117,25 @@ namespace TSQL
 
         private readonly List<Token> _tokens;
         private int _current = 0;
+
+        /// <summary>
+        /// Non-reserved keywords that can be used as identifiers.
+        /// These are contextual keywords - they act as keywords only in specific contexts.
+        /// </summary>
+        private static readonly HashSet<TokenType> ContextualKeywords = new HashSet<TokenType>
+        {
+            TokenType.ROWS,
+            TokenType.RANGE,
+            TokenType.PARTITION,
+            TokenType.UNBOUNDED,
+            TokenType.PRECEDING,
+            TokenType.FOLLOWING,
+            TokenType.ROW,
+            TokenType.ROW_NUMBER,
+            TokenType.RANK,
+            TokenType.DENSE_RANK,
+            TokenType.NTILE
+        };
 
         public Parser(IEnumerable<Token> tokens)
         {
@@ -297,8 +325,9 @@ namespace TSQL
             }
 
             // Check for alternate alias syntax: alias = expression
+            // Contextual keywords can also be used as aliases
             Alias alias = null;
-            if (Check(TokenType.IDENTIFIER) && CheckNext(TokenType.EQUAL))
+            if (IsIdentifierOrContextualKeyword() && CheckNext(TokenType.EQUAL))
             {
                 Token aliasToken = Advance();
                 Token equalToken = Advance();
@@ -383,14 +412,16 @@ namespace TSQL
         {
             if (Match(TokenType.AS, out Token asToken))
             {
-                SuffixAlias alias = new SuffixAlias(Consume(TokenType.IDENTIFIER, "Expected alias"));
+                // After AS, expect an identifier or contextual keyword
+                SuffixAlias alias = new SuffixAlias(ConsumeIdentifierOrContextualKeyword("Expected alias"));
                 alias._asKeyword = asToken;
 
                 return alias;
             }
-            else if (Match(TokenType.IDENTIFIER, out Token aliasToken))
+            else if (IsIdentifierOrContextualKeyword())
             {
-                SuffixAlias alias = new SuffixAlias(aliasToken);
+                // Contextual keywords can be used as aliases without AS
+                SuffixAlias alias = new SuffixAlias(Advance());
                 alias._asKeyword = ConcreteToken.Empty;
                 return alias;
             }
@@ -509,7 +540,7 @@ namespace TSQL
                 return Grouping();
             }
 
-            // Handle COALESCE keyword - uses standard function call syntax
+            // Handle COALESCE keyword - uses standard function call syntax with optional OVER
             if (Match(TokenType.COALESCE, out Token coalesceToken))
             {
                 ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(coalesceToken));
@@ -522,9 +553,27 @@ namespace TSQL
                 return FinishOpenXml(openXmlToken);
             }
 
-            // TODO: add special handling for keywords COALESCE and OPENXML, possibly others too.
-            // make new parse functions for them, similar to FinishCall and check/Match for COALESCE & OPENXML tokens
-            if (Check(TokenType.IDENTIFIER))
+            // Handle ranking functions - they REQUIRE an OVER clause when used as functions
+            // But if not followed by '(', treat as column identifier (contextual keyword)
+            if (IsRankingFunction() && CheckNext(TokenType.LEFT_PAREN))
+            {
+                Token rankingToken = Advance();
+                ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(rankingToken));
+                FunctionCall functionCall = FinishCall(callee);
+
+                // OVER is required for ranking functions
+                if (!Check(TokenType.OVER))
+                {
+                    throw Error(Peek(), $"Ranking function {rankingToken.Lexeme} requires an OVER clause");
+                }
+
+                OverClause overClause = ParseOverClause();
+                return new Expr.WindowFunction(functionCall, overClause);
+            }
+
+            // Handle identifiers (columns) or function calls with optional OVER
+            // This includes contextual keywords when not used as functions
+            if (IsIdentifierOrContextualKeyword())
             {
                 // Collect all the parts separated by dots
                 IdentifierPartsBuffer parts = CollectIdentifierParts();
@@ -532,7 +581,15 @@ namespace TSQL
                 if (Check(TokenType.LEFT_PAREN))
                 {
                     ObjectIdentifier functionIdentifier = FunctionIdentifier(parts);
-                    return FinishCall(functionIdentifier);
+                    FunctionCall functionCall = FinishCall(functionIdentifier);
+
+                    // Check for optional OVER clause
+                    if (Check(TokenType.OVER))
+                    {
+                        OverClause overClause = ParseOverClause();
+                        return new Expr.WindowFunction(functionCall, overClause);
+                    }
+                    return functionCall;
                 }
                 else
                 {
@@ -593,6 +650,244 @@ namespace TSQL
             return functionCall;
         }
 
+        #region Window Function Parsing
+
+        /// <summary>
+        /// Checks if the current token is a ranking function keyword (without consuming it).
+        /// </summary>
+        private bool IsRankingFunction()
+        {
+            return Check(TokenType.ROW_NUMBER) || Check(TokenType.RANK) ||
+                   Check(TokenType.DENSE_RANK) || Check(TokenType.NTILE);
+        }
+
+        /// <summary>
+        /// Parses the OVER clause: OVER (PARTITION BY ... ORDER BY ... ROWS/RANGE ...)
+        /// </summary>
+        private OverClause ParseOverClause()
+        {
+            OverClause clause = new OverClause();
+            clause._overKeyword = Consume(TokenType.OVER, "Expected OVER");
+            clause._leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after OVER");
+
+            // Optional PARTITION BY
+            if (Match(TokenType.PARTITION, out Token partitionToken))
+            {
+                clause._partitionKeyword = partitionToken;
+                clause._partitionByKeyword = Consume(TokenType.BY, "Expected BY after PARTITION");
+                clause.PartitionBy = ParseExpressionList();
+            }
+
+            // Optional ORDER BY
+            if (Match(TokenType.ORDER, out Token orderToken))
+            {
+                clause._orderKeyword = orderToken;
+                clause._orderByKeyword = Consume(TokenType.BY, "Expected BY after ORDER");
+                clause.OrderBy = ParseOrderByList();
+            }
+
+            // Optional ROWS or RANGE frame clause (requires ORDER BY)
+            if (Check(TokenType.ROWS, TokenType.RANGE))
+            {
+                if (clause.OrderBy == null || clause.OrderBy.Count == 0)
+                {
+                    throw Error(Peek(), "ROWS or RANGE clause requires ORDER BY");
+                }
+                clause.Frame = ParseWindowFrame();
+            }
+
+            clause._rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after OVER clause");
+            return clause;
+        }
+
+        /// <summary>
+        /// Parses a window frame clause: ROWS/RANGE [BETWEEN bound AND bound | bound]
+        /// </summary>
+        private WindowFrame ParseWindowFrame()
+        {
+            Token rowsOrRangeToken;
+            WindowFrameType frameType;
+
+            if (Match(TokenType.ROWS, out rowsOrRangeToken))
+            {
+                frameType = WindowFrameType.Rows;
+            }
+            else
+            {
+                rowsOrRangeToken = Consume(TokenType.RANGE, "Expected ROWS or RANGE");
+                frameType = WindowFrameType.Range;
+            }
+
+            WindowFrameBound start;
+            WindowFrameBound end = null;
+            Token betweenToken = null;
+            Token andToken = null;
+
+            // Check for BETWEEN syntax
+            if (Match(TokenType.BETWEEN, out betweenToken))
+            {
+                start = ParseWindowFrameBound(allowFollowing: true);
+                andToken = Consume(TokenType.AND, "Expected AND in BETWEEN clause");
+                end = ParseWindowFrameBound(allowFollowing: true);
+            }
+            else
+            {
+                // Short syntax: just a single bound (implies AND CURRENT ROW)
+                start = ParseWindowFrameBound(allowFollowing: false);
+            }
+
+            WindowFrame frame = new WindowFrame(frameType, start, end);
+            frame._rowsOrRangeToken = rowsOrRangeToken;
+            frame._betweenToken = betweenToken;
+            frame._andToken = andToken;
+
+            return frame;
+        }
+
+        /// <summary>
+        /// Parses a single window frame bound (e.g., UNBOUNDED PRECEDING, CURRENT ROW, 3 PRECEDING)
+        /// </summary>
+        private WindowFrameBound ParseWindowFrameBound(bool allowFollowing)
+        {
+            WindowFrameBound bound;
+
+            if (Match(TokenType.UNBOUNDED, out Token unboundedToken))
+            {
+                if (Match(TokenType.PRECEDING, out Token precedingToken))
+                {
+                    bound = new WindowFrameBound(WindowFrameBoundType.UnboundedPreceding);
+                    bound._unboundedToken = unboundedToken;
+                    bound._precedingToken = precedingToken;
+                }
+                else if (allowFollowing && Match(TokenType.FOLLOWING, out Token followingToken))
+                {
+                    bound = new WindowFrameBound(WindowFrameBoundType.UnboundedFollowing);
+                    bound._unboundedToken = unboundedToken;
+                    bound._followingToken = followingToken;
+                }
+                else
+                {
+                    throw Error(Peek(), allowFollowing
+                        ? "Expected PRECEDING or FOLLOWING after UNBOUNDED"
+                        : "Expected PRECEDING after UNBOUNDED");
+                }
+            }
+            else if (Match(TokenType.CURRENT, out Token currentToken))
+            {
+                Token rowToken = Consume(TokenType.ROW, "Expected ROW after CURRENT");
+                bound = new WindowFrameBound(WindowFrameBoundType.CurrentRow);
+                bound._currentToken = currentToken;
+                bound._rowToken = rowToken;
+            }
+            else if (Check(TokenType.WHOLE_NUMBER))
+            {
+                Expr offset = new Expr.Literal(Advance());
+
+                if (Match(TokenType.PRECEDING, out Token precedingToken))
+                {
+                    bound = new WindowFrameBound(WindowFrameBoundType.Preceding, offset);
+                    bound._precedingToken = precedingToken;
+                }
+                else if (allowFollowing && Match(TokenType.FOLLOWING, out Token followingToken))
+                {
+                    bound = new WindowFrameBound(WindowFrameBoundType.Following, offset);
+                    bound._followingToken = followingToken;
+                }
+                else
+                {
+                    throw Error(Peek(), allowFollowing
+                        ? "Expected PRECEDING or FOLLOWING after number"
+                        : "Expected PRECEDING after number");
+                }
+            }
+            else
+            {
+                throw Error(Peek(), "Expected window frame bound (UNBOUNDED PRECEDING, CURRENT ROW, N PRECEDING, etc.)");
+            }
+
+            return bound;
+        }
+
+        /// <summary>
+        /// Parses a comma-separated list of expressions (for PARTITION BY)
+        /// </summary>
+        private SyntaxElementList<Expr> ParseExpressionList()
+        {
+            SyntaxElementList<Expr> list = new SyntaxElementList<Expr>();
+            do
+            {
+                Expr expr = Expression();
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                list.Add(expr, comma);
+            } while (Previous().Type == TokenType.COMMA);
+            return list;
+        }
+
+        /// <summary>
+        /// Parses a comma-separated list of ORDER BY items
+        /// </summary>
+        private SyntaxElementList<OrderByItem> ParseOrderByList()
+        {
+            SyntaxElementList<OrderByItem> list = new SyntaxElementList<OrderByItem>();
+            do
+            {
+                Expr expr = Expression();
+
+                Token orderToken = null;
+                bool desc = false;
+                if (Match(TokenType.DESC, out orderToken))
+                {
+                    desc = true;
+                }
+                else
+                {
+                    Match(TokenType.ASC, out orderToken);
+                }
+
+                OrderByItem item = new OrderByItem { Expression = expr, Descending = desc };
+                item._orderToken = orderToken;
+
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                list.Add(item, comma);
+            } while (Previous().Type == TokenType.COMMA);
+            return list;
+        }
+
+        #endregion
+
+        #region Contextual Keyword Helpers
+
+        /// <summary>
+        /// Checks if the current token is an identifier or a contextual keyword that can be used as an identifier.
+        /// </summary>
+        private bool IsIdentifierOrContextualKeyword()
+        {
+            if (IsAtEnd()) return false;
+            TokenType type = Peek().Type;
+            return type == TokenType.IDENTIFIER || ContextualKeywords.Contains(type);
+        }
+
+        /// <summary>
+        /// Checks if the given token is an identifier or a contextual keyword.
+        /// </summary>
+        private bool IsIdentifierOrContextualKeyword(Token token)
+        {
+            return token.Type == TokenType.IDENTIFIER || ContextualKeywords.Contains(token.Type);
+        }
+
+        /// <summary>
+        /// Consumes an identifier or contextual keyword token.
+        /// </summary>
+        private Token ConsumeIdentifierOrContextualKeyword(string message)
+        {
+            if (IsIdentifierOrContextualKeyword())
+            {
+                return Advance();
+            }
+            throw Error(Peek(), message);
+        }
+
+        #endregion
 
         private bool IsJoinKeyword()
         {
@@ -1044,8 +1339,8 @@ namespace TSQL
         {
             IdentifierPartsBuffer parts = new IdentifierPartsBuffer();
 
-            // Get the first part
-            Token first = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected identifier or '*' for column reference");
+            // Get the first part - can be IDENTIFIER, contextual keyword, or STAR
+            Token first = ConsumeIdentifierOrContextualKeywordOrStar("Expected identifier or '*' for column reference");
             parts.Add(new IdentifierPart(first, dotBefore: null));
 
             if (first.Type == TokenType.STAR) { return parts; }
@@ -1062,13 +1357,25 @@ namespace TSQL
                     continue;
                 }
 
-                Token next = Consume(new TokenType[] { TokenType.IDENTIFIER, TokenType.STAR }, "Expected identifier or '*' after dot");
+                Token next = ConsumeIdentifierOrContextualKeywordOrStar("Expected identifier or '*' after dot");
                 parts.Add(new IdentifierPart(next, dotBefore: dot));
 
                 if (next.Type == TokenType.STAR) { break; }
             }
 
             return parts;
+        }
+
+        /// <summary>
+        /// Consumes an identifier, contextual keyword, or STAR token.
+        /// </summary>
+        private Token ConsumeIdentifierOrContextualKeywordOrStar(string message)
+        {
+            if (Check(TokenType.STAR) || IsIdentifierOrContextualKeyword())
+            {
+                return Advance();
+            }
+            throw Error(Peek(), message);
         }
 
         private class IdentifierPart

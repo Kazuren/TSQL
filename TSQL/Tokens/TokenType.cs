@@ -1,4 +1,4 @@
-﻿namespace TSQL
+namespace TSQL
 {
     public enum TokenType
     {
@@ -41,6 +41,12 @@
         TABLE, TABLESAMPLE, TEXTSIZE, THEN, TO, TOP, TRAN, TRANSACTION, TRIGGER, TRUNCATE, TRY_CONVERT, TSEQUAL,
         UNION, UNIQUE, UNPIVOT, UPDATE, UPDATETEXT, USE, USER,
         VALUES, VARYING, VIEW,
-        WAITFOR, WHEN, WHERE, WHILE, WITH, WITHIN /*WITHIN = WITHIN GROUP*/, WRITETEXT
+        WAITFOR, WHEN, WHERE, WHILE, WITH, WITHIN /*WITHIN = WITHIN GROUP*/, WRITETEXT,
+
+        // Window function keywords (contextual - can also be used as identifiers)
+        PARTITION, ROWS, RANGE, UNBOUNDED, PRECEDING, FOLLOWING, ROW,
+
+        // Ranking functions (contextual - can also be used as identifiers)
+        ROW_NUMBER, RANK, DENSE_RANK, NTILE
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace TSQL.StandardLibrary.Visitors
+namespace TSQL.StandardLibrary.Visitors
 {
     public class SourceCodeVisitor : Expr.Visitor<string>, Stmt.Visitor<string>
     {
@@ -43,6 +43,11 @@
         }
 
         public string VisitVariableExpr(Expr.Variable expr)
+        {
+            return expr.ToSource();
+        }
+
+        public string VisitWindowFunctionExpr(Expr.WindowFunction expr)
         {
             return expr.ToSource();
         }
