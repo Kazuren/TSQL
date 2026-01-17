@@ -9,6 +9,8 @@ namespace TSQL
     // ## @variable.function_call
     //  - reason: @variable must be a CLR user-defined type, something that's rare and not worth implementing unless needed
 
+    // TODO: support CAST(exp AS data_type) SYNTAX. special case? or support it everywhere?
+
     // dollar sign ($) columns need no unique handling, column identifier already handles them just fine
     /*
     Legend:
@@ -34,16 +36,25 @@ namespace TSQL
             factor -> unary ( ( "/" | "*") unary )*
             unary -> ("-") scalar_subquery | scalar_subquery
             scalar_subquery -> ( "(" select_expression ")" ) | primary
-            primary -> "NULL" | WHOLE_NUMBER | DECIMAL | STRING | column_expression | ( "(" expression ")" ) | VARIABLE
+            primary -> 
+                "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
+                | column_expression | ( "(" expression ")" ) 
+                | scalar_function | window_function
         
 
         Syntax nodes:
-            column_expression -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
+            column_expression -> fully_qualified_identifier
+            fully_qualified_identifier -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
+
+            scalar_function -> function_call
+            function_call -> fully_qualified_identifier "(" (expression_list)? ")" 
+            expression_list -> expression ("," expression)*
+
             select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | parenthesized_expression) ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)?
             parenthesized_expression -> ( "(" select_expression | expression ")" ) 
             wildcard -> STAR
             qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
-            select_item -> wildcard | qualified_wildcard | expression
+            select_item -> wildcard | qualified_wildcard | expression ("AS" IDENTIFIER)?
             select_list -> select_item ("," select_item)*
 
             from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
