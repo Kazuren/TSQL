@@ -54,10 +54,9 @@ namespace TSQL
             parenthesized_expression -> ( "(" select_expression | expression ")" ) 
             wildcard -> STAR
             qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
-            select_item -> wildcard | qualified_wildcard | expression ("AS" IDENTIFIER)?
+            select_item -> wildcard | qualified_wildcard | expression (("AS")? IDENTIFIER)?
             select_list -> select_item ("," select_item)*
 
-            from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
             where_clause -> "WHERE search_condition
             group_by_clause -> "GROUP BY"
             having_clause -> "HAVING"
@@ -90,15 +89,47 @@ namespace TSQL
                 null_predicate | contains_predicate | in_predicate | 
                 quantifier_predicate | exists_predicate | "(" predicate ")"
             ---------------- WHERE ---------------
-
-
+    
             ---------------- FROM ---------------
-            table_source -> 
+            from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
+            table_source -> fully_qualified_identifier (for_system_time)? ( ("AS")? IDENTIFIER ) (tablesample_clause)? (with_hints)?
 
-            table_variable -> VARIABLE ( ("AS")? IDENTIFIER) 
-                
-            ---------------- FROM ---------------
-            variable -> VARIABLE
+            for_system_time -> "FOR" "SYSTEM_TIME" system_time
+            system_time -> 
+                AS OF date_time 
+                | FROM date_time TO date_time 
+                | BETWEEN date_time AND date_time 
+                | CONTAINED IN "(" date_time "," date_time ")" 
+                | ALL
+
+            TODO: should null be supported here too?
+            date_time -> STRING | VARIABLE
+
+            tablesample_clause -> 
+            with_hints -> "WITH" "(" table_hint ("," table_hint)* ")"
+            table_hint -> "NOEXPAND"
+                | "INDEX" "(" index_value ("," index_value)* ")"
+                | "INDEX" "=" index_value
+                | "FORCESEEK" ( "(" index_value "(" IDENTIFIER ("," IDENTIFIER)? ")" ")" )?
+                | "FORCESCAN"
+                | "HOLDLOCK"
+                | "NOLOCK"
+                | "NOWAIT"
+                | "PAGLOCK"
+                | "READCOMMITTED"
+                | "READCOMMITTEDLOCK"
+                | "READPAST"
+                | "READUNCOMMITTED"
+                | "REPEATABLEREAD"
+                | "ROWLOCK"
+                | "SERIALIZABLE"
+                | "SNAPSHOT"
+                | "SPATIAL_WINDOW_MAX_CELLS" "=" WHOLE_NUMBER
+                | "TABLOCK"
+                | "TABLOCKX"
+                | "UPDLOCK"
+                | "XLOCK"
+            index_value -> WHOLE_NUMBER | IDENTIFIER
 
             ---------------- WINDOW FUNCTIONS ---------------
             window_function -> function_call over_clause
