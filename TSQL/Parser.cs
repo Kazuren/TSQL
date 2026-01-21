@@ -92,7 +92,11 @@ namespace TSQL
     
             ---------------- FROM ---------------
             from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
-            table_source -> fully_qualified_identifier (for_system_time)? ( ("AS")? IDENTIFIER ) (tablesample_clause)? (with_hints)?
+            table_source -> 
+                fully_qualified_identifier (for_system_time)? ( ("AS")? IDENTIFIER ) (tablesample_clause)? (with_hints)?
+                | rowset_function ( ("AS")? IDENTIFIER )? ( "(" bulk_column_alias ("," bulk_column_alias)* ")" )?\
+                | user_defined_function ( ("AS")? IDENTIFIER )?
+                | "OPENXML" openxml_clause
 
             for_system_time -> "FOR" "SYSTEM_TIME" system_time
             system_time -> 
@@ -105,7 +109,8 @@ namespace TSQL
             TODO: should null be supported here too?
             date_time -> STRING | VARIABLE
 
-            tablesample_clause -> 
+            tablesample_clause -> "TABLESAMPLE" ("SYSTEM")? "(" sample_number ("PERCENT" | "ROWS") ")" ( "REPEATABLE" "(" repeat_seed ")" )?
+
             with_hints -> "WITH" "(" table_hint ("," table_hint)* ")"
             table_hint -> "NOEXPAND"
                 | "INDEX" "(" index_value ("," index_value)* ")"
@@ -130,6 +135,12 @@ namespace TSQL
                 | "UPDLOCK"
                 | "XLOCK"
             index_value -> WHOLE_NUMBER | IDENTIFIER
+
+            rowset_function -> TODO: just normal function call??
+            user_defined_function -> TODO: just normal function call??
+             
+            openxml_clause -> TODO:
+
 
             ---------------- WINDOW FUNCTIONS ---------------
             window_function -> function_call over_clause
