@@ -47,6 +47,9 @@ namespace TSQL
         PARTITION, ROWS, RANGE, UNBOUNDED, PRECEDING, FOLLOWING, ROW,
 
         // Ranking functions (contextual - can also be used as identifiers)
-        ROW_NUMBER, RANK, DENSE_RANK, NTILE
+        ROW_NUMBER, RANK, DENSE_RANK, NTILE,
+
+        // FROM clause keywords (contextual - can also be used as identifiers)
+        APPLY, LOOP, HASH, REMOTE, SYSTEM, CONTAINED, REPEATABLE
     }
 }

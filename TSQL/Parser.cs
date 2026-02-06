@@ -187,7 +187,14 @@ namespace TSQL
             TokenType.ROW_NUMBER,
             TokenType.RANK,
             TokenType.DENSE_RANK,
-            TokenType.NTILE
+            TokenType.NTILE,
+            TokenType.APPLY,
+            TokenType.LOOP,
+            TokenType.HASH,
+            TokenType.REMOTE,
+            TokenType.SYSTEM,
+            TokenType.CONTAINED,
+            TokenType.REPEATABLE
         };
 
         public Parser(IEnumerable<Token> tokens)
