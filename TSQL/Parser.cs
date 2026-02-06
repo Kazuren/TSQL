@@ -323,10 +323,11 @@ namespace TSQL
                 selectExpr._distinctKeyword = Previous();
             }
 
-            if (Match(TokenType.TOP))
+            if (Match(TokenType.TOP, out Token topKeyword))
             {
                 Expr expr = Expression();
                 selectExpr.Top = new TopClause(expr);
+                selectExpr.Top._topKeyword = topKeyword;
             }
 
             do

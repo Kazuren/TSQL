@@ -1406,5 +1406,101 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Integration Tests - Complex FROM + WHERE Combinations
+
+        [Theory]
+        // JOIN + WHERE
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id WHERE T1.active = 1")]
+        [InlineData("SELECT a FROM T1 LEFT JOIN T2 ON T1.id = T2.id WHERE T2.id IS NULL")]
+        // Multi-join chain + WHERE
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id LEFT JOIN T3 ON T2.id = T3.id WHERE T1.x > 0")]
+        // Qualified names + JOIN
+        [InlineData("SELECT a FROM dbo.T1 t1 CROSS JOIN dbo.T2 t2")]
+        [InlineData("SELECT a FROM dbo.T1 t1 INNER JOIN dbo.T2 t2 ON t1.id = t2.id")]
+        // Table hints + JOIN
+        [InlineData("SELECT a FROM T1 WITH (NOLOCK) INNER JOIN T2 WITH (NOLOCK) ON T1.id = T2.id")]
+        // CROSS APPLY with subquery
+        [InlineData("SELECT a FROM T1 CROSS APPLY (SELECT TOP 1 b FROM T2 WHERE T2.id = T1.id) AS sub")]
+        // Join hint with qualified names
+        [InlineData("SELECT a FROM T1 t1 INNER LOOP JOIN T2 t2 ON t1.id = t2.id")]
+        // PIVOT + WHERE
+        [InlineData("SELECT a FROM T PIVOT (SUM(Amount) FOR Month IN (Jan, Feb)) AS pvt WHERE pvt.Jan > 0")]
+        // VALUES + WHERE
+        [InlineData("SELECT a FROM (VALUES (1, 'x'), (2, 'y')) AS t(id, name) WHERE t.id > 1")]
+        // Subquery derived table + WHERE
+        [InlineData("SELECT a FROM (SELECT x, y FROM T) AS sub WHERE sub.x = 1")]
+        // Table variable + JOIN
+        [InlineData("SELECT a FROM @TempTable t INNER JOIN T2 ON t.id = T2.id")]
+        // Multiple comma-separated sources + WHERE
+        [InlineData("SELECT a FROM T1, T2 WHERE T1.id = T2.id")]
+        // Complex predicates in ON clause
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id AND T1.type = T2.type")]
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id OR T1.alt_id = T2.id")]
+        // Nested subquery in FROM + JOIN
+        [InlineData("SELECT a FROM (SELECT x FROM T1) AS sub INNER JOIN T2 ON sub.x = T2.id")]
+        // OUTER APPLY
+        [InlineData("SELECT a FROM T1 OUTER APPLY (SELECT b FROM T2 WHERE T2.id = T1.id) AS sub")]
+        // Full outer join
+        [InlineData("SELECT a FROM T1 FULL OUTER JOIN T2 ON T1.id = T2.id WHERE T1.id IS NOT NULL")]
+        // Parenthesized join group
+        [InlineData("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id) CROSS JOIN T3")]
+        // Derived column aliases on subquery + JOIN
+        [InlineData("SELECT a FROM (SELECT 1, 2) AS t(c1, c2) INNER JOIN T2 ON t.c1 = T2.id")]
+        public void Parse_IntegrationTests_RoundTripsCorrectly(string source)
+        {
+            // Arrange
+            Scanner scanner = new Scanner(source);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+
+            // Act
+            Stmt stmt = parser.Parse();
+
+            // Assert
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void Parse_JoinWithWhere_HasCorrectASTStructure()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id WHERE T1.active = 1");
+            SelectExpression expr = select.SelectExpression;
+
+            // FROM should contain a QualifiedJoin
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(expr.From.TableSources[0]);
+            Assert.Equal(JoinType.Inner, join.JoinType);
+
+            TableReference t1 = Assert.IsType<TableReference>(join.Left);
+            Assert.Equal("T1", t1.TableName.ObjectName.Name);
+
+            TableReference t2 = Assert.IsType<TableReference>(join.Right);
+            Assert.Equal("T2", t2.TableName.ObjectName.Name);
+
+            // ON condition should be a comparison
+            Assert.IsType<AST.Predicate.Comparison>(join.OnCondition);
+
+            // WHERE should be a comparison predicate
+            Assert.NotNull(expr.Where);
+            Assert.IsType<AST.Predicate.Comparison>(expr.Where);
+        }
+
+        [Fact]
+        public void Parse_CrossApplyWithSubquery_HasCorrectASTStructure()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM T1 CROSS APPLY (SELECT b FROM T2 WHERE T2.id = T1.id) AS sub");
+            SelectExpression expr = select.SelectExpression;
+
+            ApplyJoin apply = Assert.IsType<ApplyJoin>(expr.From.TableSources[0]);
+            Assert.Equal(ApplyType.Cross, apply.ApplyType);
+
+            TableReference t1 = Assert.IsType<TableReference>(apply.Left);
+            Assert.Equal("T1", t1.TableName.ObjectName.Name);
+
+            SubqueryReference sub = Assert.IsType<SubqueryReference>(apply.Right);
+            Assert.Equal("sub", sub.Alias.Name.Lexeme);
+        }
+
+        #endregion
     }
 }
