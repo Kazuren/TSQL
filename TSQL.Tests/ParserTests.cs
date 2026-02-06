@@ -720,5 +720,140 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region WHERE Clause / Search Condition Tests
+
+        [Fact]
+        public void Parse_WhereComparison_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT a FROM T WHERE a = 1");
+
+            // Assert
+            Assert.NotNull(select.SelectExpression.Where);
+            var comparison = Assert.IsType<AST.Predicate.Comparison>(select.SelectExpression.Where);
+            Assert.IsType<Expr.ColumnIdentifier>(comparison.Left);
+            Assert.Equal("=", comparison.Operator.Lexeme);
+            Assert.IsType<Expr.Literal>(comparison.Right);
+        }
+
+        [Fact]
+        public void Parse_WhereIsNull_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT a FROM T WHERE a IS NULL");
+
+            // Assert
+            var nullPred = Assert.IsType<AST.Predicate.Null>(select.SelectExpression.Where);
+            Assert.False(nullPred.Negated);
+        }
+
+        [Fact]
+        public void Parse_WhereIsNotNull_HasCorrectStructure()
+        {
+            // Arrange & Act
+            var select = ParseSelect("SELECT a FROM T WHERE a IS NOT NULL");
+
+            // Assert
+            var nullPred = Assert.IsType<AST.Predicate.Null>(select.SelectExpression.Where);
+            Assert.True(nullPred.Negated);
+        }
+
+        [Fact]
+        public void Parse_WhereAndOr_HasCorrectPrecedence()
+        {
+            // a = 1 AND b = 2 OR c = 3 should be (a=1 AND b=2) OR c=3
+            var select = ParseSelect("SELECT a FROM T WHERE a = 1 AND b = 2 OR c = 3");
+
+            var orPred = Assert.IsType<AST.Predicate.Or>(select.SelectExpression.Where);
+            Assert.IsType<AST.Predicate.And>(orPred.Left);
+            Assert.IsType<AST.Predicate.Comparison>(orPred.Right);
+        }
+
+        [Fact]
+        public void Parse_WhereNot_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WHERE NOT a = 1");
+
+            var notPred = Assert.IsType<AST.Predicate.Not>(select.SelectExpression.Where);
+            Assert.IsType<AST.Predicate.Comparison>(notPred.Predicate);
+        }
+
+        [Fact]
+        public void Parse_WhereLike_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WHERE a LIKE '%test%'");
+
+            var likePred = Assert.IsType<AST.Predicate.Like>(select.SelectExpression.Where);
+            Assert.False(likePred.Negated);
+            Assert.IsType<Expr.ColumnIdentifier>(likePred.Left);
+            Assert.IsType<Expr.Literal>(likePred.Pattern);
+        }
+
+        [Fact]
+        public void Parse_WhereBetween_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WHERE a BETWEEN 1 AND 10");
+
+            var between = Assert.IsType<AST.Predicate.Between>(select.SelectExpression.Where);
+            Assert.False(between.Negated);
+        }
+
+        [Fact]
+        public void Parse_WhereInList_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WHERE a IN (1, 2, 3)");
+
+            var inPred = Assert.IsType<AST.Predicate.In>(select.SelectExpression.Where);
+            Assert.False(inPred.Negated);
+            Assert.NotNull(inPred.ValueList);
+            Assert.Equal(3, inPred.ValueList.Count);
+        }
+
+        [Fact]
+        public void Parse_WhereExists_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WHERE EXISTS (SELECT 1 FROM T2)");
+
+            var exists = Assert.IsType<AST.Predicate.Exists>(select.SelectExpression.Where);
+            Assert.NotNull(exists.Subquery);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE a = 1")]
+        [InlineData("SELECT a FROM T WHERE a > b")]
+        [InlineData("SELECT a FROM T WHERE a >= 1")]
+        [InlineData("SELECT a FROM T WHERE a <> 1")]
+        [InlineData("SELECT a FROM T WHERE a != 1")]
+        [InlineData("SELECT a FROM T WHERE a IS NULL")]
+        [InlineData("SELECT a FROM T WHERE a IS NOT NULL")]
+        [InlineData("SELECT a FROM T WHERE a BETWEEN 1 AND 10")]
+        [InlineData("SELECT a FROM T WHERE a NOT BETWEEN 1 AND 10")]
+        [InlineData("SELECT a FROM T WHERE a LIKE '%test%'")]
+        [InlineData("SELECT a FROM T WHERE a NOT LIKE '%test%'")]
+        [InlineData("SELECT a FROM T WHERE a LIKE '%test%' ESCAPE '\\'")]
+        [InlineData("SELECT a FROM T WHERE a IN (1, 2, 3)")]
+        [InlineData("SELECT a FROM T WHERE a NOT IN (1, 2, 3)")]
+        [InlineData("SELECT a FROM T WHERE NOT a = 1")]
+        [InlineData("SELECT a FROM T WHERE a = 1 AND b = 2")]
+        [InlineData("SELECT a FROM T WHERE a = 1 OR b = 2")]
+        [InlineData("SELECT a FROM T WHERE a = 1 AND b = 2 OR c = 3")]
+        [InlineData("SELECT a FROM T WHERE EXISTS (SELECT 1 FROM T2)")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS (a, 'test')")]
+        public void Parse_SearchCondition_RoundTripsCorrectly(string source)
+        {
+            // Arrange
+            Scanner scanner = new Scanner(source);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+
+            // Act
+            Stmt stmt = parser.Parse();
+
+            // Assert
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        #endregion
     }
 }

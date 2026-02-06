@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TSQL.AST;
 using static TSQL.Expr;
 
 namespace TSQL
@@ -330,48 +331,11 @@ namespace TSQL
 
             selectExpr.From = FromClause();
 
-            //while (IsJoinKeyword())
-            //{
-            //    selectExpr.Joins.Add(JoinClause());
-            //}
-
-            //if (Match(TokenType.FROM))
-            //{
-            //    Token fromToken = Previous();
-            //    selectExpr.From = FromClause();
-
-            //}
-
-            //if (Match(TokenType.WHERE))
-            //{
-            //    selectExpr.Where = Expression();
-            //}
-
-            //if (Match(TokenType.GROUP))
-            //{
-            //    Consume(TokenType.BY, "Expected BY after GROUP");
-            //    do
-            //    {
-            //        selectExpr.GroupBy.Add(Expression());
-            //    } while (Match(TokenType.COMMA));
-            //}
-
-            //if (Match(TokenType.HAVING))
-            //{
-            //    selectExpr.Having = Expression();
-            //}
-
-            //if (Match(TokenType.ORDER))
-            //{
-            //    Consume(TokenType.BY, "Expected BY after ORDER");
-            //    do
-            //    {
-            //        Expr expr = Expression();
-            //        bool desc = Match(TokenType.DESC);
-            //        if (!desc) Match(TokenType.ASC);
-            //        selectExpr.OrderBy.Add(new OrderByItem() { Expression = expr, Descending = desc });
-            //    } while (Match(TokenType.COMMA));
-            //}
+            if (Match(TokenType.WHERE, out Token whereToken))
+            {
+                selectExpr._whereKeyword = whereToken;
+                selectExpr.Where = SearchCondition();
+            }
 
             return selectExpr;
         }
@@ -489,6 +453,241 @@ namespace TSQL
             return null;
         }
 
+
+        #region Search Condition Parsing
+
+        private Predicate SearchCondition()
+        {
+            return OrPredicate();
+        }
+
+        private Predicate OrPredicate()
+        {
+            Predicate left = AndPredicate();
+
+            while (Match(TokenType.OR, out Token orToken))
+            {
+                Predicate right = AndPredicate();
+                Predicate.Or or = new Predicate.Or(left, right);
+                or._orToken = orToken;
+                left = or;
+            }
+
+            return left;
+        }
+
+        private Predicate AndPredicate()
+        {
+            Predicate left = UnaryPredicate();
+
+            while (Match(TokenType.AND, out Token andToken))
+            {
+                Predicate right = UnaryPredicate();
+                Predicate.And and = new Predicate.And(left, right);
+                and._andToken = andToken;
+                left = and;
+            }
+
+            return left;
+        }
+
+        private Predicate UnaryPredicate()
+        {
+            if (Match(TokenType.NOT, out Token notToken))
+            {
+                Predicate predicate = UnaryPredicate();
+                Predicate.Not not = new Predicate.Not(predicate);
+                not._notToken = notToken;
+                return not;
+            }
+
+            return PrimaryPredicate();
+        }
+
+        private Predicate PrimaryPredicate()
+        {
+            // EXISTS (select_expression)
+            if (Match(TokenType.EXISTS, out Token existsToken))
+            {
+                Expr.Subquery subquery = Subquery();
+                Predicate.Exists exists = new Predicate.Exists(subquery);
+                exists._existsToken = existsToken;
+                return exists;
+            }
+
+            // CONTAINS (column, search_condition)
+            if (Match(TokenType.CONTAINS, out Token containsToken))
+            {
+                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected ( after CONTAINS");
+                Expr column;
+                if (Check(TokenType.STAR))
+                {
+                    column = new Expr.Wildcard(Advance());
+                }
+                else
+                {
+                    column = Expression();
+                }
+                Token comma = Consume(TokenType.COMMA, "Expected , in CONTAINS");
+                Expr searchExpr = Expression();
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after CONTAINS");
+
+                Predicate.Contains contains = new Predicate.Contains(column, searchExpr);
+                contains._containsToken = containsToken;
+                contains._leftParen = leftParen;
+                contains._comma = comma;
+                contains._rightParen = rightParen;
+                return contains;
+            }
+
+            // Grouped predicate: (predicate)
+            // Must disambiguate from subquery expressions
+            if (Check(TokenType.LEFT_PAREN) && !CheckNext(TokenType.SELECT))
+            {
+                // Could be a grouped predicate or an expression starting with (
+                // Try parsing as predicate group - if the content after ( starts with
+                // something that looks like a predicate, treat it as grouped predicate
+                // This is tricky because (a + b) could be an expression or a predicate start
+                // We only treat it as a grouped predicate at the search_condition level
+                // when we know we're already in a predicate context
+                // Fall through to expression-based predicate parsing below
+            }
+
+            // Expression-based predicates: parse left expression, then check what follows
+            Expr leftExpr = Expression();
+
+            // comparison_operator expression
+            if (IsComparisonOperator())
+            {
+                Token op = Advance();
+
+                // Check for quantified predicate: op (ALL|SOME|ANY) (select)
+                if (Check(TokenType.ALL, TokenType.SOME, TokenType.ANY))
+                {
+                    Token quantifier = Advance();
+                    Expr.Subquery subquery = Subquery();
+                    Predicate.Quantifier quant = new Predicate.Quantifier(leftExpr, op, quantifier, subquery);
+                    return quant;
+                }
+
+                Expr rightExpr = Expression();
+                return new Predicate.Comparison(leftExpr, op, rightExpr);
+            }
+
+            // [NOT] LIKE expression [ESCAPE string]
+            if (Check(TokenType.LIKE) || (Check(TokenType.NOT) && CheckNext(TokenType.LIKE)))
+            {
+                Token notToken = null;
+                bool negated = false;
+                if (Match(TokenType.NOT, out notToken))
+                {
+                    negated = true;
+                }
+                Token likeToken = Consume(TokenType.LIKE, "Expected LIKE");
+                Expr pattern = Expression();
+
+                Expr escapeExpr = null;
+                Token escapeToken = null;
+                if (Match(TokenType.ESCAPE, out escapeToken))
+                {
+                    escapeExpr = Expression();
+                }
+
+                Predicate.Like like = new Predicate.Like(leftExpr, pattern, escapeExpr, negated);
+                like._notToken = notToken;
+                like._likeToken = likeToken;
+                like._escapeToken = escapeToken;
+                return like;
+            }
+
+            // [NOT] BETWEEN expression AND expression
+            if (Check(TokenType.BETWEEN) || (Check(TokenType.NOT) && CheckNext(TokenType.BETWEEN)))
+            {
+                Token notToken = null;
+                bool negated = false;
+                if (Match(TokenType.NOT, out notToken))
+                {
+                    negated = true;
+                }
+                Token betweenToken = Consume(TokenType.BETWEEN, "Expected BETWEEN");
+                Expr low = Expression();
+                Token andToken = Consume(TokenType.AND, "Expected AND in BETWEEN");
+                Expr high = Expression();
+
+                Predicate.Between between = new Predicate.Between(leftExpr, low, high, negated);
+                between._notToken = notToken;
+                between._betweenToken = betweenToken;
+                between._andToken = andToken;
+                return between;
+            }
+
+            // IS [NOT] NULL
+            if (Check(TokenType.IS))
+            {
+                Token isToken = Advance();
+                Token notToken = null;
+                bool negated = false;
+                if (Match(TokenType.NOT, out notToken))
+                {
+                    negated = true;
+                }
+                Token nullToken = Consume(TokenType.NULL, "Expected NULL after IS");
+
+                Predicate.Null nullPred = new Predicate.Null(leftExpr, negated);
+                nullPred._isToken = isToken;
+                nullPred._notToken = notToken;
+                nullPred._nullToken = nullToken;
+                return nullPred;
+            }
+
+            // [NOT] IN (select_expression | expression_list)
+            if (Check(TokenType.IN) || (Check(TokenType.NOT) && CheckNext(TokenType.IN)))
+            {
+                Token notToken = null;
+                bool negated = false;
+                if (Match(TokenType.NOT, out notToken))
+                {
+                    negated = true;
+                }
+                Token inToken = Consume(TokenType.IN, "Expected IN");
+                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected ( after IN");
+
+                Predicate.In inPred;
+                if (Check(TokenType.SELECT))
+                {
+                    SelectExpression subSelect = SelectExpression();
+                    Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after IN subquery");
+                    Expr.Subquery sub = new Expr.Subquery(subSelect, leftParen, rightParen);
+                    inPred = new Predicate.In(leftExpr, negated, sub);
+                }
+                else
+                {
+                    SyntaxElementList<Expr> values = ParseExpressionList();
+                    Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after IN list");
+                    inPred = new Predicate.In(leftExpr, negated, values);
+                    inPred._rightParen = rightParen;
+                }
+
+                inPred._notToken = notToken;
+                inPred._inToken = inToken;
+                inPred._leftParen = leftParen;
+                return inPred;
+            }
+
+            throw Error(Peek(), "Expected predicate (comparison, LIKE, BETWEEN, IS NULL, IN, or EXISTS)");
+        }
+
+        private bool IsComparisonOperator()
+        {
+            if (IsAtEnd()) return false;
+            TokenType type = Peek().Type;
+            return type == TokenType.EQUAL || type == TokenType.NOT_EQUAL ||
+                   type == TokenType.GREATER || type == TokenType.GREATER_EQUAL ||
+                   type == TokenType.LESS || type == TokenType.LESS_EQUAL ||
+                   type == TokenType.NOT_LESS || type == TokenType.NOT_GREATER;
+        }
+
+        #endregion
 
         //private JoinClause JoinClause()
         //{

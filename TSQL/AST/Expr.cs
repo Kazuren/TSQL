@@ -824,7 +824,7 @@ namespace TSQL
         public SyntaxElementList<SelectItem> Columns { get; set; } = new SyntaxElementList<SelectItem>();
         public FromClause From { get; set; }
         public SyntaxElementList<JoinClause> Joins { get; set; } = new SyntaxElementList<JoinClause>();
-        public Expr Where { get; set; }
+        public AST.Predicate Where { get; set; }
         public SyntaxElementList<Expr> GroupBy { get; set; } = new SyntaxElementList<Expr>();
         public Expr Having { get; set; }
         public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
@@ -832,6 +832,7 @@ namespace TSQL
         // Original tokens
         internal Token _selectKeyword;
         internal Token _distinctKeyword;
+        internal Token _whereKeyword;
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _selectKeyword;
@@ -857,6 +858,15 @@ namespace TSQL
             if (From != null)
             {
                 foreach (Token token in From.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (Where != null)
+            {
+                yield return _whereKeyword;
+                foreach (Token token in Where.DescendantTokens())
                 {
                     yield return token;
                 }
