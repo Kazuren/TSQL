@@ -381,12 +381,12 @@ namespace TSQL
         {
             foreach (Token token in Left.DescendantTokens())
                 yield return token;
-            if (_joinHintToken != null)
-                yield return _joinHintToken;
             if (_joinTypeToken != null)
                 yield return _joinTypeToken;
             if (_outerToken != null)
                 yield return _outerToken;
+            if (_joinHintToken != null)
+                yield return _joinHintToken;
             yield return _joinToken;
             foreach (Token token in Right.DescendantTokens())
                 yield return token;

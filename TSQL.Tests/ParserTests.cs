@@ -498,6 +498,158 @@ namespace TSQL.Tests
             Assert.Equal("t", tableRef.Alias.Name.Lexeme);
         }
 
+        [Fact]
+        public void Parse_InnerJoin_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinType.Inner, join.JoinType);
+            var left = Assert.IsType<TableReference>(join.Left);
+            var right = Assert.IsType<TableReference>(join.Right);
+            Assert.Equal("T1", left.TableName.ObjectName.Name);
+            Assert.Equal("T2", right.TableName.ObjectName.Name);
+            Assert.NotNull(join.OnCondition);
+        }
+
+        [Fact]
+        public void Parse_LeftJoin_HasCorrectJoinType()
+        {
+            var select = ParseSelect("SELECT a FROM T1 LEFT JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinType.LeftOuter, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_LeftOuterJoin_HasCorrectJoinType()
+        {
+            var select = ParseSelect("SELECT a FROM T1 LEFT OUTER JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinType.LeftOuter, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_RightJoin_HasCorrectJoinType()
+        {
+            var select = ParseSelect("SELECT a FROM T1 RIGHT JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinType.RightOuter, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_FullOuterJoin_HasCorrectJoinType()
+        {
+            var select = ParseSelect("SELECT a FROM T1 FULL OUTER JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinType.FullOuter, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_BareJoin_DefaultsToInner()
+        {
+            var select = ParseSelect("SELECT a FROM T1 JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinType.Inner, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_CrossJoin_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T1 CROSS JOIN T2");
+
+            var join = Assert.IsType<CrossJoin>(select.SelectExpression.From.TableSources[0]);
+            var left = Assert.IsType<TableReference>(join.Left);
+            var right = Assert.IsType<TableReference>(join.Right);
+            Assert.Equal("T1", left.TableName.ObjectName.Name);
+            Assert.Equal("T2", right.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_CrossApply_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T1 CROSS APPLY (SELECT b FROM T2) AS sub");
+
+            var join = Assert.IsType<ApplyJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(ApplyType.Cross, join.ApplyType);
+            var left = Assert.IsType<TableReference>(join.Left);
+            Assert.Equal("T1", left.TableName.ObjectName.Name);
+            var right = Assert.IsType<SubqueryReference>(join.Right);
+            Assert.NotNull(right.Alias);
+        }
+
+        [Fact]
+        public void Parse_OuterApply_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T1 OUTER APPLY (SELECT b FROM T2) AS sub");
+
+            var join = Assert.IsType<ApplyJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(ApplyType.Outer, join.ApplyType);
+        }
+
+        [Fact]
+        public void Parse_MultiJoinChain_IsLeftAssociative()
+        {
+            var select = ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id INNER JOIN T3 ON T2.id = T3.id");
+
+            // Should be: (T1 JOIN T2) JOIN T3
+            var outerJoin = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            var innerJoin = Assert.IsType<QualifiedJoin>(outerJoin.Left);
+            var t3 = Assert.IsType<TableReference>(outerJoin.Right);
+            var t1 = Assert.IsType<TableReference>(innerJoin.Left);
+            var t2 = Assert.IsType<TableReference>(innerJoin.Right);
+            Assert.Equal("T1", t1.TableName.ObjectName.Name);
+            Assert.Equal("T2", t2.TableName.ObjectName.Name);
+            Assert.Equal("T3", t3.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_LoopJoinWithoutType_TreatsLoopAsAlias()
+        {
+            // Without an explicit join type, LOOP is treated as an alias
+            var select = ParseSelect("SELECT a FROM T1 LOOP JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            var left = Assert.IsType<TableReference>(join.Left);
+            Assert.Equal("LOOP", left.Alias.Name.Lexeme);
+            Assert.Null(join.JoinHint);
+            Assert.Equal(JoinType.Inner, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_JoinHint_InnerHashJoin()
+        {
+            var select = ParseSelect("SELECT a FROM T1 INNER HASH JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinHint.Hash, join.JoinHint);
+            Assert.Equal(JoinType.Inner, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_JoinHint_LeftMergeJoin()
+        {
+            var select = ParseSelect("SELECT a FROM T1 LEFT MERGE JOIN T2 ON T1.id = T2.id");
+
+            var join = Assert.IsType<QualifiedJoin>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(JoinHint.Merge, join.JoinHint);
+            Assert.Equal(JoinType.LeftOuter, join.JoinType);
+        }
+
+        [Fact]
+        public void Parse_ParenthesizedJoin_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id)");
+
+            var paren = Assert.IsType<ParenthesizedTableSource>(select.SelectExpression.From.TableSources[0]);
+            var join = Assert.IsType<QualifiedJoin>(paren.Inner);
+            Assert.Equal(JoinType.Inner, join.JoinType);
+        }
+
         #endregion
 
         #region Round-Trip Theory Tests
@@ -531,6 +683,29 @@ namespace TSQL.Tests
         // FROM clause - table variable
         [InlineData("SELECT a FROM @TempTable")]
         [InlineData("SELECT a FROM @TempTable AS t")]
+        // FROM clause - JOINs
+        [InlineData("SELECT a FROM T1 JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 LEFT JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 LEFT OUTER JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 RIGHT JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 RIGHT OUTER JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 FULL JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 FULL OUTER JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 CROSS JOIN T2")]
+        [InlineData("SELECT a FROM T1 CROSS APPLY (SELECT b FROM T2) AS sub")]
+        [InlineData("SELECT a FROM T1 OUTER APPLY (SELECT b FROM T2) AS sub")]
+        // FROM clause - join hints
+        [InlineData("SELECT a FROM T1 LOOP JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 INNER HASH JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 LEFT MERGE JOIN T2 ON T1.id = T2.id")]
+        [InlineData("SELECT a FROM T1 LEFT OUTER REMOTE JOIN T2 ON T1.id = T2.id")]
+        // FROM clause - multi-join chains
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id INNER JOIN T3 ON T2.id = T3.id")]
+        [InlineData("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id LEFT JOIN T3 ON T2.id = T3.id CROSS JOIN T4")]
+        // FROM clause - parenthesized joins
+        [InlineData("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id)")]
+        [InlineData("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id) CROSS JOIN T3")]
 
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
         {

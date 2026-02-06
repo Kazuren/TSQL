@@ -112,7 +112,7 @@ namespace TSQL
             rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (("AS")? IDENTIFIER)?
 
             join_part -> qualified_join | cross_join | apply_join | pivot_clause | unpivot_clause
-            qualified_join -> (join_hint)? ("INNER" | "LEFT" ("OUTER")? | "RIGHT" ("OUTER")? | "FULL" ("OUTER")?)? "JOIN" table_source_primary "ON" search_condition
+            qualified_join -> ( ("INNER" | "LEFT" ("OUTER")? | "RIGHT" ("OUTER")? | "FULL" ("OUTER")?) (join_hint)? )? "JOIN" table_source_primary "ON" search_condition
             cross_join -> "CROSS" "JOIN" table_source_primary
             apply_join -> ("CROSS" | "OUTER") "APPLY" table_source_primary
             join_hint -> "LOOP" | "HASH" | "MERGE" | "REMOTE"
@@ -425,15 +425,162 @@ namespace TSQL
         private TableSource ParseTableSourceItem()
         {
             TableSource source = ParseTableSourcePrimary();
-            // JOIN suffixes will be parsed here in Phase 4
+
+            while (IsJoinStart())
+            {
+                source = ParseJoinSuffix(source);
+            }
+
             return source;
+        }
+
+        private bool IsJoinStart()
+        {
+            TokenType type = Peek().Type;
+
+            if (type == TokenType.JOIN || type == TokenType.INNER)
+                return true;
+
+            if (type == TokenType.LEFT || type == TokenType.RIGHT || type == TokenType.FULL)
+                return true;
+
+            // CROSS can be CROSS JOIN or CROSS APPLY
+            if (type == TokenType.CROSS)
+            {
+                Token next = PeekNext();
+                return next != null && (next.Type == TokenType.JOIN || next.Type == TokenType.APPLY);
+            }
+
+            // OUTER APPLY
+            if (type == TokenType.OUTER)
+            {
+                Token next = PeekNext();
+                return next != null && next.Type == TokenType.APPLY;
+            }
+
+            // Join hints (LOOP, HASH, MERGE, REMOTE) are only valid AFTER a join type
+            // keyword (INNER, LEFT, etc.), so they don't start a join by themselves.
+            // When used standalone like "FROM T LOOP JOIN ...", LOOP is an alias.
+
+            return false;
+        }
+
+        private TableSource ParseJoinSuffix(TableSource left)
+        {
+            // CROSS JOIN
+            if (Check(TokenType.CROSS) && CheckNext(TokenType.JOIN))
+            {
+                return ParseCrossJoin(left);
+            }
+
+            // CROSS APPLY
+            if (Check(TokenType.CROSS) && CheckNext(TokenType.APPLY))
+            {
+                return ParseApplyJoin(left, ApplyType.Cross);
+            }
+
+            // OUTER APPLY
+            if (Check(TokenType.OUTER) && CheckNext(TokenType.APPLY))
+            {
+                return ParseApplyJoin(left, ApplyType.Outer);
+            }
+
+            // Qualified join: [join_hint] [INNER|LEFT|RIGHT|FULL] [OUTER] JOIN ... ON ...
+            return ParseQualifiedJoin(left);
+        }
+
+        private QualifiedJoin ParseQualifiedJoin(TableSource left)
+        {
+            // Optional join type
+            Token joinTypeToken = null;
+            Token outerToken = null;
+            JoinType joinType = JoinType.Inner; // default for bare JOIN
+
+            if (Match(TokenType.INNER, out Token innerToken))
+            {
+                joinTypeToken = innerToken;
+                joinType = JoinType.Inner;
+            }
+            else if (Match(TokenType.LEFT, out Token leftToken))
+            {
+                joinTypeToken = leftToken;
+                joinType = JoinType.LeftOuter;
+                Match(TokenType.OUTER, out outerToken);
+            }
+            else if (Match(TokenType.RIGHT, out Token rightToken))
+            {
+                joinTypeToken = rightToken;
+                joinType = JoinType.RightOuter;
+                Match(TokenType.OUTER, out outerToken);
+            }
+            else if (Match(TokenType.FULL, out Token fullToken))
+            {
+                joinTypeToken = fullToken;
+                joinType = JoinType.FullOuter;
+                Match(TokenType.OUTER, out outerToken);
+            }
+
+            // Optional join hint (between join type and JOIN keyword)
+            Token joinHintToken = null;
+            JoinHint? joinHint = null;
+            if (Match(TokenType.LOOP, out Token loopToken)) { joinHintToken = loopToken; joinHint = JoinHint.Loop; }
+            else if (Match(TokenType.HASH, out Token hashToken)) { joinHintToken = hashToken; joinHint = JoinHint.Hash; }
+            else if (Match(TokenType.MERGE, out Token mergeToken)) { joinHintToken = mergeToken; joinHint = JoinHint.Merge; }
+            else if (Match(TokenType.REMOTE, out Token remoteToken)) { joinHintToken = remoteToken; joinHint = JoinHint.Remote; }
+
+            Token joinToken = Consume(TokenType.JOIN, "Expected JOIN");
+            TableSource right = ParseTableSourcePrimary();
+            Token onToken = Consume(TokenType.ON, "Expected ON");
+            AST.Predicate onCondition = SearchCondition();
+
+            QualifiedJoin qualifiedJoin = new QualifiedJoin(left, right, joinType, onCondition, joinHint);
+            qualifiedJoin._joinHintToken = joinHintToken;
+            qualifiedJoin._joinTypeToken = joinTypeToken;
+            qualifiedJoin._outerToken = outerToken;
+            qualifiedJoin._joinToken = joinToken;
+            qualifiedJoin._onToken = onToken;
+
+            return qualifiedJoin;
+        }
+
+        private CrossJoin ParseCrossJoin(TableSource left)
+        {
+            Token crossToken = Consume(TokenType.CROSS, "Expected CROSS");
+            Token joinToken = Consume(TokenType.JOIN, "Expected JOIN");
+            TableSource right = ParseTableSourcePrimary();
+
+            CrossJoin crossJoin = new CrossJoin(left, right);
+            crossJoin._crossToken = crossToken;
+            crossJoin._joinToken = joinToken;
+
+            return crossJoin;
+        }
+
+        private ApplyJoin ParseApplyJoin(TableSource left, ApplyType applyType)
+        {
+            Token applyTypeToken = Advance(); // CROSS or OUTER
+            Token applyToken = Consume(TokenType.APPLY, "Expected APPLY");
+            TableSource right = ParseTableSourcePrimary();
+
+            ApplyJoin applyJoin = new ApplyJoin(left, right, applyType);
+            applyJoin._applyTypeToken = applyTypeToken;
+            applyJoin._applyToken = applyToken;
+
+            return applyJoin;
         }
 
         private TableSource ParseTableSourcePrimary()
         {
-            if (Check(TokenType.LEFT_PAREN))
+            // Subquery: (SELECT ...)
+            if (Check(TokenType.LEFT_PAREN) && CheckNext(TokenType.SELECT))
             {
                 return ParseSubqueryTableSource();
+            }
+
+            // Parenthesized table source: (T1 JOIN T2 ON ...)
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                return ParseParenthesizedTableSource();
             }
 
             if (Check(TokenType.VARIABLE))
@@ -442,6 +589,20 @@ namespace TSQL
             }
 
             return ParseNamedTableSource();
+        }
+
+        private ParenthesizedTableSource ParseParenthesizedTableSource()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+            TableSource inner = ParseTableSourceItem();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            ParenthesizedTableSource parenSource = new ParenthesizedTableSource(inner);
+            parenSource._leftParen = leftParen;
+            parenSource._rightParen = rightParen;
+            parenSource.Alias = Alias();
+
+            return parenSource;
         }
 
         private TableReference ParseNamedTableSource()
