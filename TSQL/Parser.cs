@@ -611,9 +611,327 @@ namespace TSQL
             Expr.ObjectIdentifier objectId = FunctionIdentifier(parts);
 
             TableReference tableRef = new TableReference(objectId);
+
+            // FOR SYSTEM_TIME (before alias)
+            if (Check(TokenType.FOR) && IsSystemTimeLookahead())
+            {
+                tableRef.ForSystemTime = ParseForSystemTimeClause();
+            }
+
             tableRef.Alias = Alias();
 
+            // TABLESAMPLE (after alias)
+            if (Check(TokenType.TABLESAMPLE))
+            {
+                tableRef.Tablesample = ParseTablesampleClause();
+            }
+
+            // WITH (table hints) (after alias)
+            if (Check(TokenType.WITH) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                tableRef.TableHints = ParseTableHintClause();
+            }
+
             return tableRef;
+        }
+
+        private bool IsSystemTimeLookahead()
+        {
+            Token next = PeekNext();
+            return next != null && next.Type == TokenType.IDENTIFIER &&
+                   next.Lexeme.Equals("SYSTEM_TIME", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private ForSystemTimeClause ParseForSystemTimeClause()
+        {
+            Token forToken = Consume(TokenType.FOR, "Expected FOR");
+            Token systemTimeToken = Consume(TokenType.IDENTIFIER, "Expected SYSTEM_TIME");
+
+            if (Match(TokenType.AS, out Token asToken))
+            {
+                // AS OF date_time
+                Token ofToken = Consume(TokenType.OF, "Expected OF");
+                Expr startTime = Expression();
+
+                ForSystemTimeClause clause = new ForSystemTimeClause(SystemTimeType.AsOf, startTime);
+                clause._forToken = forToken;
+                clause._systemTimeToken = systemTimeToken;
+                clause._typeKeyword1 = asToken;
+                clause._typeKeyword2 = ofToken;
+                return clause;
+            }
+            else if (Match(TokenType.FROM, out Token fromKw))
+            {
+                // FROM date_time TO date_time
+                Expr startTime = Expression();
+                Token toToken = Consume(TokenType.TO, "Expected TO");
+                Expr endTime = Expression();
+
+                ForSystemTimeClause clause = new ForSystemTimeClause(SystemTimeType.FromTo, startTime, endTime);
+                clause._forToken = forToken;
+                clause._systemTimeToken = systemTimeToken;
+                clause._typeKeyword1 = fromKw;
+                clause._typeKeyword2 = toToken;
+                return clause;
+            }
+            else if (Match(TokenType.BETWEEN, out Token betweenToken))
+            {
+                // BETWEEN date_time AND date_time
+                Expr startTime = Expression();
+                Token andToken = Consume(TokenType.AND, "Expected AND");
+                Expr endTime = Expression();
+
+                ForSystemTimeClause clause = new ForSystemTimeClause(SystemTimeType.BetweenAnd, startTime, endTime);
+                clause._forToken = forToken;
+                clause._systemTimeToken = systemTimeToken;
+                clause._typeKeyword1 = betweenToken;
+                clause._typeKeyword2 = andToken;
+                return clause;
+            }
+            else if (Match(TokenType.CONTAINED, out Token containedToken))
+            {
+                // CONTAINED IN (date_time, date_time)
+                Token inToken = Consume(TokenType.IN, "Expected IN");
+                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+                Expr startTime = Expression();
+                Token comma = Consume(TokenType.COMMA, "Expected ,");
+                Expr endTime = Expression();
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+                ForSystemTimeClause clause = new ForSystemTimeClause(SystemTimeType.ContainedIn, startTime, endTime);
+                clause._forToken = forToken;
+                clause._systemTimeToken = systemTimeToken;
+                clause._typeKeyword1 = containedToken;
+                clause._typeKeyword2 = inToken;
+                clause._leftParen = leftParen;
+                clause._comma = comma;
+                clause._rightParen = rightParen;
+                return clause;
+            }
+            else if (Match(TokenType.ALL, out Token allToken))
+            {
+                // ALL
+                ForSystemTimeClause clause = new ForSystemTimeClause(SystemTimeType.All);
+                clause._forToken = forToken;
+                clause._systemTimeToken = systemTimeToken;
+                clause._typeKeyword1 = allToken;
+                return clause;
+            }
+            else
+            {
+                throw Error(Peek(), "Expected AS OF, FROM...TO, BETWEEN...AND, CONTAINED IN, or ALL after FOR SYSTEM_TIME");
+            }
+        }
+
+        private TablesampleClause ParseTablesampleClause()
+        {
+            Token tablesampleToken = Consume(TokenType.TABLESAMPLE, "Expected TABLESAMPLE");
+
+            // Optional SYSTEM keyword
+            Token systemToken = null;
+            if (Check(TokenType.SYSTEM))
+            {
+                systemToken = Advance();
+            }
+
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+            Expr sampleSize = Expression();
+
+            // PERCENT or ROWS
+            TableSampleUnit unit;
+            Token unitToken;
+            if (Match(TokenType.PERCENT, out Token percentToken))
+            {
+                unit = TableSampleUnit.Percent;
+                unitToken = percentToken;
+            }
+            else if (Match(TokenType.ROWS, out Token rowsToken))
+            {
+                unit = TableSampleUnit.Rows;
+                unitToken = rowsToken;
+            }
+            else
+            {
+                throw Error(Peek(), "Expected PERCENT or ROWS");
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            // Optional REPEATABLE(seed)
+            Expr repeatSeed = null;
+            Token repeatableToken = null;
+            Token repeatLeftParen = null;
+            Token repeatRightParen = null;
+            if (Match(TokenType.REPEATABLE, out repeatableToken))
+            {
+                repeatLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+                repeatSeed = Expression();
+                repeatRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+            }
+
+            TablesampleClause clause = new TablesampleClause(sampleSize, unit, repeatSeed);
+            clause._tablesampleToken = tablesampleToken;
+            clause._systemToken = systemToken;
+            clause._leftParen = leftParen;
+            clause._unitToken = unitToken;
+            clause._rightParen = rightParen;
+            clause._repeatableToken = repeatableToken;
+            clause._repeatLeftParen = repeatLeftParen;
+            clause._repeatRightParen = repeatRightParen;
+            return clause;
+        }
+
+        private static readonly Dictionary<string, TableHintType> SimpleTableHints =
+            new Dictionary<string, TableHintType>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "NOEXPAND", TableHintType.NoExpand },
+                { "FORCESCAN", TableHintType.ForceScan },
+                { "NOLOCK", TableHintType.NoLock },
+                { "NOWAIT", TableHintType.NoWait },
+                { "PAGLOCK", TableHintType.PageLock },
+                { "READCOMMITTED", TableHintType.ReadCommitted },
+                { "READCOMMITTEDLOCK", TableHintType.ReadCommittedLock },
+                { "READPAST", TableHintType.ReadPast },
+                { "READUNCOMMITTED", TableHintType.ReadUncommitted },
+                { "REPEATABLEREAD", TableHintType.RepeatableRead },
+                { "ROWLOCK", TableHintType.RowLock },
+                { "SERIALIZABLE", TableHintType.Serializable },
+                { "SNAPSHOT", TableHintType.Snapshot },
+                { "TABLOCK", TableHintType.TabLock },
+                { "TABLOCKX", TableHintType.TabLockX },
+                { "UPDLOCK", TableHintType.UpdLock },
+                { "XLOCK", TableHintType.XLock },
+            };
+
+        private TableHintClause ParseTableHintClause()
+        {
+            Token withToken = Consume(TokenType.WITH, "Expected WITH");
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            SyntaxElementList<TableHint> hints = new SyntaxElementList<TableHint>();
+            hints.Add(ParseTableHint());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                hints.Add(ParseTableHint(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            TableHintClause clause = new TableHintClause(hints);
+            clause._withToken = withToken;
+            clause._leftParen = leftParen;
+            clause._rightParen = rightParen;
+            return clause;
+        }
+
+        private TableHint ParseTableHint()
+        {
+            Token hintToken = Peek();
+
+            // HOLDLOCK is a keyword
+            if (Check(TokenType.HOLDLOCK))
+            {
+                Advance();
+                TableHint hint = new TableHint(TableHintType.HoldLock);
+                hint._hintToken = hintToken;
+                return hint;
+            }
+
+            // INDEX hint
+            if (Check(TokenType.INDEX))
+            {
+                Advance();
+                TableHint hint;
+                if (Match(TokenType.EQUAL, out Token equalsToken))
+                {
+                    // INDEX = value
+                    SyntaxElementList<Expr> indexValues = new SyntaxElementList<Expr>();
+                    indexValues.Add(Expression());
+                    hint = new TableHint(TableHintType.Index, indexValues);
+                    hint._equalsToken = equalsToken;
+                }
+                else
+                {
+                    // INDEX(value, ...)
+                    Token indexLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+                    SyntaxElementList<Expr> indexValues = new SyntaxElementList<Expr>();
+                    indexValues.Add(Expression());
+                    while (Match(TokenType.COMMA, out Token comma))
+                    {
+                        indexValues.Add(Expression(), comma);
+                    }
+                    Token indexRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+                    hint = new TableHint(TableHintType.Index, indexValues);
+                    hint._leftParen = indexLeftParen;
+                    hint._rightParen = indexRightParen;
+                }
+                hint._hintToken = hintToken;
+                return hint;
+            }
+
+            // Identifier-based hints
+            if (Check(TokenType.IDENTIFIER))
+            {
+                string lexeme = hintToken.Lexeme;
+
+                // Simple keyword hints
+                if (SimpleTableHints.TryGetValue(lexeme, out TableHintType hintType))
+                {
+                    Advance();
+                    TableHint hint = new TableHint(hintType);
+                    hint._hintToken = hintToken;
+                    return hint;
+                }
+
+                // FORCESEEK with optional parameters
+                if (lexeme.Equals("FORCESEEK", StringComparison.OrdinalIgnoreCase))
+                {
+                    Advance();
+                    TableHint hint;
+                    if (Check(TokenType.LEFT_PAREN))
+                    {
+                        Token fsLeftParen = Advance();
+                        Expr indexValue = Expression();
+                        Token innerLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+                        SyntaxElementList<ColumnName> columns = new SyntaxElementList<ColumnName>();
+                        columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+                        while (Match(TokenType.COMMA, out Token comma))
+                        {
+                            columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                        }
+                        Token innerRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+                        Token fsRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+                        hint = new TableHint(TableHintType.ForceSeek, indexValue, columns);
+                        hint._leftParen = fsLeftParen;
+                        hint._innerLeftParen = innerLeftParen;
+                        hint._innerRightParen = innerRightParen;
+                        hint._rightParen = fsRightParen;
+                    }
+                    else
+                    {
+                        hint = new TableHint(TableHintType.ForceSeek);
+                    }
+                    hint._hintToken = hintToken;
+                    return hint;
+                }
+
+                // SPATIAL_WINDOW_MAX_CELLS = N
+                if (lexeme.Equals("SPATIAL_WINDOW_MAX_CELLS", StringComparison.OrdinalIgnoreCase))
+                {
+                    Advance();
+                    Token equalsToken = Consume(TokenType.EQUAL, "Expected =");
+                    Expr value = Expression();
+
+                    TableHint hint = new TableHint(TableHintType.SpatialWindowMaxCells, value);
+                    hint._hintToken = hintToken;
+                    hint._equalsToken = equalsToken;
+                    return hint;
+                }
+            }
+
+            throw Error(Peek(), "Expected table hint");
         }
 
         private SubqueryReference ParseSubqueryTableSource()

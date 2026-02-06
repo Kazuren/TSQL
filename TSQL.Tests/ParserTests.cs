@@ -641,6 +641,99 @@ namespace TSQL.Tests
         }
 
         [Fact]
+        public void Parse_ForSystemTimeAsOf_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T FOR SYSTEM_TIME AS OF '2020-01-01'");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.ForSystemTime);
+            Assert.Equal(SystemTimeType.AsOf, tableRef.ForSystemTime.TimeType);
+        }
+
+        [Fact]
+        public void Parse_ForSystemTimeAll_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T FOR SYSTEM_TIME ALL");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.ForSystemTime);
+            Assert.Equal(SystemTimeType.All, tableRef.ForSystemTime.TimeType);
+        }
+
+        [Fact]
+        public void Parse_ForSystemTimeBetweenAnd_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T FOR SYSTEM_TIME BETWEEN '2020-01-01' AND '2021-01-01'");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.ForSystemTime);
+            Assert.Equal(SystemTimeType.BetweenAnd, tableRef.ForSystemTime.TimeType);
+        }
+
+        [Fact]
+        public void Parse_TablesamplePercent_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T AS t TABLESAMPLE (10 PERCENT)");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.Tablesample);
+            Assert.Equal(TableSampleUnit.Percent, tableRef.Tablesample.Unit);
+        }
+
+        [Fact]
+        public void Parse_TablesampleWithRepeatable_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T TABLESAMPLE SYSTEM (100 ROWS) REPEATABLE (42)");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.Tablesample);
+            Assert.Equal(TableSampleUnit.Rows, tableRef.Tablesample.Unit);
+            Assert.NotNull(tableRef.Tablesample.RepeatSeed);
+        }
+
+        [Fact]
+        public void Parse_TableHintNolock_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WITH (NOLOCK)");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.TableHints);
+            Assert.Equal(1, tableRef.TableHints.Hints.Count);
+            Assert.Equal(TableHintType.NoLock, tableRef.TableHints.Hints[0].HintType);
+        }
+
+        [Fact]
+        public void Parse_TableHintMultiple_HasCorrectCount()
+        {
+            var select = ParseSelect("SELECT a FROM T WITH (NOLOCK, NOWAIT)");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.TableHints);
+            Assert.Equal(2, tableRef.TableHints.Hints.Count);
+            Assert.Equal(TableHintType.NoLock, tableRef.TableHints.Hints[0].HintType);
+            Assert.Equal(TableHintType.NoWait, tableRef.TableHints.Hints[1].HintType);
+        }
+
+        [Fact]
+        public void Parse_TableHintIndex_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WITH (INDEX(1))");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(TableHintType.Index, tableRef.TableHints.Hints[0].HintType);
+            Assert.Equal(1, tableRef.TableHints.Hints[0].IndexValues.Count);
+        }
+
+        [Fact]
+        public void Parse_TableHintHoldLock_HasCorrectStructure()
+        {
+            var select = ParseSelect("SELECT a FROM T WITH (HOLDLOCK)");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(TableHintType.HoldLock, tableRef.TableHints.Hints[0].HintType);
+        }
+
+        [Fact]
         public void Parse_ParenthesizedJoin_HasCorrectStructure()
         {
             var select = ParseSelect("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id)");
@@ -706,6 +799,30 @@ namespace TSQL.Tests
         // FROM clause - parenthesized joins
         [InlineData("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id)")]
         [InlineData("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id) CROSS JOIN T3")]
+        // FROM clause - FOR SYSTEM_TIME
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME AS OF '2020-01-01'")]
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME FROM '2020-01-01' TO '2021-01-01'")]
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME BETWEEN '2020-01-01' AND '2021-01-01'")]
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME CONTAINED IN ('2020-01-01', '2021-01-01')")]
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME ALL")]
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME AS OF @AsOfDate")]
+        [InlineData("SELECT a FROM T FOR SYSTEM_TIME AS OF '2020-01-01' AS t")]
+        // FROM clause - TABLESAMPLE
+        [InlineData("SELECT a FROM T TABLESAMPLE (10 PERCENT)")]
+        [InlineData("SELECT a FROM T AS t TABLESAMPLE (100 ROWS)")]
+        [InlineData("SELECT a FROM T TABLESAMPLE SYSTEM (10 PERCENT)")]
+        [InlineData("SELECT a FROM T TABLESAMPLE (10 PERCENT) REPEATABLE (42)")]
+        // FROM clause - table hints
+        [InlineData("SELECT a FROM T WITH (NOLOCK)")]
+        [InlineData("SELECT a FROM T WITH (NOLOCK, NOWAIT)")]
+        [InlineData("SELECT a FROM T WITH (HOLDLOCK)")]
+        [InlineData("SELECT a FROM T WITH (INDEX(1))")]
+        [InlineData("SELECT a FROM T WITH (INDEX(1, 2))")]
+        [InlineData("SELECT a FROM T WITH (INDEX = 1)")]
+        [InlineData("SELECT a FROM T WITH (READCOMMITTED, ROWLOCK)")]
+        // FROM clause - combined suffixes
+        [InlineData("SELECT a FROM T AS t TABLESAMPLE (10 PERCENT) WITH (NOLOCK)")]
+        [InlineData("SELECT a FROM T1 WITH (NOLOCK) INNER JOIN T2 WITH (NOLOCK) ON T1.id = T2.id")]
 
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
         {
