@@ -1310,12 +1310,7 @@ namespace TSQL
             // [NOT] LIKE expression [ESCAPE string]
             if (Check(TokenType.LIKE) || (Check(TokenType.NOT) && CheckNext(TokenType.LIKE)))
             {
-                Token notToken = null;
-                bool negated = false;
-                if (Match(TokenType.NOT, out notToken))
-                {
-                    negated = true;
-                }
+                var (notToken, negated) = TryConsumeNot();
                 Token likeToken = Consume(TokenType.LIKE, "Expected LIKE");
                 Expr pattern = Expression();
 
@@ -1336,12 +1331,7 @@ namespace TSQL
             // [NOT] BETWEEN expression AND expression
             if (Check(TokenType.BETWEEN) || (Check(TokenType.NOT) && CheckNext(TokenType.BETWEEN)))
             {
-                Token notToken = null;
-                bool negated = false;
-                if (Match(TokenType.NOT, out notToken))
-                {
-                    negated = true;
-                }
+                var (notToken, negated) = TryConsumeNot();
                 Token betweenToken = Consume(TokenType.BETWEEN, "Expected BETWEEN");
                 Expr low = Expression();
                 Token andToken = Consume(TokenType.AND, "Expected AND in BETWEEN");
@@ -1358,12 +1348,7 @@ namespace TSQL
             if (Check(TokenType.IS))
             {
                 Token isToken = Advance();
-                Token notToken = null;
-                bool negated = false;
-                if (Match(TokenType.NOT, out notToken))
-                {
-                    negated = true;
-                }
+                var (notToken, negated) = TryConsumeNot();
                 Token nullToken = Consume(TokenType.NULL, "Expected NULL after IS");
 
                 Predicate.Null nullPred = new Predicate.Null(leftExpr, negated);
@@ -1376,12 +1361,7 @@ namespace TSQL
             // [NOT] IN (select_expression | expression_list)
             if (Check(TokenType.IN) || (Check(TokenType.NOT) && CheckNext(TokenType.IN)))
             {
-                Token notToken = null;
-                bool negated = false;
-                if (Match(TokenType.NOT, out notToken))
-                {
-                    negated = true;
-                }
+                var (notToken, negated) = TryConsumeNot();
                 Token inToken = Consume(TokenType.IN, "Expected IN");
                 Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected ( after IN");
 
@@ -1853,6 +1833,13 @@ namespace TSQL
                          TokenType.FULL, TokenType.CROSS, TokenType.JOIN);
         }
 
+
+        private (Token token, bool negated) TryConsumeNot()
+        {
+            if (Match(TokenType.NOT, out Token notToken))
+                return (notToken, true);
+            return (null, false);
+        }
 
         private Token Consume(TokenType type, string message)
         {

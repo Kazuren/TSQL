@@ -12,6 +12,11 @@ namespace TSQL.Tests
             Assert.IsType<Stmt.Select>(stmt);
             return (Stmt.Select)stmt;
         }
+
+        private static string RoundTrip(string source)
+        {
+            return ParseSelect(source).ToSource();
+        }
         #endregion
 
         #region Existing Tests
@@ -67,65 +72,29 @@ namespace TSQL.Tests
         [Fact]
         public void ParsePrefixAlias_RoundTripsCorrectly()
         {
-            // Arrange
             string source = "SELECT bAlias = b FROM T";
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         [Fact]
         public void ParseMixedAliasStyles_RoundTripsCorrectly()
         {
-            // Arrange
             string source = "SELECT a, bAlias = b, c AS cAlias FROM T";
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         [Fact]
         public void ParsePrefixAlias_WithExpression_RoundTripsCorrectly()
         {
-            // Arrange
             string source = "SELECT total = a + b FROM T";
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         [Fact]
         public void ParseIdentifiers_ParsesCorrectly()
         {
-            // Arrange
             string source = "SELECT *, o.*, d..o.*, d.s.o.*, d.s.o.a, d..o.a, o.a, a FROM T";
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
         #endregion
 
@@ -826,16 +795,7 @@ namespace TSQL.Tests
 
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
         {
-            // Arrange
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         #endregion
@@ -1105,16 +1065,7 @@ namespace TSQL.Tests
         [InlineData("SELECT ROW_NUMBER() OVER (PARTITION BY a, b ORDER BY c ASC, d DESC) FROM T")]
         public void Parse_WindowFunction_RoundTripsCorrectly(string source)
         {
-            // Arrange
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         #endregion
@@ -1240,16 +1191,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM T WHERE CONTAINS (a, 'test')")]
         public void Parse_SearchCondition_RoundTripsCorrectly(string source)
         {
-            // Arrange
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         #endregion
@@ -1401,8 +1343,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM T UNPIVOT (Val FOR Col IN (A, B)) AS u")]
         public void Parse_PivotUnpivotValuesFeatures_RoundTripsCorrectly(string source)
         {
-            Stmt stmt = ParseSelect(source);
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         #endregion
@@ -1449,16 +1390,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM (SELECT 1, 2) AS t(c1, c2) INNER JOIN T2 ON t.c1 = T2.id")]
         public void Parse_IntegrationTests_RoundTripsCorrectly(string source)
         {
-            // Arrange
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         [Fact]
@@ -1510,13 +1442,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM T WHERE a NOT IN (SELECT b FROM T2)")]
         public void Parse_InSubquery_RoundTripsCorrectly(string source)
         {
-            // Bug: _rightParen was never assigned for the subquery branch of IN predicate
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
-
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         [Theory]
@@ -1526,15 +1452,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM T WHERE (a + b) > 0")]
         public void Parse_GroupedPredicate_RoundTripsCorrectly(string source)
         {
-            // Bug: grouped predicates like (a = 1) failed to parse because
-            // the empty if-block fell through to Expression() which can't handle
-            // predicate operators inside parens
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
-
-            Assert.Equal(source, stmt.ToSource());
+            Assert.Equal(source, RoundTrip(source));
         }
 
         [Fact]

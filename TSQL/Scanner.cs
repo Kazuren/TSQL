@@ -282,27 +282,22 @@ namespace TSQL
             // Pass the slice directly - string allocation is deferred until Lexeme is accessed
             AddToken(type, slice.ToString(), slice);
         }
-        private void BracketDelimitedIdentifier()
+        private string ConsumeDelimitedContent(char closingDelimiter, string unterminatedError)
         {
             StringBuilder builder = new StringBuilder();
 
-            // consume characters until we hit a closing bracket
             while (!IsAtEnd())
             {
-                if (Peek() == ']')
+                if (Peek() == closingDelimiter)
                 {
-                    // Check if this is an escaped bracket (two consecutive closing brackets)
-                    if (PeekNext() == ']')
+                    if (PeekNext() == closingDelimiter)
                     {
-                        // consume both brackets
+                        // Escaped delimiter (doubled) — consume both, emit one
                         Consume(2);
-
-                        // This is an escaped bracket, add a single bracket to the result
-                        builder.Append(']');
+                        builder.Append(closingDelimiter);
                     }
                     else
                     {
-                        // This is the actual closing bracket, we're done
                         break;
                     }
                 }
@@ -320,111 +315,30 @@ namespace TSQL
 
             if (IsAtEnd())
             {
-                throw new Exception("Unterminated delimited identifier.");
+                throw new Exception(unterminatedError);
             }
 
             // Consume the closing delimiter
             Advance();
 
-            // lexeme = full source text including brackets, literal = content without brackets
-            AddToken(TokenType.IDENTIFIER, builder.ToString());
+            return builder.ToString();
+        }
+
+        private void BracketDelimitedIdentifier()
+        {
+            string content = ConsumeDelimitedContent(']', "Unterminated delimited identifier.");
+            AddToken(TokenType.IDENTIFIER, content);
         }
 
         private void QuoteDelimitedIdentifier()
         {
-            StringBuilder builder = new StringBuilder();
-
-            // consume characters until we hit a closing quote
-            while (!IsAtEnd())
-            {
-                if (Peek() == '"')
-                {
-                    // Check if this is an escaped quote (two consecutive double quotes)
-                    if (PeekNext() == '"')
-                    {
-                        // consume both quotes
-                        Consume(2);
-
-                        // This is an escaped quote, add a single quote to the result
-                        builder.Append('"');
-                    }
-                    else
-                    {
-                        // This is the actual closing quote, we're done
-                        break;
-                    }
-                }
-                else
-                {
-                    char currentChar = Peek();
-                    if (currentChar == '\n')
-                    {
-                        IncrementLineNumber();
-                    }
-                    builder.Append(currentChar);
-                    Advance();
-                }
-            }
-
-            if (IsAtEnd())
-            {
-                throw new Exception("Unterminated delimited identifier.");
-            }
-
-            // Consume the closing delimiter
-            Advance();
-
-            // lexeme = full source text including quotes, literal = content without quotes
-            AddToken(TokenType.IDENTIFIER, builder.ToString());
+            string content = ConsumeDelimitedContent('"', "Unterminated delimited identifier.");
+            AddToken(TokenType.IDENTIFIER, content);
         }
 
         private void String()
         {
-            StringBuilder builder = new StringBuilder();
-
-            // consume characters until we hit another ''' that ends the string
-            while (!IsAtEnd())
-            {
-                if (Peek() == '\'')
-                {
-                    // Check if this is an escaped quote (two consecutive single quotes)
-                    if (PeekNext() == '\'')
-                    {
-                        // consume both quotes
-                        Consume(2);
-
-                        // This is an escaped quote, add a single quote to the result
-                        builder.Append('\'');
-                    }
-                    else
-                    {
-                        // This is the actual closing quote, we're done
-                        break;
-                    }
-                }
-                else
-                {
-                    char currentChar = Peek();
-                    if (currentChar == '\n')
-                    {
-                        IncrementLineNumber();
-                    }
-                    builder.Append(currentChar);
-                    Advance();
-                }
-            }
-
-
-            if (IsAtEnd())
-            {
-                throw new Exception("Unterminated string.");
-            }
-
-            // The closing '
-            Advance();
-
-            // lexeme = full source text including quotes, literal = content without quotes
-            string value = builder.ToString();
+            string value = ConsumeDelimitedContent('\'', "Unterminated string.");
             AddToken(TokenType.STRING, value);
         }
 

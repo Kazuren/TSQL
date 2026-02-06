@@ -21,11 +21,7 @@ namespace TSQL
         /// Returns all tokens under this node in document order.
         /// This is the single source of truth for source text.
         /// </summary>
-        public virtual IEnumerable<Token> DescendantTokens()
-        {
-            // TODO: make abstract when done with coding
-            throw new System.NotImplementedException();
-        }
+        public abstract IEnumerable<Token> DescendantTokens();
 
         public string ToSource()
         {

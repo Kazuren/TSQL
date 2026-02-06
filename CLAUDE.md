@@ -40,8 +40,6 @@ This is a T-SQL parser library targeting .NET Standard 2.0 for broad compatibili
 All AST nodes implement `Accept<T>()` for visitor traversal:
 - `Expr.Visitor<T>` - Expression visitor interface
 - `Stmt.Visitor<T>` - Statement visitor interface
-- `SourceCodeVisitor` (in StandardLibrary) - Reconstructs source from AST
-
 ### Trivia Preservation
 
 Tokens carry leading/trailing trivia (whitespace, comments) enabling exact source reconstruction via `ToSource()`.
@@ -59,7 +57,7 @@ Tokens carry leading/trailing trivia (whitespace, comments) enabling exact sourc
 
 - **TSQL** - Core parser library (.NET Standard 2.0)
 - **TSQL.Generators** - Roslyn source generator for keyword dictionary
-- **TSQL.StandardLibrary** - Visitor implementations like `SourceCodeVisitor`
+- **TSQL.StandardLibrary** - Visitor implementations
 - **TSQL.Tests** - xUnit tests for scanner, parser, and AST
 - **TSQL.Benchmarks** - BenchmarkDotNet performance profiling
 

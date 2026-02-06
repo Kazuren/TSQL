@@ -21,7 +21,48 @@ namespace TSQL
         }
 
 
-        public abstract class SqlIdentifier : Expr { }
+        public abstract class SqlIdentifier : Expr
+        {
+            /// <summary>
+            /// Yields tokens for the qualified prefix: [database.]schema.]object.
+            /// Handles all combinations of present/missing parts, including skipped schema (database..object).
+            /// </summary>
+            protected static IEnumerable<Token> YieldQualifiedPrefix(
+                DatabaseName database, Token dbToSchemaDot,
+                SchemaName schema, Token schemaToObjDot,
+                ObjectName obj, Token objToLeafDot)
+            {
+                if (database != null && schema != null && obj != null)
+                {
+                    foreach (Token t in database.DescendantTokens()) yield return t;
+                    yield return dbToSchemaDot;
+                    foreach (Token t in schema.DescendantTokens()) yield return t;
+                    yield return schemaToObjDot;
+                    foreach (Token t in obj.DescendantTokens()) yield return t;
+                    yield return objToLeafDot;
+                }
+                else if (schema != null && obj != null)
+                {
+                    foreach (Token t in schema.DescendantTokens()) yield return t;
+                    yield return schemaToObjDot;
+                    foreach (Token t in obj.DescendantTokens()) yield return t;
+                    yield return objToLeafDot;
+                }
+                else if (database != null && schema == null && obj != null)
+                {
+                    foreach (Token t in database.DescendantTokens()) yield return t;
+                    yield return dbToSchemaDot;
+                    yield return schemaToObjDot;
+                    foreach (Token t in obj.DescendantTokens()) yield return t;
+                    yield return objToLeafDot;
+                }
+                else if (obj != null)
+                {
+                    foreach (Token t in obj.DescendantTokens()) yield return t;
+                    yield return objToLeafDot;
+                }
+            }
+        }
         public class ObjectIdentifier : SqlIdentifier
         {
             public ServerName ServerName { get; }
@@ -69,46 +110,30 @@ namespace TSQL
                 if (ServerName != null)
                 {
                     foreach (Token token in ServerName.DescendantTokens())
-                    {
                         yield return token;
-                    }
-                }
-
-                if (ServerName != null)
-                {
                     yield return _serverToDatabaseDot;
                 }
 
                 if (DatabaseName != null)
                 {
                     foreach (Token token in DatabaseName.DescendantTokens())
-                    {
                         yield return token;
-                    }
                 }
 
                 if (ServerName != null || DatabaseName != null)
-                {
                     yield return _databaseToSchemaDot;
-                }
 
                 if (SchemaName != null)
                 {
                     foreach (Token token in SchemaName.DescendantTokens())
-                    {
                         yield return token;
-                    }
                 }
 
                 if (ServerName != null || DatabaseName != null || SchemaName != null)
-                {
                     yield return _schemaToObjectDot;
-                }
 
                 foreach (Token token in ObjectName.DescendantTokens())
-                {
                     yield return token;
-                }
             }
         }
         public class Wildcard : SqlIdentifier, SelectItem
@@ -180,71 +205,9 @@ namespace TSQL
 
             public override IEnumerable<Token> DescendantTokens()
             {
-                if (DatabaseName != null && SchemaName != null && ObjectName != null)
-                {
-                    foreach (Token token in DatabaseName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _databaseToSchemaDot;
-
-                    foreach (Token token in SchemaName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _schemaToObjectDot;
-
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToStarDot;
-
-                    yield return WildcardToken;
-                }
-                else if (SchemaName != null && ObjectName != null)
-                {
-                    foreach (Token token in SchemaName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _schemaToObjectDot;
-
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToStarDot;
-
-                    yield return WildcardToken;
-                }
-                else if (DatabaseName != null && SchemaName == null && ObjectName != null)
-                {
-                    foreach (Token token in DatabaseName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _databaseToSchemaDot;
-                    yield return _schemaToObjectDot;
-
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToStarDot;
-
-                    yield return WildcardToken;
-                }
-                else if (ObjectName != null)
-                {
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToStarDot;
-
-                    yield return WildcardToken;
-                }
+                foreach (Token token in YieldQualifiedPrefix(DatabaseName, _databaseToSchemaDot, SchemaName, _schemaToObjectDot, ObjectName, _objectToStarDot))
+                    yield return token;
+                yield return WildcardToken;
             }
         }
 
@@ -301,90 +264,13 @@ namespace TSQL
 
             public override IEnumerable<Token> DescendantTokens()
             {
-                if (DatabaseName != null && SchemaName != null && ObjectName != null)
+                if (ObjectName != null)
                 {
-                    foreach (Token token in DatabaseName.DescendantTokens())
-                    {
+                    foreach (Token token in YieldQualifiedPrefix(DatabaseName, _databaseToSchemaDot, SchemaName, _schemaToObjectDot, ObjectName, _objectToColumnDot))
                         yield return token;
-                    }
-                    yield return _databaseToSchemaDot;
-
-                    foreach (Token token in SchemaName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _schemaToObjectDot;
-
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToColumnDot;
-
-                    foreach (Token token in ColumnName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
                 }
-                else if (SchemaName != null && ObjectName != null)
-                {
-                    foreach (Token token in SchemaName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _schemaToObjectDot;
-
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToColumnDot;
-
-                    foreach (Token token in ColumnName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                }
-                else if (DatabaseName != null && SchemaName == null && ObjectName != null)
-                {
-                    foreach (Token token in DatabaseName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _databaseToSchemaDot;
-                    yield return _schemaToObjectDot;
-
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToColumnDot;
-
-                    foreach (Token token in ColumnName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                }
-                else if (ObjectName != null)
-                {
-                    foreach (Token token in ObjectName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                    yield return _objectToColumnDot;
-
-                    foreach (Token token in ColumnName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                }
-                else
-                {
-                    foreach (Token token in ColumnName.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                }
+                foreach (Token token in ColumnName.DescendantTokens())
+                    yield return token;
             }
         }
 
@@ -873,19 +759,15 @@ namespace TSQL
         }
     }
 
-    public class ServerName : SyntaxElement
+    public abstract class SqlName : SyntaxElement
     {
         public string Name { get; }
         private readonly Token _token;
 
-        public ServerName(string name)
-        {
-            Name = name;
-        }
+        protected SqlName(string name) { Name = name; }
 
-        internal ServerName(Token token)
+        internal SqlName(Token token)
         {
-            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
             Name = token.Lexeme;
             _token = token;
         }
@@ -895,90 +777,34 @@ namespace TSQL
             yield return _token;
         }
     }
-    public class DatabaseName : SyntaxElement
+
+    public class ServerName : SqlName
     {
-        public string Name { get; }
-        private readonly Token _token;
-
-        public DatabaseName(string name)
-        {
-            Name = name;
-        }
-
-        internal DatabaseName(Token token)
-        {
-            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
-            Name = token.Lexeme;
-            _token = token;
-        }
-        public override IEnumerable<Token> DescendantTokens()
-        {
-            yield return _token;
-        }
+        public ServerName(string name) : base(name) { }
+        internal ServerName(Token token) : base(token) { }
     }
-    public class SchemaName : SyntaxElement
+
+    public class DatabaseName : SqlName
     {
-        public string Name { get; }
-        private readonly Token _token;
-
-        public SchemaName(string name)
-        {
-            Name = name;
-        }
-
-        internal SchemaName(Token token)
-        {
-            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
-            Name = token.Lexeme;
-            _token = token;
-        }
-        public override IEnumerable<Token> DescendantTokens()
-        {
-            yield return _token;
-        }
+        public DatabaseName(string name) : base(name) { }
+        internal DatabaseName(Token token) : base(token) { }
     }
-    public class ObjectName : SyntaxElement
+
+    public class SchemaName : SqlName
     {
-        public string Name { get; }
-        private readonly Token _token;
-
-        public ObjectName(string name)
-        {
-            Name = name;
-        }
-
-        internal ObjectName(Token token)
-        {
-            // Use Lexeme for the name - works for IDENTIFIER and contextual keywords
-            Name = token.Lexeme;
-            _token = token;
-        }
-
-        public override IEnumerable<Token> DescendantTokens()
-        {
-            yield return _token;
-        }
+        public SchemaName(string name) : base(name) { }
+        internal SchemaName(Token token) : base(token) { }
     }
-    public class ColumnName : SyntaxElement
+
+    public class ObjectName : SqlName
     {
-        public string Name { get; }
-        private readonly Token _token;
+        public ObjectName(string name) : base(name) { }
+        internal ObjectName(Token token) : base(token) { }
+    }
 
-        public ColumnName(string name)
-        {
-            Name = name;
-        }
-
-        internal ColumnName(Token token)
-        {
-            // Use Lexeme for the name - works for IDENTIFIER, STAR, and contextual keywords
-            Name = token.Lexeme;
-            _token = token;
-        }
-
-        public override IEnumerable<Token> DescendantTokens()
-        {
-            yield return _token;
-        }
+    public class ColumnName : SqlName
+    {
+        public ColumnName(string name) : base(name) { }
+        internal ColumnName(Token token) : base(token) { }
     }
 }
