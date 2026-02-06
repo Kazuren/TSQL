@@ -569,7 +569,9 @@ namespace TSQL
         public SyntaxElementList<ValuesRow> Rows { get; }
         public DerivedColumnAliases ColumnAliases { get; set; }
 
+        internal Token _outerLeftParen;
         internal Token _valuesToken;
+        internal Token _outerRightParen;
 
         public ValuesTableSource(SyntaxElementList<ValuesRow> rows)
         {
@@ -578,9 +580,11 @@ namespace TSQL
 
         public override IEnumerable<Token> DescendantTokens()
         {
+            yield return _outerLeftParen;
             yield return _valuesToken;
             foreach (Token token in Rows.DescendantTokens())
                 yield return token;
+            yield return _outerRightParen;
             if (Alias != null)
                 foreach (Token token in Alias.DescendantTokens())
                     yield return token;

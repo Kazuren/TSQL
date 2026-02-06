@@ -1253,5 +1253,158 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region PIVOT, UNPIVOT, VALUES, Rowset Functions, Derived Column Aliases
+
+        // ---- VALUES table source ----
+
+        [Fact]
+        public void Parse_ValuesTableSource_HasCorrectStructure()
+        {
+            // Arrange & Act
+            Stmt.Select select = ParseSelect("SELECT a FROM (VALUES (1, 'x'), (2, 'y')) AS t(id, name)");
+            FromClause from = select.SelectExpression.From;
+
+            // Assert
+            ValuesTableSource values = Assert.IsType<ValuesTableSource>(from.TableSources[0]);
+            Assert.Equal(2, values.Rows.Count);
+            Assert.Equal(2, values.Rows[0].Values.Count);
+            Assert.Equal(2, values.Rows[1].Values.Count);
+            Assert.NotNull(values.Alias);
+            Assert.Equal("t", values.Alias.Name.Lexeme);
+            Assert.NotNull(values.ColumnAliases);
+            Assert.Equal(2, values.ColumnAliases.ColumnNames.Count);
+            Assert.Equal("id", values.ColumnAliases.ColumnNames[0].Name);
+            Assert.Equal("name", values.ColumnAliases.ColumnNames[1].Name);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM (VALUES (1, 'x'), (2, 'y')) AS t(id, name)")]
+        [InlineData("SELECT a FROM (VALUES (1), (2), (3)) AS t(id)")]
+        [InlineData("SELECT a FROM (VALUES (1 + 2, 'hello')) AS t(val, txt)")]
+        public void Parse_ValuesTableSource_RoundTripsCorrectly(string source)
+        {
+            Stmt stmt = ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        // ---- Derived column aliases on subquery ----
+
+        [Fact]
+        public void Parse_SubqueryDerivedColumnAliases_HasCorrectStructure()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM (SELECT 1, 2) AS t(col1, col2)");
+            FromClause from = select.SelectExpression.From;
+
+            SubqueryReference subRef = Assert.IsType<SubqueryReference>(from.TableSources[0]);
+            Assert.NotNull(subRef.Alias);
+            Assert.Equal("t", subRef.Alias.Name.Lexeme);
+            Assert.NotNull(subRef.ColumnAliases);
+            Assert.Equal(2, subRef.ColumnAliases.ColumnNames.Count);
+            Assert.Equal("col1", subRef.ColumnAliases.ColumnNames[0].Name);
+            Assert.Equal("col2", subRef.ColumnAliases.ColumnNames[1].Name);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM (SELECT 1, 2) AS t(col1, col2)")]
+        [InlineData("SELECT a FROM (SELECT x FROM T) AS sub(val)")]
+        public void Parse_SubqueryDerivedColumnAliases_RoundTripsCorrectly(string source)
+        {
+            Stmt stmt = ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        // ---- PIVOT ----
+
+        [Fact]
+        public void Parse_PivotTableSource_HasCorrectStructure()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM T PIVOT (SUM(Amount) FOR Month IN (Jan, Feb, Mar)) AS pvt");
+            FromClause from = select.SelectExpression.From;
+
+            PivotTableSource pivot = Assert.IsType<PivotTableSource>(from.TableSources[0]);
+            Assert.IsType<TableReference>(pivot.Source);
+            Assert.Equal("SUM", pivot.AggregateFunction.Callee.ObjectName.Name);
+            Assert.Equal("Month", pivot.PivotColumn.ObjectName.Name);
+            Assert.Equal(3, pivot.ValueList.Count);
+            Assert.NotNull(pivot.Alias);
+            Assert.Equal("pvt", pivot.Alias.Name.Lexeme);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T PIVOT (SUM(Amount) FOR Month IN (Jan, Feb, Mar)) AS pvt")]
+        [InlineData("SELECT a FROM T PIVOT (COUNT(Id) FOR Status IN (Active, Inactive)) AS p")]
+        public void Parse_PivotTableSource_RoundTripsCorrectly(string source)
+        {
+            Stmt stmt = ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        // ---- UNPIVOT ----
+
+        [Fact]
+        public void Parse_UnpivotTableSource_HasCorrectStructure()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM T UNPIVOT (Value FOR Quarter IN (Q1, Q2, Q3, Q4)) AS unpvt");
+            FromClause from = select.SelectExpression.From;
+
+            UnpivotTableSource unpivot = Assert.IsType<UnpivotTableSource>(from.TableSources[0]);
+            Assert.IsType<TableReference>(unpivot.Source);
+            Assert.Equal("Value", unpivot.ValueColumn.ObjectName.Name);
+            Assert.Equal("Quarter", unpivot.PivotColumn.ObjectName.Name);
+            Assert.Equal(4, unpivot.ColumnList.Count);
+            Assert.Equal("Q1", unpivot.ColumnList[0].Name);
+            Assert.Equal("Q4", unpivot.ColumnList[3].Name);
+            Assert.NotNull(unpivot.Alias);
+            Assert.Equal("unpvt", unpivot.Alias.Name.Lexeme);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T UNPIVOT (Value FOR Quarter IN (Q1, Q2, Q3, Q4)) AS unpvt")]
+        [InlineData("SELECT a FROM T UNPIVOT (Amount FOR Year IN (Y2020, Y2021)) AS u")]
+        public void Parse_UnpivotTableSource_RoundTripsCorrectly(string source)
+        {
+            Stmt stmt = ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        // ---- Rowset functions ----
+
+        [Fact]
+        public void Parse_OpenQueryRowsetFunction_HasCorrectStructure()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM OPENQUERY(LinkedServer, 'SELECT 1') AS oq");
+            FromClause from = select.SelectExpression.From;
+
+            RowsetFunctionReference rowset = Assert.IsType<RowsetFunctionReference>(from.TableSources[0]);
+            Assert.Equal("OPENQUERY", rowset.FunctionCall.Callee.ObjectName.Name);
+            Assert.Equal(2, rowset.FunctionCall.Arguments.Count);
+            Assert.NotNull(rowset.Alias);
+            Assert.Equal("oq", rowset.Alias.Name.Lexeme);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM OPENQUERY(LinkedServer, 'SELECT 1') AS oq")]
+        [InlineData("SELECT a FROM OPENROWSET('SQLNCLI', 'Server=srv;', 'SELECT 1') AS ors")]
+        public void Parse_RowsetFunction_RoundTripsCorrectly(string source)
+        {
+            Stmt stmt = ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        // ---- Combined / edge cases ----
+
+        [Theory]
+        [InlineData("SELECT a FROM (SELECT 1) AS t")]
+        [InlineData("SELECT a FROM (VALUES (1)) AS t(id)")]
+        [InlineData("SELECT a FROM T PIVOT (MAX(Val) FOR Col IN (A, B)) AS p")]
+        [InlineData("SELECT a FROM T UNPIVOT (Val FOR Col IN (A, B)) AS u")]
+        public void Parse_PivotUnpivotValuesFeatures_RoundTripsCorrectly(string source)
+        {
+            Stmt stmt = ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        #endregion
     }
 }

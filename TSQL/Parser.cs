@@ -107,7 +107,7 @@ namespace TSQL
             named_table_source -> fully_qualified_identifier (for_system_time)? (("AS")? IDENTIFIER)? (tablesample_clause)? (with_hints)?
             subquery_table_source -> "(" select_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
             variable_table_source -> VARIABLE (("AS")? IDENTIFIER)?
-            values_table_source -> "VALUES" values_row ("," values_row)* (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
+            values_table_source -> "(" "VALUES" values_row ("," values_row)* ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
             values_row -> "(" expression ("," expression)* ")"
             rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (("AS")? IDENTIFIER)?
 
@@ -426,15 +426,26 @@ namespace TSQL
         {
             TableSource source = ParseTableSourcePrimary();
 
-            while (IsJoinStart())
+            while (IsJoinOrPivotStart())
             {
-                source = ParseJoinSuffix(source);
+                if (Check(TokenType.PIVOT))
+                {
+                    source = ParsePivotTableSource(source);
+                }
+                else if (Check(TokenType.UNPIVOT))
+                {
+                    source = ParseUnpivotTableSource(source);
+                }
+                else
+                {
+                    source = ParseJoinSuffix(source);
+                }
             }
 
             return source;
         }
 
-        private bool IsJoinStart()
+        private bool IsJoinOrPivotStart()
         {
             TokenType type = Peek().Type;
 
@@ -457,6 +468,10 @@ namespace TSQL
                 Token next = PeekNext();
                 return next != null && next.Type == TokenType.APPLY;
             }
+
+            // PIVOT / UNPIVOT are suffixes on a table source
+            if (type == TokenType.PIVOT || type == TokenType.UNPIVOT)
+                return true;
 
             // Join hints (LOOP, HASH, MERGE, REMOTE) are only valid AFTER a join type
             // keyword (INNER, LEFT, etc.), so they don't start a join by themselves.
@@ -577,6 +592,12 @@ namespace TSQL
                 return ParseSubqueryTableSource();
             }
 
+            // Values derived table: (VALUES (...), (...)) AS alias(cols)
+            if (Check(TokenType.LEFT_PAREN) && CheckNext(TokenType.VALUES))
+            {
+                return ParseValuesTableSource();
+            }
+
             // Parenthesized table source: (T1 JOIN T2 ON ...)
             if (Check(TokenType.LEFT_PAREN))
             {
@@ -586,6 +607,12 @@ namespace TSQL
             if (Check(TokenType.VARIABLE))
             {
                 return ParseTableVariable();
+            }
+
+            // Rowset functions: OPENROWSET, OPENQUERY, OPENDATASOURCE
+            if (Check(TokenType.OPENROWSET) || Check(TokenType.OPENQUERY) || Check(TokenType.OPENDATASOURCE))
+            {
+                return ParseRowsetFunction();
             }
 
             return ParseNamedTableSource();
@@ -940,6 +967,12 @@ namespace TSQL
             SubqueryReference subqueryRef = new SubqueryReference(subquery);
             subqueryRef.Alias = Alias();
 
+            // Optional derived column aliases: (col1, col2, ...)
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                subqueryRef.ColumnAliases = ParseDerivedColumnAliases();
+            }
+
             return subqueryRef;
         }
 
@@ -950,6 +983,174 @@ namespace TSQL
             varRef.Alias = Alias();
 
             return varRef;
+        }
+
+        private ValuesTableSource ParseValuesTableSource()
+        {
+            Token outerLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+            Token valuesToken = Consume(TokenType.VALUES, "Expected VALUES");
+
+            SyntaxElementList<ValuesRow> rows = new SyntaxElementList<ValuesRow>();
+            rows.Add(ParseValuesRow());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                rows.Add(ParseValuesRow(), comma);
+            }
+
+            Token outerRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            ValuesTableSource valuesSource = new ValuesTableSource(rows);
+            valuesSource._outerLeftParen = outerLeftParen;
+            valuesSource._valuesToken = valuesToken;
+            valuesSource._outerRightParen = outerRightParen;
+            valuesSource.Alias = Alias();
+
+            // Optional derived column aliases: (col1, col2, ...)
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                valuesSource.ColumnAliases = ParseDerivedColumnAliases();
+            }
+
+            return valuesSource;
+        }
+
+        private ValuesRow ParseValuesRow()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            SyntaxElementList<Expr> values = new SyntaxElementList<Expr>();
+            values.Add(Expression());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                values.Add(Expression(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            ValuesRow row = new ValuesRow(values);
+            row._leftParen = leftParen;
+            row._rightParen = rightParen;
+            return row;
+        }
+
+        private RowsetFunctionReference ParseRowsetFunction()
+        {
+            // OPENROWSET, OPENQUERY, OPENDATASOURCE are reserved keywords,
+            // so we consume the token directly and build the ObjectIdentifier manually.
+            Token keywordToken = Advance();
+            Expr.ObjectIdentifier functionId = new Expr.ObjectIdentifier(new ObjectName(keywordToken));
+            Expr.FunctionCall functionCall = FinishCall(functionId);
+
+            RowsetFunctionReference rowsetRef = new RowsetFunctionReference(functionCall);
+            rowsetRef.Alias = Alias();
+
+            return rowsetRef;
+        }
+
+        private PivotTableSource ParsePivotTableSource(TableSource source)
+        {
+            Token pivotToken = Consume(TokenType.PIVOT, "Expected PIVOT");
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            // Parse aggregate function call: e.g. SUM(Amount)
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ObjectIdentifier functionId = FunctionIdentifier(parts);
+            Expr.FunctionCall aggregateFunction = FinishCall(functionId);
+
+            Token forToken = Consume(TokenType.FOR, "Expected FOR");
+
+            // Parse pivot column identifier
+            IdentifierPartsBuffer pivotParts = CollectIdentifierParts();
+            Expr.ObjectIdentifier pivotColumn = FunctionIdentifier(pivotParts);
+
+            Token inToken = Consume(TokenType.IN, "Expected IN");
+            Token inLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            // Parse value list
+            SyntaxElementList<Expr> valueList = new SyntaxElementList<Expr>();
+            valueList.Add(Expression());
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                valueList.Add(Expression(), comma);
+            }
+
+            Token inRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            PivotTableSource pivot = new PivotTableSource(source, aggregateFunction, pivotColumn, valueList);
+            pivot._pivotToken = pivotToken;
+            pivot._leftParen = leftParen;
+            pivot._forToken = forToken;
+            pivot._inToken = inToken;
+            pivot._inLeftParen = inLeftParen;
+            pivot._inRightParen = inRightParen;
+            pivot._rightParen = rightParen;
+            pivot.Alias = Alias();
+
+            return pivot;
+        }
+
+        private UnpivotTableSource ParseUnpivotTableSource(TableSource source)
+        {
+            Token unpivotToken = Consume(TokenType.UNPIVOT, "Expected UNPIVOT");
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            // Parse value column identifier
+            IdentifierPartsBuffer valueParts = CollectIdentifierParts();
+            Expr.ObjectIdentifier valueColumn = FunctionIdentifier(valueParts);
+
+            Token forToken = Consume(TokenType.FOR, "Expected FOR");
+
+            // Parse pivot column identifier
+            IdentifierPartsBuffer pivotParts = CollectIdentifierParts();
+            Expr.ObjectIdentifier pivotColumn = FunctionIdentifier(pivotParts);
+
+            Token inToken = Consume(TokenType.IN, "Expected IN");
+            Token inLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            // Parse column list
+            SyntaxElementList<ColumnName> columnList = new SyntaxElementList<ColumnName>();
+            columnList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                columnList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+            }
+
+            Token inRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            UnpivotTableSource unpivot = new UnpivotTableSource(source, valueColumn, pivotColumn, columnList);
+            unpivot._unpivotToken = unpivotToken;
+            unpivot._leftParen = leftParen;
+            unpivot._forToken = forToken;
+            unpivot._inToken = inToken;
+            unpivot._inLeftParen = inLeftParen;
+            unpivot._inRightParen = inRightParen;
+            unpivot._rightParen = rightParen;
+            unpivot.Alias = Alias();
+
+            return unpivot;
+        }
+
+        private DerivedColumnAliases ParseDerivedColumnAliases()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+
+            SyntaxElementList<ColumnName> columnNames = new SyntaxElementList<ColumnName>();
+            columnNames.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                columnNames.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+            DerivedColumnAliases aliases = new DerivedColumnAliases(columnNames);
+            aliases._leftParen = leftParen;
+            aliases._rightParen = rightParen;
+            return aliases;
         }
 
         private Alias Alias()
