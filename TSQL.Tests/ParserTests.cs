@@ -410,6 +410,94 @@ namespace TSQL.Tests
             Assert.Equal("t", tableRef.Alias.Name.Lexeme);
         }
 
+        [Fact]
+        public void Parse_FromQualifiedName_TwoPart()
+        {
+            var select = ParseSelect("SELECT a FROM dbo.MyTable");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
+            Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_FromQualifiedName_ThreePart()
+        {
+            var select = ParseSelect("SELECT a FROM MyDb.dbo.MyTable");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal("MyDb", tableRef.TableName.DatabaseName.Name);
+            Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
+            Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_FromQualifiedName_FourPart()
+        {
+            var select = ParseSelect("SELECT a FROM Server1.MyDb.dbo.MyTable");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal("Server1", tableRef.TableName.ServerName.Name);
+            Assert.Equal("MyDb", tableRef.TableName.DatabaseName.Name);
+            Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
+            Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_FromCommaSeparated_HasMultipleSources()
+        {
+            var select = ParseSelect("SELECT a FROM T1, T2, T3");
+
+            Assert.Equal(3, select.SelectExpression.From.TableSources.Count);
+            var t1 = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            var t2 = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[1]);
+            var t3 = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[2]);
+            Assert.Equal("T1", t1.TableName.ObjectName.Name);
+            Assert.Equal("T2", t2.TableName.ObjectName.Name);
+            Assert.Equal("T3", t3.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_FromSubquery_HasSubqueryReference()
+        {
+            var select = ParseSelect("SELECT a FROM (SELECT b FROM T) AS sub");
+
+            var subRef = Assert.IsType<SubqueryReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(subRef.Subquery);
+            Assert.NotNull(subRef.Alias);
+            Assert.Equal("sub", subRef.Alias.Name.Lexeme);
+        }
+
+        [Fact]
+        public void Parse_FromTableVariable_HasVariableReference()
+        {
+            var select = ParseSelect("SELECT a FROM @TempTable");
+
+            var varRef = Assert.IsType<TableVariableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal("@TempTable", varRef.VariableName);
+        }
+
+        [Fact]
+        public void Parse_FromTableVariableWithAlias_HasAliasSet()
+        {
+            var select = ParseSelect("SELECT a FROM @TempTable AS t");
+
+            var varRef = Assert.IsType<TableVariableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal("@TempTable", varRef.VariableName);
+            Assert.NotNull(varRef.Alias);
+            Assert.Equal("t", varRef.Alias.Name.Lexeme);
+        }
+
+        [Fact]
+        public void Parse_FromAliasWithoutAs_HasAliasSet()
+        {
+            var select = ParseSelect("SELECT a FROM MyTable t");
+
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.Alias);
+            Assert.Equal("t", tableRef.Alias.Name.Lexeme);
+        }
+
         #endregion
 
         #region Round-Trip Theory Tests
@@ -428,6 +516,21 @@ namespace TSQL.Tests
         [InlineData("SELECT GETDATE() FROM T")]
         [InlineData("SELECT COALESCE(a, b) FROM T")]
         [InlineData("SELECT @P0 FROM T")]
+        // FROM clause - qualified names
+        [InlineData("SELECT a FROM dbo.T")]
+        [InlineData("SELECT a FROM MyDb.dbo.T")]
+        [InlineData("SELECT a FROM Server1.MyDb.dbo.T")]
+        [InlineData("SELECT a FROM T AS t1")]
+        [InlineData("SELECT a FROM dbo.T AS t1")]
+        // FROM clause - comma-separated sources
+        [InlineData("SELECT a FROM T1, T2")]
+        [InlineData("SELECT a FROM T1, T2, T3")]
+        [InlineData("SELECT a FROM dbo.T1 AS t1, dbo.T2 AS t2")]
+        // FROM clause - subquery
+        [InlineData("SELECT a FROM (SELECT b FROM T) AS sub")]
+        // FROM clause - table variable
+        [InlineData("SELECT a FROM @TempTable")]
+        [InlineData("SELECT a FROM @TempTable AS t")]
 
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
         {

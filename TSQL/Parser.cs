@@ -92,31 +92,50 @@ namespace TSQL
             ---------------- WHERE ---------------
     
             ---------------- FROM ---------------
-            from_clause -> "FROM fully_qualified_identifier ("," fully_qualified_identifier)*"
-            table_source -> 
-                fully_qualified_identifier (for_system_time)? ( ("AS")? IDENTIFIER ) (tablesample_clause)? (with_hints)?
-                | rowset_function ( ("AS")? IDENTIFIER )? ( "(" bulk_column_alias ("," bulk_column_alias)* ")" )?\
-                | user_defined_function ( ("AS")? IDENTIFIER )?
-                | "OPENXML" openxml_clause
+            from_clause -> "FROM" table_source_list
+            table_source_list -> table_source_item ("," table_source_item)*
+            table_source_item -> table_source_primary (join_part)*
+
+            table_source_primary ->
+                named_table_source
+                | subquery_table_source
+                | variable_table_source
+                | values_table_source
+                | rowset_function_source
+                | "(" table_source_item ")"
+
+            named_table_source -> fully_qualified_identifier (for_system_time)? (("AS")? IDENTIFIER)? (tablesample_clause)? (with_hints)?
+            subquery_table_source -> "(" select_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
+            variable_table_source -> VARIABLE (("AS")? IDENTIFIER)?
+            values_table_source -> "VALUES" values_row ("," values_row)* (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
+            values_row -> "(" expression ("," expression)* ")"
+            rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (("AS")? IDENTIFIER)?
+
+            join_part -> qualified_join | cross_join | apply_join | pivot_clause | unpivot_clause
+            qualified_join -> (join_hint)? ("INNER" | "LEFT" ("OUTER")? | "RIGHT" ("OUTER")? | "FULL" ("OUTER")?)? "JOIN" table_source_primary "ON" search_condition
+            cross_join -> "CROSS" "JOIN" table_source_primary
+            apply_join -> ("CROSS" | "OUTER") "APPLY" table_source_primary
+            join_hint -> "LOOP" | "HASH" | "MERGE" | "REMOTE"
+
+            pivot_clause -> "PIVOT" "(" function_call "FOR" fully_qualified_identifier "IN" "(" expression_list ")" ")" (("AS")? IDENTIFIER)?
+            unpivot_clause -> "UNPIVOT" "(" fully_qualified_identifier "FOR" fully_qualified_identifier "IN" "(" IDENTIFIER ("," IDENTIFIER)* ")" ")" (("AS")? IDENTIFIER)?
 
             for_system_time -> "FOR" "SYSTEM_TIME" system_time
-            system_time -> 
-                AS OF date_time 
-                | FROM date_time TO date_time 
-                | BETWEEN date_time AND date_time 
-                | CONTAINED IN "(" date_time "," date_time ")" 
-                | ALL
-
-            TODO: should null be supported here too?
+            system_time ->
+                "AS" "OF" date_time
+                | "FROM" date_time "TO" date_time
+                | "BETWEEN" date_time "AND" date_time
+                | "CONTAINED" "IN" "(" date_time "," date_time ")"
+                | "ALL"
             date_time -> STRING | VARIABLE
 
-            tablesample_clause -> "TABLESAMPLE" ("SYSTEM")? "(" sample_number ("PERCENT" | "ROWS") ")" ( "REPEATABLE" "(" repeat_seed ")" )?
+            tablesample_clause -> "TABLESAMPLE" ("SYSTEM")? "(" expression ("PERCENT" | "ROWS") ")" ( "REPEATABLE" "(" expression ")" )?
 
             with_hints -> "WITH" "(" table_hint ("," table_hint)* ")"
             table_hint -> "NOEXPAND"
                 | "INDEX" "(" index_value ("," index_value)* ")"
                 | "INDEX" "=" index_value
-                | "FORCESEEK" ( "(" index_value "(" IDENTIFIER ("," IDENTIFIER)? ")" ")" )?
+                | "FORCESEEK" ( "(" index_value "(" IDENTIFIER ("," IDENTIFIER)* ")" ")" )?
                 | "FORCESCAN"
                 | "HOLDLOCK"
                 | "NOLOCK"
@@ -136,12 +155,7 @@ namespace TSQL
                 | "UPDLOCK"
                 | "XLOCK"
             index_value -> WHOLE_NUMBER | IDENTIFIER
-
-            rowset_function -> TODO: just normal function call??
-            user_defined_function -> TODO: just normal function call??
-             
-            openxml_clause -> TODO:
-
+            ---------------- FROM ---------------
 
             ---------------- WINDOW FUNCTIONS ---------------
             window_function -> function_call over_clause
@@ -398,25 +412,65 @@ namespace TSQL
 
             FromClause fromClause = new FromClause(fromToken);
 
-            if (Check(TokenType.LEFT_PAREN))
-            {
-                Expr.Subquery subquery = Subquery();
-                SubqueryReference subqueryRef = new SubqueryReference(subquery);
-                subqueryRef.Alias = Alias();
+            fromClause.TableSources.Add(ParseTableSourceItem());
 
-                fromClause.TableSources.Add(subqueryRef);
-            }
-            else
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                Token tableName = ConsumeIdentifierOrContextualKeyword("Expected table name");
-                Expr.ObjectIdentifier objectId = new Expr.ObjectIdentifier(new ObjectName(tableName));
-                TableReference tableRef = new TableReference(objectId);
-                tableRef.Alias = Alias();
-
-                fromClause.TableSources.Add(tableRef);
+                fromClause.TableSources.Add(ParseTableSourceItem(), comma);
             }
 
             return fromClause;
+        }
+
+        private TableSource ParseTableSourceItem()
+        {
+            TableSource source = ParseTableSourcePrimary();
+            // JOIN suffixes will be parsed here in Phase 4
+            return source;
+        }
+
+        private TableSource ParseTableSourcePrimary()
+        {
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                return ParseSubqueryTableSource();
+            }
+
+            if (Check(TokenType.VARIABLE))
+            {
+                return ParseTableVariable();
+            }
+
+            return ParseNamedTableSource();
+        }
+
+        private TableReference ParseNamedTableSource()
+        {
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ObjectIdentifier objectId = FunctionIdentifier(parts);
+
+            TableReference tableRef = new TableReference(objectId);
+            tableRef.Alias = Alias();
+
+            return tableRef;
+        }
+
+        private SubqueryReference ParseSubqueryTableSource()
+        {
+            Expr.Subquery subquery = Subquery();
+            SubqueryReference subqueryRef = new SubqueryReference(subquery);
+            subqueryRef.Alias = Alias();
+
+            return subqueryRef;
+        }
+
+        private TableVariableReference ParseTableVariable()
+        {
+            Token variable = Consume(TokenType.VARIABLE, "Expected table variable");
+            TableVariableReference varRef = new TableVariableReference(variable);
+            varRef.Alias = Alias();
+
+            return varRef;
         }
 
         private Alias Alias()
