@@ -477,7 +477,7 @@ namespace TSQL
         public TableSource Source { get; }
         public Expr.FunctionCall AggregateFunction { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
-        public SyntaxElementList<Expr> ValueList { get; }
+        public SyntaxElementList<ColumnName> ValueList { get; }
 
         internal Token _pivotToken;
         internal Token _leftParen;
@@ -487,7 +487,7 @@ namespace TSQL
         internal Token _inRightParen;
         internal Token _rightParen;
 
-        public PivotTableSource(TableSource source, Expr.FunctionCall aggregateFunction, Expr.ObjectIdentifier pivotColumn, SyntaxElementList<Expr> valueList)
+        public PivotTableSource(TableSource source, Expr.FunctionCall aggregateFunction, Expr.ObjectIdentifier pivotColumn, SyntaxElementList<ColumnName> valueList)
         {
             Source = source;
             AggregateFunction = aggregateFunction;

@@ -1502,5 +1502,69 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Bug Fix Tests
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE a IN (SELECT b FROM T2)")]
+        [InlineData("SELECT a FROM T WHERE a NOT IN (SELECT b FROM T2)")]
+        public void Parse_InSubquery_RoundTripsCorrectly(string source)
+        {
+            // Bug: _rightParen was never assigned for the subquery branch of IN predicate
+            Scanner scanner = new Scanner(source);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            Stmt stmt = parser.Parse();
+
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE (a = 1)")]
+        [InlineData("SELECT a FROM T WHERE (a = 1 AND b = 2)")]
+        [InlineData("SELECT a FROM T WHERE (a = 1) AND b = 2")]
+        [InlineData("SELECT a FROM T WHERE (a + b) > 0")]
+        public void Parse_GroupedPredicate_RoundTripsCorrectly(string source)
+        {
+            // Bug: grouped predicates like (a = 1) failed to parse because
+            // the empty if-block fell through to Expression() which can't handle
+            // predicate operators inside parens
+            Scanner scanner = new Scanner(source);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            Stmt stmt = parser.Parse();
+
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void Parse_GroupedPredicate_ProducesGroupingNode()
+        {
+            Stmt.Select select = ParseSelect("SELECT a FROM T WHERE (a = 1)");
+
+            var grouping = Assert.IsType<AST.Predicate.Grouping>(select.SelectExpression.Where);
+            Assert.IsType<AST.Predicate.Comparison>(grouping.Predicate);
+        }
+
+        [Fact]
+        public void Parse_PivotInValues_AcceptsIdentifiers()
+        {
+            // PIVOT IN values must be identifiers (they become output column names)
+            Stmt.Select select = ParseSelect("SELECT a FROM T PIVOT (SUM(Amount) FOR Month IN (Jan, Feb)) AS pvt");
+            PivotTableSource pivot = Assert.IsType<PivotTableSource>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal(2, pivot.ValueList.Count);
+            Assert.Equal("Jan", pivot.ValueList[0].Name);
+            Assert.Equal("Feb", pivot.ValueList[1].Name);
+        }
+
+        [Fact]
+        public void Parse_PivotInValues_RejectsExpressions()
+        {
+            // PIVOT IN values cannot be arbitrary expressions like 1 + 2
+            Assert.Throws<Parser.ParseError>(() =>
+                ParseSelect("SELECT a FROM T PIVOT (SUM(Amount) FOR Month IN (1 + 2)) AS pvt"));
+        }
+
+        #endregion
     }
 }

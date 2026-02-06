@@ -175,7 +175,7 @@ namespace TSQL
 
     public class Parser
     {
-        private class ParseError : Exception
+        public class ParseError : Exception
         {
             public ParseError(string message) : base(message)
             {
@@ -1069,12 +1069,12 @@ namespace TSQL
             Token inToken = Consume(TokenType.IN, "Expected IN");
             Token inLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
 
-            // Parse value list
-            SyntaxElementList<Expr> valueList = new SyntaxElementList<Expr>();
-            valueList.Add(Expression());
+            // PIVOT IN values are identifiers that become output column names
+            SyntaxElementList<ColumnName> valueList = new SyntaxElementList<ColumnName>();
+            valueList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected identifier for PIVOT value")));
             while (Match(TokenType.COMMA, out Token comma))
             {
-                valueList.Add(Expression(), comma);
+                valueList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected identifier for PIVOT value")), comma);
             }
 
             Token inRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -1262,17 +1262,28 @@ namespace TSQL
                 return contains;
             }
 
-            // Grouped predicate: (predicate)
-            // Must disambiguate from subquery expressions
+            // Grouped predicate: (search_condition)
+            // Disambiguate from expression grouping like (a + b) > 0 using backtracking.
+            // Try parsing as grouped predicate first; if it fails, fall through to
+            // expression-based predicate parsing.
             if (Check(TokenType.LEFT_PAREN) && !CheckNext(TokenType.SELECT))
             {
-                // Could be a grouped predicate or an expression starting with (
-                // Try parsing as predicate group - if the content after ( starts with
-                // something that looks like a predicate, treat it as grouped predicate
-                // This is tricky because (a + b) could be an expression or a predicate start
-                // We only treat it as a grouped predicate at the search_condition level
-                // when we know we're already in a predicate context
-                // Fall through to expression-based predicate parsing below
+                int saved = _current;
+                try
+                {
+                    Token leftParen = Advance();
+                    Predicate inner = SearchCondition();
+                    if (Check(TokenType.RIGHT_PAREN))
+                    {
+                        Token rightParen = Advance();
+                        Predicate.Grouping grouping = new Predicate.Grouping(inner);
+                        grouping._leftParen = leftParen;
+                        grouping._rightParen = rightParen;
+                        return grouping;
+                    }
+                }
+                catch (ParseError) { }
+                _current = saved;
             }
 
             // Expression-based predicates: parse left expression, then check what follows
@@ -1381,6 +1392,7 @@ namespace TSQL
                     Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after IN subquery");
                     Expr.Subquery sub = new Expr.Subquery(subSelect, leftParen, rightParen);
                     inPred = new Predicate.In(leftExpr, negated, sub);
+                    inPred._rightParen = rightParen;
                 }
                 else
                 {
