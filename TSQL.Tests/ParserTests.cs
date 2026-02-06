@@ -392,7 +392,9 @@ namespace TSQL.Tests
 
             // Assert
             Assert.NotNull(select.SelectExpression.From);
-            Assert.NotNull(select.SelectExpression.From.TableSource);
+            Assert.Equal(1, select.SelectExpression.From.TableSources.Count);
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
         }
 
         [Fact]
@@ -403,8 +405,9 @@ namespace TSQL.Tests
 
             // Assert
             Assert.NotNull(select.SelectExpression.From);
-            Assert.NotNull(select.SelectExpression.From.Alias);
-            Assert.Equal("t", select.SelectExpression.From.Alias.Name.Lexeme);
+            var tableRef = Assert.IsType<TableReference>(select.SelectExpression.From.TableSources[0]);
+            Assert.NotNull(tableRef.Alias);
+            Assert.Equal("t", tableRef.Alias.Name.Lexeme);
         }
 
         #endregion

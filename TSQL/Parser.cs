@@ -396,40 +396,27 @@ namespace TSQL
                 return null;
             }
 
+            FromClause fromClause = new FromClause(fromToken);
+
             if (Check(TokenType.LEFT_PAREN))
             {
                 Expr.Subquery subquery = Subquery();
+                SubqueryReference subqueryRef = new SubqueryReference(subquery);
+                subqueryRef.Alias = Alias();
 
-                Alias alias = null;
-                if (Match(TokenType.AS, out Token asToken))
-                {
-                    SuffixAlias suffixAlias = new SuffixAlias(Consume(TokenType.IDENTIFIER, "Expected alias"));
-                    suffixAlias._asKeyword = asToken;
-                    alias = suffixAlias;
-                }
-                else if (Match(TokenType.IDENTIFIER, out Token aliasToken))
-                {
-                    SuffixAlias suffixAlias = new SuffixAlias(aliasToken);
-                    suffixAlias._asKeyword = ConcreteToken.Empty;
-                    alias = suffixAlias;
-                }
-
-                return new FromClause(fromToken) { TableSource = new SubqueryReference() { Subquery = subquery }, Alias = alias };
+                fromClause.TableSources.Add(subqueryRef);
             }
             else
             {
-                Token tableName = Consume(TokenType.IDENTIFIER, "Expected table name");
-                Alias tableAlias = Alias();
+                Token tableName = ConsumeIdentifierOrContextualKeyword("Expected table name");
+                Expr.ObjectIdentifier objectId = new Expr.ObjectIdentifier(new ObjectName(tableName));
+                TableReference tableRef = new TableReference(objectId);
+                tableRef.Alias = Alias();
 
-                return new FromClause(fromToken)
-                {
-                    TableSource = new TableReference()
-                    {
-                        TableName = tableName
-                    },
-                    Alias = tableAlias
-                };
+                fromClause.TableSources.Add(tableRef);
             }
+
+            return fromClause;
         }
 
         private Alias Alias()
@@ -688,41 +675,6 @@ namespace TSQL
         }
 
         #endregion
-
-        //private JoinClause JoinClause()
-        //{
-        //    JoinClause join = new JoinClause();
-
-        //    if (Match(TokenType.INNER)) join.JoinType = "INNER";
-        //    else if (Match(TokenType.LEFT)) join.JoinType = "LEFT";
-        //    else if (Match(TokenType.RIGHT)) join.JoinType = "RIGHT";
-        //    else if (Match(TokenType.FULL)) join.JoinType = "FULL";
-        //    else if (Match(TokenType.CROSS)) join.JoinType = "CROSS";
-
-        //    Match(TokenType.OUTER);
-        //    Consume(TokenType.JOIN, "Expected JOIN");
-
-        //    if (Check(TokenType.LEFT_PAREN))
-        //    {
-        //        join.TableSource = new SubqueryReference() { Subquery = Subquery() };
-
-        //        if (Match(TokenType.AS))
-        //        {
-        //            join.Alias = Consume(TokenType.IDENTIFIER, "Expected alias").Lexeme;
-        //        }
-        //    }
-        //    else
-        //    {
-        //        join.TableSource = new TableReference() { TableName = Consume(TokenType.IDENTIFIER, "Expected table name").Lexeme };
-        //        if (Check(TokenType.IDENTIFIER))
-        //            join.Alias = Advance().Lexeme;
-        //    }
-
-        //    if (Match(TokenType.ON))
-        //        join.OnCondition = Expression();
-
-        //    return join;
-        //}
 
         private Expr Expression()
         {

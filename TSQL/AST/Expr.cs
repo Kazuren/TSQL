@@ -823,7 +823,6 @@ namespace TSQL
         public TopClause Top { get; set; }
         public SyntaxElementList<SelectItem> Columns { get; set; } = new SyntaxElementList<SelectItem>();
         public FromClause From { get; set; }
-        public SyntaxElementList<JoinClause> Joins { get; set; } = new SyntaxElementList<JoinClause>();
         public AST.Predicate Where { get; set; }
         public SyntaxElementList<Expr> GroupBy { get; set; } = new SyntaxElementList<Expr>();
         public Expr Having { get; set; }
