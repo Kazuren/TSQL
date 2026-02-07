@@ -231,3 +231,59 @@ public IEnumerable<string> Validate(User user) =>
         .Where(rule => !rule.Predicate(user))
         .Select(rule => rule.ErrorMessage);
 ```
+
+### 4. The Simplicity Principle
+
+Complexity is the central problem in software design. Fight it at every turn. The goal is not just working code — it is code that is *easy to understand and modify*.
+
+**Deep modules over shallow ones.** A well-designed module has a simple interface that hides a complex implementation. A method that does significant work behind a clean signature is worth more than ten tiny methods that scatter logic and force callers to assemble the pieces. Before splitting a function, ask: does this make the system simpler for the *reader*, or just shorter per function?
+
+```csharp
+// Shallow: caller must orchestrate multiple steps, complexity leaks out
+var scanner = new Scanner(sql);
+var tokens = scanner.ScanTokens();
+var parser = new Parser(tokens);
+var ast = parser.ParseSelect();
+var source = ast.ToSource();
+
+// Deep: one method, clear intent, all complexity hidden inside
+string source = SqlFormatter.Format(sql);
+```
+
+**Define errors out of existence.** The best way to deal with edge cases is to define the problem so they don't exist. Design abstractions where the "special cases" are naturally handled by the normal code path, rather than requiring separate detection and handling.
+
+```csharp
+// Bad: edge cases require special handling everywhere
+public SyntaxElementList<T> ParseList()
+{
+    // Must handle: empty list, single item, trailing comma, null separators...
+    if (IsAtEnd()) return new SyntaxElementList<T>();
+    var first = ParseItem();
+    if (!Check(COMMA)) return new SyntaxElementList<T>(first);
+    // ...more special cases
+}
+
+// Good: define the structure so one code path handles all cases
+// SyntaxElementList<T> stores items and separators together —
+// an empty list, single item, and multi-item list are all just
+// "zero or more (separator, item) pairs after an optional first item."
+// No special cases needed.
+```
+
+**Information hiding.** Each module should encapsulate a design decision — a data format, an algorithm, a policy — so that changing it does not ripple through the codebase. When internal details leak into the interface (through parameter types, naming, or documentation), every caller becomes coupled to the implementation.
+
+**Prefer somewhat general-purpose.** When building a module, make its interface slightly more general than the immediate use case demands, without adding unused functionality. A general-purpose interface is often *simpler* than a special-purpose one because it replaces multiple narrow interfaces with one clean one.
+
+```csharp
+// Too special-purpose: one method per hint category
+public QueryHint ParseSimpleHint() { ... }
+public QueryHint ParseValueHint() { ... }
+public QueryHint ParseTwoTokenHint() { ... }
+
+// More general: single entry point, dispatches internally
+public QueryHint ParseQueryHint() { ... }
+```
+
+**Tactical vs. strategic programming.** Working code is necessary but not sufficient. Every change should leave the system a little cleaner than you found it. Tactical programming — "just make it work, clean up later" — accumulates complexity that never gets cleaned up. Think about the *right* design before writing code, even when the quick fix is obvious.
+
+**Say no to complexity you don't need.** If there are two ways to solve a problem and one is simpler, pick the simpler one. Don't add layers of abstraction for a single use case. Don't add configuration for things that can be constants. Don't add indirection that exists only to "keep options open." Wait until a pattern repeats naturally before extracting it. Three similar lines are better than a premature abstraction.
