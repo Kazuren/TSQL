@@ -1484,5 +1484,108 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region GROUP BY Tests
+
+        [Theory]
+        [InlineData("SELECT a, SUM(b) FROM T GROUP BY a")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY a, b")]
+        [InlineData("SELECT DATEPART(yyyy, d), SUM(e) FROM T GROUP BY DATEPART(yyyy, d)")]
+        [InlineData("SELECT a, SUM(b) FROM T WHERE x > 1 GROUP BY a")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY ROLLUP(a, b)")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY CUBE(a, b)")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS(a, b)")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS((a, b), a, ())")]
+        [InlineData("SELECT a, b, c, SUM(d) FROM T GROUP BY ROLLUP((a, b), c)")]
+        [InlineData("SELECT SUM(c) FROM T GROUP BY ()")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY a, ROLLUP(b)")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS(ROLLUP(a, b), ())")]
+        [InlineData("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS(CUBE(a, b), (a), ())")]
+        public void Parse_GroupBy(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_GroupBy_SimpleStructure()
+        {
+            var stmt = ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a");
+            var groupBy = stmt.SelectExpression.GroupBy;
+
+            Assert.NotNull(groupBy);
+            Assert.Equal(1, groupBy.Items.Count);
+            Assert.IsType<GroupByExpression>(groupBy.Items[0]);
+        }
+
+        [Fact]
+        public void Parse_GroupBy_RollupStructure()
+        {
+            var stmt = ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY ROLLUP(a, b)");
+            var groupBy = stmt.SelectExpression.GroupBy;
+
+            Assert.NotNull(groupBy);
+            Assert.Equal(1, groupBy.Items.Count);
+            var rollup = Assert.IsType<GroupByRollup>(groupBy.Items[0]);
+            Assert.Equal(2, rollup.Items.Count);
+        }
+
+        [Fact]
+        public void Parse_GroupBy_CubeStructure()
+        {
+            var stmt = ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY CUBE(a, b)");
+            var groupBy = stmt.SelectExpression.GroupBy;
+
+            Assert.NotNull(groupBy);
+            Assert.Equal(1, groupBy.Items.Count);
+            var cube = Assert.IsType<GroupByCube>(groupBy.Items[0]);
+            Assert.Equal(2, cube.Items.Count);
+        }
+
+        [Fact]
+        public void Parse_GroupBy_GroupingSetsStructure()
+        {
+            var stmt = ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS((a, b), a, ())");
+            var groupBy = stmt.SelectExpression.GroupBy;
+
+            Assert.NotNull(groupBy);
+            Assert.Equal(1, groupBy.Items.Count);
+            var gs = Assert.IsType<GroupByGroupingSets>(groupBy.Items[0]);
+            Assert.Equal(3, gs.Items.Count);
+            Assert.IsType<GroupByComposite>(gs.Items[0]);
+            Assert.IsType<GroupByExpression>(gs.Items[1]);
+            Assert.IsType<GroupByGrandTotal>(gs.Items[2]);
+        }
+
+        [Fact]
+        public void Parse_GroupBy_CompositeInRollup()
+        {
+            var stmt = ParseSelect("SELECT a, b, c, SUM(d) FROM T GROUP BY ROLLUP((a, b), c)");
+            var rollup = Assert.IsType<GroupByRollup>(stmt.SelectExpression.GroupBy.Items[0]);
+
+            Assert.Equal(2, rollup.Items.Count);
+            var composite = Assert.IsType<GroupByComposite>(rollup.Items[0]);
+            Assert.Equal(2, composite.Expressions.Count);
+            Assert.IsType<GroupByExpression>(rollup.Items[1]);
+        }
+
+        [Fact]
+        public void Parse_GroupBy_MixedItems()
+        {
+            var stmt = ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY a, ROLLUP(b)");
+            var groupBy = stmt.SelectExpression.GroupBy;
+
+            Assert.Equal(2, groupBy.Items.Count);
+            Assert.IsType<GroupByExpression>(groupBy.Items[0]);
+            Assert.IsType<GroupByRollup>(groupBy.Items[1]);
+        }
+
+        [Fact]
+        public void Parse_GroupBy_NoGroupBy_ReturnsNull()
+        {
+            var stmt = ParseSelect("SELECT a FROM T");
+            Assert.Null(stmt.SelectExpression.GroupBy);
+        }
+
+        #endregion
     }
 }

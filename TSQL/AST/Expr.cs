@@ -710,7 +710,7 @@ namespace TSQL
         public SyntaxElementList<SelectItem> Columns { get; set; } = new SyntaxElementList<SelectItem>();
         public FromClause From { get; set; }
         public AST.Predicate Where { get; set; }
-        public SyntaxElementList<Expr> GroupBy { get; set; } = new SyntaxElementList<Expr>();
+        public GroupByClause GroupBy { get; set; }
         public Expr Having { get; set; }
         public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
 
@@ -752,6 +752,14 @@ namespace TSQL
             {
                 yield return _whereKeyword;
                 foreach (Token token in Where.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (GroupBy != null)
+            {
+                foreach (Token token in GroupBy.DescendantTokens())
                 {
                     yield return token;
                 }

@@ -615,6 +615,173 @@ namespace TSQL
 
     #endregion
 
+    #region GROUP BY Clause
+
+    public class GroupByClause : SyntaxElement
+    {
+        public SyntaxElementList<GroupByItem> Items { get; }
+
+        internal Token _groupKeyword;
+        internal Token _byKeyword;
+
+        internal GroupByClause(Token groupKeyword, Token byKeyword, SyntaxElementList<GroupByItem> items)
+        {
+            _groupKeyword = groupKeyword;
+            _byKeyword = byKeyword;
+            Items = items;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _groupKeyword;
+            yield return _byKeyword;
+            foreach (Token token in Items.DescendantTokens())
+                yield return token;
+        }
+    }
+
+    public abstract class GroupByItem : SyntaxElement { }
+
+    public class GroupByExpression : GroupByItem
+    {
+        public Expr Expression { get; }
+
+        internal GroupByExpression(Expr expression)
+        {
+            Expression = expression;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in Expression.DescendantTokens())
+                yield return token;
+        }
+    }
+
+    public class GroupByGrandTotal : GroupByItem
+    {
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        internal GroupByGrandTotal(Token leftParen, Token rightParen)
+        {
+            _leftParen = leftParen;
+            _rightParen = rightParen;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _leftParen;
+            yield return _rightParen;
+        }
+    }
+
+    public class GroupByComposite : GroupByItem
+    {
+        public SyntaxElementList<Expr> Expressions { get; }
+
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        internal GroupByComposite(Token leftParen, SyntaxElementList<Expr> expressions, Token rightParen)
+        {
+            _leftParen = leftParen;
+            Expressions = expressions;
+            _rightParen = rightParen;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _leftParen;
+            foreach (Token token in Expressions.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+        }
+    }
+
+    public class GroupByRollup : GroupByItem
+    {
+        public SyntaxElementList<GroupByItem> Items { get; }
+
+        internal Token _rollupKeyword;
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        internal GroupByRollup(Token rollupKeyword, Token leftParen, SyntaxElementList<GroupByItem> items, Token rightParen)
+        {
+            _rollupKeyword = rollupKeyword;
+            _leftParen = leftParen;
+            Items = items;
+            _rightParen = rightParen;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _rollupKeyword;
+            yield return _leftParen;
+            foreach (Token token in Items.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+        }
+    }
+
+    public class GroupByCube : GroupByItem
+    {
+        public SyntaxElementList<GroupByItem> Items { get; }
+
+        internal Token _cubeKeyword;
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        internal GroupByCube(Token cubeKeyword, Token leftParen, SyntaxElementList<GroupByItem> items, Token rightParen)
+        {
+            _cubeKeyword = cubeKeyword;
+            _leftParen = leftParen;
+            Items = items;
+            _rightParen = rightParen;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _cubeKeyword;
+            yield return _leftParen;
+            foreach (Token token in Items.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+        }
+    }
+
+    public class GroupByGroupingSets : GroupByItem
+    {
+        public SyntaxElementList<GroupByItem> Items { get; }
+
+        internal Token _groupingKeyword;
+        internal Token _setsKeyword;
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        internal GroupByGroupingSets(Token groupingKeyword, Token setsKeyword, Token leftParen, SyntaxElementList<GroupByItem> items, Token rightParen)
+        {
+            _groupingKeyword = groupingKeyword;
+            _setsKeyword = setsKeyword;
+            _leftParen = leftParen;
+            Items = items;
+            _rightParen = rightParen;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _groupingKeyword;
+            yield return _setsKeyword;
+            yield return _leftParen;
+            foreach (Token token in Items.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+        }
+    }
+
+    #endregion
+
     #region Supporting Clause Types
 
     public class ValuesRow : SyntaxElement

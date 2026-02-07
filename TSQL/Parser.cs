@@ -59,7 +59,13 @@ namespace TSQL
             select_list -> select_item ("," select_item)*
 
             where_clause -> "WHERE search_condition
-            group_by_clause -> "GROUP BY"
+            group_by_clause -> "GROUP" "BY" group_by_item ("," group_by_item)*
+            group_by_item -> expression | rollup | cube | grouping_sets | "()" | "(" expression ("," expression)+ ")"
+            rollup -> "ROLLUP" "(" group_by_expression ("," group_by_expression)* ")"
+            cube -> "CUBE" "(" group_by_expression ("," group_by_expression)* ")"
+            grouping_sets -> "GROUPING" "SETS" "(" grouping_set ("," grouping_set)* ")"
+            group_by_expression -> expression | "(" expression ("," expression)+ ")"
+            grouping_set -> "()" | group_by_item
             having_clause -> "HAVING"
             order_by_clause -> "ORDER BY"
             cte_list -> cte_definition ( "," cte_definition )*
@@ -209,7 +215,11 @@ namespace TSQL
             TokenType.REMOTE,
             TokenType.SYSTEM,
             TokenType.CONTAINED,
-            TokenType.REPEATABLE
+            TokenType.REPEATABLE,
+            TokenType.ROLLUP,
+            TokenType.CUBE,
+            TokenType.GROUPING,
+            TokenType.SETS
         };
 
         public Parser(IEnumerable<Token> tokens)
@@ -350,6 +360,11 @@ namespace TSQL
             {
                 selectExpr._whereKeyword = whereToken;
                 selectExpr.Where = SearchCondition();
+            }
+
+            if (Check(TokenType.GROUP))
+            {
+                selectExpr.GroupBy = GroupByClause();
             }
 
             return selectExpr;
@@ -1789,6 +1804,191 @@ namespace TSQL
                 list.Add(item, comma);
             } while (Previous().Type == TokenType.COMMA);
             return list;
+        }
+
+        #endregion
+
+        #region GROUP BY Parsing
+
+        /// <summary>
+        /// GROUP BY a, ROLLUP(b, c), GROUPING SETS((a, b), ())
+        /// </summary>
+        private GroupByClause GroupByClause()
+        {
+            Token groupKeyword = Consume(TokenType.GROUP, "Expected GROUP");
+            Token byKeyword = Consume(TokenType.BY, "Expected BY after GROUP");
+
+            SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
+            do
+            {
+                GroupByItem item = GroupByItem();
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                items.Add(item, comma);
+            } while (Previous().Type == TokenType.COMMA);
+
+            return new GroupByClause(groupKeyword, byKeyword, items);
+        }
+
+        /// <summary>
+        /// a | ROLLUP(...) | CUBE(...) | GROUPING SETS(...) | () | (a, b)
+        /// </summary>
+        private GroupByItem GroupByItem()
+        {
+            // ROLLUP(...)
+            if (Check(TokenType.ROLLUP) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByRollup();
+            }
+
+            // CUBE(...)
+            if (Check(TokenType.CUBE) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByCube();
+            }
+
+            // GROUPING SETS(...)
+            if (Check(TokenType.GROUPING) && CheckNext(TokenType.SETS))
+            {
+                return ParseGroupByGroupingSets();
+            }
+
+            // () grand total or (a, b) composite
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByParenthesized();
+            }
+
+            // Simple expression
+            Expr expr = Expression();
+            return new GroupByExpression(expr);
+        }
+
+        /// <summary>
+        /// ROLLUP(a, b, (c, d))
+        /// </summary>
+        private GroupByRollup ParseGroupByRollup()
+        {
+            Token keyword = Advance(); // ROLLUP
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after ROLLUP");
+            SyntaxElementList<GroupByItem> items = ParseGroupByExpressionList();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after ROLLUP arguments");
+            return new GroupByRollup(keyword, leftParen, items, rightParen);
+        }
+
+        /// <summary>
+        /// CUBE(a, b, (c, d))
+        /// </summary>
+        private GroupByCube ParseGroupByCube()
+        {
+            Token keyword = Advance(); // CUBE
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after CUBE");
+            SyntaxElementList<GroupByItem> items = ParseGroupByExpressionList();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after CUBE arguments");
+            return new GroupByCube(keyword, leftParen, items, rightParen);
+        }
+
+        /// <summary>
+        /// GROUPING SETS((a, b), a, (), ROLLUP(c, d))
+        /// </summary>
+        private GroupByGroupingSets ParseGroupByGroupingSets()
+        {
+            Token groupingKeyword = Advance(); // GROUPING
+            Token setsKeyword = Consume(TokenType.SETS, "Expected SETS after GROUPING");
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after GROUPING SETS");
+
+            SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
+            do
+            {
+                GroupByItem item = ParseGroupingSetItem();
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                items.Add(item, comma);
+            } while (Previous().Type == TokenType.COMMA);
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after GROUPING SETS arguments");
+            return new GroupByGroupingSets(groupingKeyword, setsKeyword, leftParen, items, rightParen);
+        }
+
+        /// <summary>
+        /// Items inside ROLLUP/CUBE: a | (a, b)
+        /// </summary>
+        private SyntaxElementList<GroupByItem> ParseGroupByExpressionList()
+        {
+            SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
+            do
+            {
+                GroupByItem item;
+                if (Check(TokenType.LEFT_PAREN))
+                {
+                    item = ParseGroupByComposite();
+                }
+                else
+                {
+                    Expr expr = Expression();
+                    item = new GroupByExpression(expr);
+                }
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                items.Add(item, comma);
+            } while (Previous().Type == TokenType.COMMA);
+            return items;
+        }
+
+        /// <summary>
+        /// (a, b) — composite column group
+        /// </summary>
+        private GroupByComposite ParseGroupByComposite()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '('");
+            SyntaxElementList<Expr> expressions = ParseExpressionList();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after composite group");
+            return new GroupByComposite(leftParen, expressions, rightParen);
+        }
+
+        /// <summary>
+        /// Items inside GROUPING SETS: () | ROLLUP(...) | CUBE(...) | (a, b) | a
+        /// </summary>
+        private GroupByItem ParseGroupingSetItem()
+        {
+            // ROLLUP(...) inside GROUPING SETS
+            if (Check(TokenType.ROLLUP) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByRollup();
+            }
+
+            // CUBE(...) inside GROUPING SETS
+            if (Check(TokenType.CUBE) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByCube();
+            }
+
+            // () grand total or (a, b) composite
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByParenthesized();
+            }
+
+            // Simple expression
+            Expr expr = Expression();
+            return new GroupByExpression(expr);
+        }
+
+        /// <summary>
+        /// () — grand total, or (a, b) — composite column group
+        /// </summary>
+        private GroupByItem ParseGroupByParenthesized()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '('");
+
+            // () grand total
+            if (Check(TokenType.RIGHT_PAREN))
+            {
+                Token rightParen = Advance();
+                return new GroupByGrandTotal(leftParen, rightParen);
+            }
+
+            // (a, b, ...) composite
+            SyntaxElementList<Expr> expressions = ParseExpressionList();
+            Token closeParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after composite group");
+            return new GroupByComposite(leftParen, expressions, closeParen);
         }
 
         #endregion

@@ -50,6 +50,9 @@ namespace TSQL
         ROW_NUMBER, RANK, DENSE_RANK, NTILE,
 
         // FROM clause keywords (contextual - can also be used as identifiers)
-        APPLY, LOOP, HASH, REMOTE, SYSTEM, CONTAINED, REPEATABLE
+        APPLY, LOOP, HASH, REMOTE, SYSTEM, CONTAINED, REPEATABLE,
+
+        // GROUP BY keywords (contextual - can also be used as identifiers)
+        ROLLUP, CUBE, GROUPING, SETS
     }
 }
