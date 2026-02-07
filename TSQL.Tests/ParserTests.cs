@@ -1485,6 +1485,29 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region COUNT(*) / Star Argument Tests
+
+        [Theory]
+        [InlineData("SELECT COUNT(*) FROM T")]
+        [InlineData("SELECT a, COUNT(*) FROM T GROUP BY a")]
+        [InlineData("SELECT COUNT(*) FROM T WHERE x > 1")]
+        public void Parse_CountStar(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_CountStar_Structure()
+        {
+            var stmt = ParseSelect("SELECT COUNT(*) FROM T");
+            var selectColumn = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            var funcCall = Assert.IsType<Expr.FunctionCall>(selectColumn.Expression);
+            Assert.Equal(1, funcCall.Arguments.Count);
+            Assert.IsType<Expr.Wildcard>(funcCall.Arguments[0]);
+        }
+
+        #endregion
+
         #region GROUP BY Tests
 
         [Theory]

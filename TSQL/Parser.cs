@@ -1581,7 +1581,10 @@ namespace TSQL
             {
                 do
                 {
-                    Expr expr = Expression();
+                    // Allow * as function argument, e.g. COUNT(*)
+                    Expr expr = Check(TokenType.STAR)
+                        ? (Expr)new Wildcard(Advance())
+                        : Expression();
 
                     // Check if there's a comma after this argument
                     Token comma = null;
