@@ -295,19 +295,12 @@ namespace TSQL
                 selectExpr.Top._topKeyword = topKeyword;
             }
 
-            do
+            selectExpr.Columns.Add(SelectItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                SelectItem selectColumn = SelectItem();
-
-                // Check if there's a comma after this column
-                Token comma = null;
-                if (Check(TokenType.COMMA))
-                {
-                    comma = Advance(); // Capture the comma token
-                }
-
-                selectExpr.Columns.Add(selectColumn, comma);
-            } while (Previous().Type == TokenType.COMMA); // Continue if we just consumed a comma
+                selectExpr.Columns.Add(SelectItem(), comma);
+            }
 
             selectExpr.From = FromClause();
 
@@ -1579,22 +1572,19 @@ namespace TSQL
             SyntaxElementList<Expr> arguments = new SyntaxElementList<Expr>();
             if (!Check(TokenType.RIGHT_PAREN))
             {
-                do
+                // Allow * as function argument, e.g. COUNT(*)
+                Expr first = Check(TokenType.STAR)
+                    ? (Expr)new Wildcard(Advance())
+                    : Expression();
+                arguments.Add(first);
+
+                while (Match(TokenType.COMMA, out Token comma))
                 {
-                    // Allow * as function argument, e.g. COUNT(*)
                     Expr expr = Check(TokenType.STAR)
                         ? (Expr)new Wildcard(Advance())
                         : Expression();
-
-                    // Check if there's a comma after this argument
-                    Token comma = null;
-                    if (Check(TokenType.COMMA))
-                    {
-                        comma = Advance(); // capture the comma token
-                    }
-
                     arguments.Add(expr, comma);
-                } while (Previous().Type == TokenType.COMMA);
+                }
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
@@ -1770,12 +1760,13 @@ namespace TSQL
         private SyntaxElementList<Expr> ParseExpressionList()
         {
             SyntaxElementList<Expr> list = new SyntaxElementList<Expr>();
-            do
+            list.Add(Expression());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                Expr expr = Expression();
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                list.Add(expr, comma);
-            } while (Previous().Type == TokenType.COMMA);
+                list.Add(Expression(), comma);
+            }
+
             return list;
         }
 
@@ -1785,28 +1776,34 @@ namespace TSQL
         private SyntaxElementList<OrderByItem> ParseOrderByList()
         {
             SyntaxElementList<OrderByItem> list = new SyntaxElementList<OrderByItem>();
-            do
+            list.Add(ParseOrderByItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                Expr expr = Expression();
+                list.Add(ParseOrderByItem(), comma);
+            }
 
-                Token orderToken = null;
-                bool desc = false;
-                if (Match(TokenType.DESC, out orderToken))
-                {
-                    desc = true;
-                }
-                else
-                {
-                    Match(TokenType.ASC, out orderToken);
-                }
-
-                OrderByItem item = new OrderByItem { Expression = expr, Descending = desc };
-                item._orderToken = orderToken;
-
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                list.Add(item, comma);
-            } while (Previous().Type == TokenType.COMMA);
             return list;
+        }
+
+        private OrderByItem ParseOrderByItem()
+        {
+            Expr expr = Expression();
+
+            Token orderToken = null;
+            bool desc = false;
+            if (Match(TokenType.DESC, out orderToken))
+            {
+                desc = true;
+            }
+            else
+            {
+                Match(TokenType.ASC, out orderToken);
+            }
+
+            OrderByItem item = new OrderByItem { Expression = expr, Descending = desc };
+            item._orderToken = orderToken;
+            return item;
         }
 
         #endregion
@@ -1821,12 +1818,12 @@ namespace TSQL
             Cte cte = new Cte();
             cte._withToken = Consume(TokenType.WITH, "Expected WITH");
 
-            do
+            cte.Ctes.Add(ParseCteDefinition());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                CteDefinition def = ParseCteDefinition();
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                cte.Ctes.Add(def, comma);
-            } while (Previous().Type == TokenType.COMMA);
+                cte.Ctes.Add(ParseCteDefinition(), comma);
+            }
 
             return cte;
         }
@@ -1860,12 +1857,12 @@ namespace TSQL
             colNames._leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' for CTE column list");
 
             SyntaxElementList<ColumnName> names = new SyntaxElementList<ColumnName>();
-            do
+            names.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                Token name = ConsumeIdentifierOrContextualKeyword("Expected column name");
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                names.Add(new ColumnName(name), comma);
-            } while (Previous().Type == TokenType.COMMA);
+                names.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+            }
 
             colNames.ColumnNames = names;
             colNames._rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after CTE column list");
@@ -1886,12 +1883,12 @@ namespace TSQL
             Token byKeyword = Consume(TokenType.BY, "Expected BY after GROUP");
 
             SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            do
+            items.Add(GroupByItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                GroupByItem item = GroupByItem();
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                items.Add(item, comma);
-            } while (Previous().Type == TokenType.COMMA);
+                items.Add(GroupByItem(), comma);
+            }
 
             return new GroupByClause(groupKeyword, byKeyword, items);
         }
@@ -1964,12 +1961,12 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after GROUPING SETS");
 
             SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            do
+            items.Add(ParseGroupingSetItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                GroupByItem item = ParseGroupingSetItem();
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                items.Add(item, comma);
-            } while (Previous().Type == TokenType.COMMA);
+                items.Add(ParseGroupingSetItem(), comma);
+            }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after GROUPING SETS arguments");
             return new GroupByGroupingSets(groupingKeyword, setsKeyword, leftParen, items, rightParen);
@@ -1981,22 +1978,24 @@ namespace TSQL
         private SyntaxElementList<GroupByItem> ParseGroupByExpressionList()
         {
             SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            do
+            items.Add(ParseGroupByExpressionListItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
             {
-                GroupByItem item;
-                if (Check(TokenType.LEFT_PAREN))
-                {
-                    item = ParseGroupByComposite();
-                }
-                else
-                {
-                    Expr expr = Expression();
-                    item = new GroupByExpression(expr);
-                }
-                Token comma = Check(TokenType.COMMA) ? Advance() : null;
-                items.Add(item, comma);
-            } while (Previous().Type == TokenType.COMMA);
+                items.Add(ParseGroupByExpressionListItem(), comma);
+            }
+
             return items;
+        }
+
+        private GroupByItem ParseGroupByExpressionListItem()
+        {
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                return ParseGroupByComposite();
+            }
+
+            return new GroupByExpression(Expression());
         }
 
         /// <summary>
