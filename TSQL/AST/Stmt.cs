@@ -28,6 +28,12 @@ namespace TSQL
 
             public override IEnumerable<Token> DescendantTokens()
             {
+                if (CteStmt != null)
+                {
+                    foreach (Token token in CteStmt.DescendantTokens())
+                        yield return token;
+                }
+
                 foreach (Token token in SelectExpression.DescendantTokens())
                 {
                     yield return token;
@@ -58,19 +64,22 @@ namespace TSQL
         public CteColumnNames ColumnNames { get; set; }
         public Expr.Subquery Query { get; set; }
 
+        internal Token _asToken;
+
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return Name;
 
-            foreach (Token token in ColumnNames.DescendantTokens())
+            if (ColumnNames != null)
             {
-                yield return token;
+                foreach (Token token in ColumnNames.DescendantTokens())
+                    yield return token;
             }
 
+            yield return _asToken;
+
             foreach (Token token in Query.DescendantTokens())
-            {
                 yield return token;
-            }
         }
     }
 

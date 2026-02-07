@@ -27,9 +27,9 @@ namespace TSQL
 
     Grammar:
         Statements:
-            Statement -> cte_statement | select_statement
-            cte_statement -> "WITH" cte_list select_expression
-            select_statement -> select_expression
+            Statement -> ("WITH" cte_list)? select_expression
+            cte_list -> cte_definition ("," cte_definition)*
+            cte_definition -> IDENTIFIER ("(" IDENTIFIER ("," IDENTIFIER)* ")")? "AS" "(" select_expression ")"
            
         Expressions:
             expression -> term
@@ -66,12 +66,9 @@ namespace TSQL
             grouping_sets -> "GROUPING" "SETS" "(" grouping_set ("," grouping_set)* ")"
             group_by_expression -> expression | "(" expression ("," expression)+ ")"
             grouping_set -> "()" | group_by_item
-            having_clause -> "HAVING"
-            order_by_clause -> "ORDER BY"
-            cte_list -> cte_definition ( "," cte_definition )*
-            cte_definition -> IDENTIFIER ( cte_column_list )? "AS" ( "(" select_expression ")" )
-            cte_column_list -> "(" IDENTIFIER ("," IDENTIFIER)* ")"
-
+            having_clause -> "HAVING" search_condition
+            order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
+            order_by_item -> expression ("ASC" | "DESC")?
             comparison_operator = ("=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "!>" | "!<" )
 
             ---------------- WHERE ---------------
@@ -235,12 +232,6 @@ namespace TSQL
         public Stmt Parse()
         {
             Reset();
-            // Check if query starts with WITH (CTE)
-            //if (Check(TokenType.WITH))
-            //{
-            //    return CteStatement();
-            //}
-
             return ParseSelect();
         }
 
@@ -257,60 +248,20 @@ namespace TSQL
             return selectStmt;
         }
 
-        //private Stmt.Cte CteStatement()
-        //{
-        //    Consume(TokenType.WITH, "Expected WITH");
-
-        //    Stmt.Cte cteStmt = new Stmt.Cte();
-
-        //    // Parse CTE definitions
-        //    do
-        //    {
-        //        CteDefinition cte = new CteDefinition();
-        //        cte.Name = Consume(TokenType.IDENTIFIER, "Expected CTE name").Lexeme;
-
-        //        // Optional column list
-        //        if (Match(TokenType.LEFT_PAREN))
-        //        {
-        //            // Check if this is the AS clause subquery or column list
-        //            if (Check(TokenType.SELECT))
-        //            {
-        //                // It's the subquery, back up
-        //                _current--;
-        //            }
-        //            else
-        //            {
-        //                cte.ColumnNames = new List<string>();
-        //                do
-        //                {
-        //                    cte.ColumnNames.Add(Consume(TokenType.IDENTIFIER, "Expected column name").Lexeme);
-        //                } while (Match(TokenType.COMMA));
-
-        //                Consume(TokenType.RIGHT_PAREN, "Expected )");
-        //            }
-        //        }
-
-        //        Consume(TokenType.AS, "Expected AS");
-        //        Consume(TokenType.LEFT_PAREN, "Expected (");
-
-        //        cte.Query = SelectExpression();
-
-        //        Consume(TokenType.RIGHT_PAREN, "Expected )");
-
-        //        cteStmt.Ctes.Add(cte);
-
-        //    } while (Match(TokenType.COMMA));
-
-        //    // Parse main query
-        //    cteStmt.MainQuery = SelectExpression();
-
-        //    return cteStmt;
-        //}
-
-
+        /// <summary>
+        /// (WITH cte_list)? select_expression
+        /// </summary>
         private Stmt.Select SelectStatement()
         {
-            return new Stmt.Select(SelectExpression());
+            Cte cte = null;
+            if (Check(TokenType.WITH))
+            {
+                cte = ParseCte();
+            }
+
+            Stmt.Select selectStmt = new Stmt.Select(SelectExpression());
+            selectStmt.CteStmt = cte;
+            return selectStmt;
         }
 
         private Expr.Subquery Subquery()
@@ -365,6 +316,21 @@ namespace TSQL
             if (Check(TokenType.GROUP))
             {
                 selectExpr.GroupBy = GroupByClause();
+            }
+
+            // HAVING search_condition
+            if (Match(TokenType.HAVING, out Token havingToken))
+            {
+                selectExpr._havingKeyword = havingToken;
+                selectExpr.Having = SearchCondition();
+            }
+
+            // ORDER BY expr [ASC|DESC], ...
+            if (Match(TokenType.ORDER, out Token orderToken))
+            {
+                selectExpr._orderKeyword = orderToken;
+                selectExpr._orderByKeyword = Consume(TokenType.BY, "Expected BY after ORDER");
+                selectExpr.OrderBy = ParseOrderByList();
             }
 
             return selectExpr;
@@ -1807,6 +1773,70 @@ namespace TSQL
                 list.Add(item, comma);
             } while (Previous().Type == TokenType.COMMA);
             return list;
+        }
+
+        #endregion
+
+        #region CTE Parsing
+
+        /// <summary>
+        /// WITH cte1(a, b) AS (SELECT ...), cte2 AS (SELECT ...)
+        /// </summary>
+        private Cte ParseCte()
+        {
+            Cte cte = new Cte();
+            cte._withToken = Consume(TokenType.WITH, "Expected WITH");
+
+            do
+            {
+                CteDefinition def = ParseCteDefinition();
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                cte.Ctes.Add(def, comma);
+            } while (Previous().Type == TokenType.COMMA);
+
+            return cte;
+        }
+
+        /// <summary>
+        /// cte_name(col1, col2) AS (SELECT ...)
+        /// </summary>
+        private CteDefinition ParseCteDefinition()
+        {
+            CteDefinition def = new CteDefinition();
+            def.Name = ConsumeIdentifierOrContextualKeyword("Expected CTE name");
+
+            // Optional column list — if next is NOT AS, it must be (col1, col2)
+            if (!Check(TokenType.AS))
+            {
+                def.ColumnNames = ParseCteColumnNames();
+            }
+
+            def._asToken = Consume(TokenType.AS, "Expected AS after CTE name");
+            def.Query = Subquery();
+
+            return def;
+        }
+
+        /// <summary>
+        /// (col1, col2, col3)
+        /// </summary>
+        private CteColumnNames ParseCteColumnNames()
+        {
+            CteColumnNames colNames = new CteColumnNames();
+            colNames._leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' for CTE column list");
+
+            SyntaxElementList<ColumnName> names = new SyntaxElementList<ColumnName>();
+            do
+            {
+                Token name = ConsumeIdentifierOrContextualKeyword("Expected column name");
+                Token comma = Check(TokenType.COMMA) ? Advance() : null;
+                names.Add(new ColumnName(name), comma);
+            } while (Previous().Type == TokenType.COMMA);
+
+            colNames.ColumnNames = names;
+            colNames._rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after CTE column list");
+
+            return colNames;
         }
 
         #endregion

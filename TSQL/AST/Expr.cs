@@ -711,13 +711,16 @@ namespace TSQL
         public FromClause From { get; set; }
         public AST.Predicate Where { get; set; }
         public GroupByClause GroupBy { get; set; }
-        public Expr Having { get; set; }
+        public AST.Predicate Having { get; set; }
         public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
 
         // Original tokens
         internal Token _selectKeyword;
         internal Token _distinctKeyword;
         internal Token _whereKeyword;
+        internal Token _havingKeyword;
+        internal Token _orderKeyword;
+        internal Token _orderByKeyword;
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _selectKeyword;
@@ -760,6 +763,25 @@ namespace TSQL
             if (GroupBy != null)
             {
                 foreach (Token token in GroupBy.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (Having != null)
+            {
+                yield return _havingKeyword;
+                foreach (Token token in Having.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (OrderBy != null && OrderBy.Count > 0)
+            {
+                yield return _orderKeyword;
+                yield return _orderByKeyword;
+                foreach (Token token in OrderBy.DescendantTokens())
                 {
                     yield return token;
                 }

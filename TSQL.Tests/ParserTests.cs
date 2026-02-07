@@ -1610,5 +1610,128 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region HAVING Tests
+
+        [Theory]
+        [InlineData("SELECT a, SUM(b) FROM T GROUP BY a HAVING SUM(b) > 10")]
+        [InlineData("SELECT a, SUM(b) FROM T GROUP BY a HAVING SUM(b) > 10 AND SUM(b) < 100")]
+        [InlineData("SELECT a FROM T GROUP BY a HAVING a > 1")]
+        public void Parse_Having(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Having_Structure()
+        {
+            var stmt = ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a HAVING SUM(b) > 10");
+            Assert.NotNull(stmt.SelectExpression.GroupBy);
+            Assert.NotNull(stmt.SelectExpression.Having);
+        }
+
+        [Fact]
+        public void Parse_Having_NoHaving_ReturnsNull()
+        {
+            var stmt = ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a");
+            Assert.Null(stmt.SelectExpression.Having);
+        }
+
+        #endregion
+
+        #region ORDER BY Tests
+
+        [Theory]
+        [InlineData("SELECT a FROM T ORDER BY a")]
+        [InlineData("SELECT a, b FROM T ORDER BY a ASC, b DESC")]
+        [InlineData("SELECT a FROM T ORDER BY a DESC")]
+        [InlineData("SELECT a FROM T WHERE x > 1 ORDER BY a")]
+        [InlineData("SELECT a, SUM(b) FROM T GROUP BY a ORDER BY SUM(b) DESC")]
+        [InlineData("SELECT a, SUM(b) FROM T GROUP BY a HAVING SUM(b) > 10 ORDER BY a")]
+        public void Parse_OrderBy(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_OrderBy_Structure()
+        {
+            var stmt = ParseSelect("SELECT a, b FROM T ORDER BY a ASC, b DESC");
+            var orderBy = stmt.SelectExpression.OrderBy;
+
+            Assert.Equal(2, orderBy.Count);
+            Assert.False(orderBy[0].Descending);
+            Assert.True(orderBy[1].Descending);
+        }
+
+        [Fact]
+        public void Parse_OrderBy_NoOrderBy_IsEmpty()
+        {
+            var stmt = ParseSelect("SELECT a FROM T");
+            Assert.Equal(0, stmt.SelectExpression.OrderBy.Count);
+        }
+
+        #endregion
+
+        #region CTE Tests
+
+        [Theory]
+        [InlineData("WITH cte AS (SELECT a FROM T) SELECT a FROM cte")]
+        [InlineData("WITH cte(x, y) AS (SELECT a, b FROM T) SELECT x, y FROM cte")]
+        [InlineData("WITH c1 AS (SELECT a FROM T), c2 AS (SELECT b FROM U) SELECT a, b FROM c1, c2")]
+        [InlineData("WITH cte AS (SELECT a FROM T WHERE x > 1) SELECT a FROM cte ORDER BY a")]
+        public void Parse_Cte(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Cte_SimpleStructure()
+        {
+            var stmt = ParseSelect("WITH cte AS (SELECT a FROM T) SELECT a FROM cte");
+            Assert.NotNull(stmt.CteStmt);
+            Assert.Equal(1, stmt.CteStmt.Ctes.Count);
+            Assert.Equal("cte", stmt.CteStmt.Ctes[0].Name.Lexeme);
+            Assert.Null(stmt.CteStmt.Ctes[0].ColumnNames);
+        }
+
+        [Fact]
+        public void Parse_Cte_WithColumnNames()
+        {
+            var stmt = ParseSelect("WITH cte(x, y) AS (SELECT a, b FROM T) SELECT x, y FROM cte");
+            var def = stmt.CteStmt.Ctes[0];
+            Assert.NotNull(def.ColumnNames);
+            Assert.Equal(2, def.ColumnNames.ColumnNames.Count);
+        }
+
+        [Fact]
+        public void Parse_Cte_MultipleCtes()
+        {
+            var stmt = ParseSelect("WITH c1 AS (SELECT a FROM T), c2 AS (SELECT b FROM U) SELECT a, b FROM c1, c2");
+            Assert.Equal(2, stmt.CteStmt.Ctes.Count);
+            Assert.Equal("c1", stmt.CteStmt.Ctes[0].Name.Lexeme);
+            Assert.Equal("c2", stmt.CteStmt.Ctes[1].Name.Lexeme);
+        }
+
+        [Fact]
+        public void Parse_NoCte_ReturnsNull()
+        {
+            var stmt = ParseSelect("SELECT a FROM T");
+            Assert.Null(stmt.CteStmt);
+        }
+
+        #endregion
+
+        #region Integration Tests - Full SELECT Pipeline
+
+        [Theory]
+        [InlineData("WITH cte AS (SELECT a, b FROM T) SELECT a, SUM(b) FROM cte WHERE a > 1 GROUP BY a HAVING SUM(b) > 10 ORDER BY a DESC")]
+        [InlineData("SELECT a, b, SUM(c) FROM T JOIN U ON T.id = U.id WHERE a > 1 GROUP BY a, b HAVING SUM(c) > 0 ORDER BY a, b DESC")]
+        public void Parse_FullSelectPipeline(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
     }
 }
