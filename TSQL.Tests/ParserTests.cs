@@ -1931,5 +1931,153 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region OPTION Clause - Simple Hint Round-Trip Tests
+
+        [Theory]
+        [InlineData("SELECT a FROM T OPTION (HASH GROUP)")]
+        [InlineData("SELECT a FROM T OPTION (ORDER GROUP)")]
+        [InlineData("SELECT a FROM T OPTION (CONCAT UNION)")]
+        [InlineData("SELECT a FROM T OPTION (HASH UNION)")]
+        [InlineData("SELECT a FROM T OPTION (MERGE UNION)")]
+        [InlineData("SELECT a FROM T OPTION (LOOP JOIN)")]
+        [InlineData("SELECT a FROM T OPTION (MERGE JOIN)")]
+        [InlineData("SELECT a FROM T OPTION (HASH JOIN)")]
+        [InlineData("SELECT a FROM T OPTION (RECOMPILE)")]
+        [InlineData("SELECT a FROM T OPTION (EXPAND VIEWS)")]
+        [InlineData("SELECT a FROM T OPTION (FORCE ORDER)")]
+        [InlineData("SELECT a FROM T OPTION (KEEP PLAN)")]
+        [InlineData("SELECT a FROM T OPTION (KEEPFIXED PLAN)")]
+        [InlineData("SELECT a FROM T OPTION (ROBUST PLAN)")]
+        [InlineData("SELECT a FROM T OPTION (NO_PERFORMANCE_SPOOL)")]
+        [InlineData("SELECT a FROM T OPTION (OPTIMIZE FOR UNKNOWN)")]
+        [InlineData("SELECT a FROM T OPTION (IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX)")]
+        [InlineData("SELECT a FROM T OPTION (DISABLE_OPTIMIZED_PLAN_FORCING)")]
+        [InlineData("SELECT a FROM T OPTION (FORCE EXTERNALPUSHDOWN)")]
+        [InlineData("SELECT a FROM T OPTION (DISABLE EXTERNALPUSHDOWN)")]
+        [InlineData("SELECT a FROM T OPTION (FORCE SCALEOUTEXECUTION)")]
+        [InlineData("SELECT a FROM T OPTION (DISABLE SCALEOUTEXECUTION)")]
+        public void Parse_OptionSimpleHint_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
+        #region OPTION Clause - Value Hint Round-Trip Tests
+
+        [Theory]
+        [InlineData("SELECT a FROM T OPTION (FAST 10)")]
+        [InlineData("SELECT a FROM T OPTION (MAXDOP 4)")]
+        [InlineData("SELECT a FROM T OPTION (MAXRECURSION 100)")]
+        [InlineData("SELECT a FROM T OPTION (QUERYTRACEON 9481)")]
+        [InlineData("SELECT a FROM T OPTION (MAX_GRANT_PERCENT = 25)")]
+        [InlineData("SELECT a FROM T OPTION (MIN_GRANT_PERCENT = 10)")]
+        [InlineData("SELECT a FROM T OPTION (LABEL = 'MyQuery')")]
+        [InlineData("SELECT a FROM T OPTION (PARAMETERIZATION SIMPLE)")]
+        [InlineData("SELECT a FROM T OPTION (PARAMETERIZATION FORCED)")]
+        public void Parse_OptionValueHint_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
+        #region OPTION Clause - Complex Hint Round-Trip Tests
+
+        [Theory]
+        [InlineData("SELECT a FROM T OPTION (OPTIMIZE FOR (@x = 1))")]
+        [InlineData("SELECT a FROM T OPTION (OPTIMIZE FOR (@x UNKNOWN))")]
+        [InlineData("SELECT a FROM T OPTION (OPTIMIZE FOR (@x = 1, @y UNKNOWN))")]
+        [InlineData("SELECT a FROM T OPTION (USE HINT ('ENABLE_HIST_AMENDMENT_FOR_ASC_KEYS'))")]
+        [InlineData("SELECT a FROM T OPTION (USE HINT ('FORCE_LEGACY_CARDINALITY_ESTIMATION', 'ENABLE_QUERY_OPTIMIZER_HOTFIXES'))")]
+        [InlineData("SELECT a FROM T OPTION (USE PLAN '<xml/>')")]
+        [InlineData("SELECT a FROM T OPTION (TABLE HINT (T, NOLOCK))")]
+        [InlineData("SELECT a FROM T OPTION (TABLE HINT (dbo.T, INDEX(1), NOLOCK))")]
+        [InlineData("SELECT a FROM T OPTION (FOR TIMESTAMP AS OF '2024-01-01')")]
+        public void Parse_OptionComplexHint_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
+        #region OPTION Clause - Multiple Hints and Integration
+
+        [Theory]
+        [InlineData("SELECT a FROM T OPTION (RECOMPILE, MAXDOP 1)")]
+        [InlineData("SELECT a FROM T OPTION (HASH JOIN, FORCE ORDER)")]
+        [InlineData("SELECT a FROM T OPTION (FAST 10, RECOMPILE, MAXDOP 4)")]
+        [InlineData("SELECT a FROM T WHERE a > 1 OPTION (RECOMPILE)")]
+        [InlineData("SELECT a FROM T ORDER BY a OPTION (MAXDOP 4)")]
+        [InlineData("SELECT a, SUM(b) FROM T WHERE a > 1 GROUP BY a HAVING SUM(b) > 10 ORDER BY a OPTION (RECOMPILE)")]
+        [InlineData("SELECT a FROM (SELECT b FROM T) AS sub OPTION (RECOMPILE)")]
+        public void Parse_OptionMultipleAndIntegration_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
+        #region OPTION Clause - Structure Tests
+
+        [Fact]
+        public void Parse_OptionRecompile_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (RECOMPILE)");
+            Assert.NotNull(stmt.SelectExpression.Option);
+            Assert.Equal(1, stmt.SelectExpression.Option.Hints.Count);
+            Assert.Equal(QueryHintType.Recompile, stmt.SelectExpression.Option.Hints[0].HintType);
+        }
+
+        [Fact]
+        public void Parse_OptionMultipleHints_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (RECOMPILE, MAXDOP 1)");
+            Assert.NotNull(stmt.SelectExpression.Option);
+            Assert.Equal(2, stmt.SelectExpression.Option.Hints.Count);
+            Assert.Equal(QueryHintType.Recompile, stmt.SelectExpression.Option.Hints[0].HintType);
+            Assert.Equal(QueryHintType.Maxdop, stmt.SelectExpression.Option.Hints[1].HintType);
+        }
+
+        [Fact]
+        public void Parse_OptionFast_HasValue()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (FAST 10)");
+            QueryHint hint = stmt.SelectExpression.Option.Hints[0];
+            Assert.Equal(QueryHintType.Fast, hint.HintType);
+            Assert.NotNull(hint.Value);
+        }
+
+        [Fact]
+        public void Parse_OptionOptimizeFor_HasVariables()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (OPTIMIZE FOR (@x = 1, @y UNKNOWN))");
+            QueryHint hint = stmt.SelectExpression.Option.Hints[0];
+            Assert.Equal(QueryHintType.OptimizeFor, hint.HintType);
+            Assert.Equal(2, hint.OptimizeForVariables.Count);
+        }
+
+        [Fact]
+        public void Parse_OptionUseHint_HasHintNames()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (USE HINT ('ENABLE_HIST_AMENDMENT_FOR_ASC_KEYS'))");
+            QueryHint hint = stmt.SelectExpression.Option.Hints[0];
+            Assert.Equal(QueryHintType.UseHint, hint.HintType);
+            Assert.Equal(1, hint.UseHintNames.Count);
+        }
+
+        [Fact]
+        public void Parse_OptionTableHint_ReusesTableHintParsing()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (TABLE HINT (T, NOLOCK))");
+            QueryHint hint = stmt.SelectExpression.Option.Hints[0];
+            Assert.Equal(QueryHintType.QueryTableHint, hint.HintType);
+            Assert.NotNull(hint.TableHintObjectName);
+            Assert.Equal(1, hint.TableHints.Count);
+            Assert.Equal(TableHintType.NoLock, hint.TableHints[0].HintType);
+        }
+
+        #endregion
     }
 }

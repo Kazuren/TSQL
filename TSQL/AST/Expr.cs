@@ -967,6 +967,7 @@ namespace TSQL
         public GroupByClause GroupBy { get; set; }
         public AST.Predicate Having { get; set; }
         public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
+        public OptionClause Option { get; set; }
 
         // Original tokens
         internal Token _selectKeyword;
@@ -1036,6 +1037,14 @@ namespace TSQL
                 yield return _orderKeyword;
                 yield return _orderByKeyword;
                 foreach (Token token in OrderBy.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (Option != null)
+            {
+                foreach (Token token in Option.DescendantTokens())
                 {
                     yield return token;
                 }
