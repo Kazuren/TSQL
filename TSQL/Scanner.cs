@@ -76,6 +76,9 @@ namespace TSQL
                 case '*':
                     AddToken(TokenType.STAR);
                     break;
+                case '%':
+                    AddToken(TokenType.MODULO);
+                    break;
                 case '=':
                     AddToken(TokenType.EQUAL);
                     break;
@@ -279,8 +282,10 @@ namespace TSQL
                 type = TokenType.IDENTIFIER;
             }
 
+            // NULL keyword has a null literal value; all others use the lexeme string
+            object literal = type == TokenType.NULL ? null : slice.ToString();
             // Pass the slice directly - string allocation is deferred until Lexeme is accessed
-            AddToken(type, slice.ToString(), slice);
+            AddToken(type, literal, slice);
         }
         private string ConsumeDelimitedContent(char closingDelimiter, string unterminatedError)
         {

@@ -18,6 +18,10 @@ namespace TSQL
             T VisitFunctionCallExpr(FunctionCall expr);
             T VisitVariableExpr(Variable expr);
             T VisitWindowFunctionExpr(WindowFunction expr);
+            T VisitSimpleCaseExpr(SimpleCase expr);
+            T VisitSearchedCaseExpr(SearchedCase expr);
+            T VisitCastExpr(CastExpression expr);
+            T VisitConvertExpr(ConvertExpression expr);
         }
 
 
@@ -521,6 +525,221 @@ namespace TSQL
                 }
             }
         }
+
+        /// <summary>
+        /// CASE operand WHEN value THEN result [...] [ELSE default] END
+        /// </summary>
+        public class SimpleCase : Expr
+        {
+            public Expr Operand { get; }
+            public List<SimpleCaseWhen> WhenClauses { get; }
+            public Expr ElseResult { get; }
+
+            internal Token _caseToken;
+            internal Token _elseToken;
+            internal Token _endToken;
+
+            public SimpleCase(Expr operand, List<SimpleCaseWhen> whenClauses, Expr elseResult)
+            {
+                Operand = operand;
+                WhenClauses = whenClauses;
+                ElseResult = elseResult;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitSimpleCaseExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _caseToken;
+                foreach (Token token in Operand.DescendantTokens())
+                    yield return token;
+                foreach (SimpleCaseWhen when in WhenClauses)
+                    foreach (Token token in when.DescendantTokens())
+                        yield return token;
+                if (ElseResult != null)
+                {
+                    yield return _elseToken;
+                    foreach (Token token in ElseResult.DescendantTokens())
+                        yield return token;
+                }
+                yield return _endToken;
+            }
+        }
+
+        public class SimpleCaseWhen : SyntaxElement
+        {
+            public Expr Value { get; }
+            public Expr Result { get; }
+
+            internal Token _whenToken;
+            internal Token _thenToken;
+
+            public SimpleCaseWhen(Expr value, Expr result)
+            {
+                Value = value;
+                Result = result;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _whenToken;
+                foreach (Token token in Value.DescendantTokens())
+                    yield return token;
+                yield return _thenToken;
+                foreach (Token token in Result.DescendantTokens())
+                    yield return token;
+            }
+        }
+
+        /// <summary>
+        /// CASE WHEN condition THEN result [...] [ELSE default] END
+        /// </summary>
+        public class SearchedCase : Expr
+        {
+            public List<SearchedCaseWhen> WhenClauses { get; }
+            public Expr ElseResult { get; }
+
+            internal Token _caseToken;
+            internal Token _elseToken;
+            internal Token _endToken;
+
+            public SearchedCase(List<SearchedCaseWhen> whenClauses, Expr elseResult)
+            {
+                WhenClauses = whenClauses;
+                ElseResult = elseResult;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitSearchedCaseExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _caseToken;
+                foreach (SearchedCaseWhen when in WhenClauses)
+                    foreach (Token token in when.DescendantTokens())
+                        yield return token;
+                if (ElseResult != null)
+                {
+                    yield return _elseToken;
+                    foreach (Token token in ElseResult.DescendantTokens())
+                        yield return token;
+                }
+                yield return _endToken;
+            }
+        }
+
+        public class SearchedCaseWhen : SyntaxElement
+        {
+            public AST.Predicate Condition { get; }
+            public Expr Result { get; }
+
+            internal Token _whenToken;
+            internal Token _thenToken;
+
+            public SearchedCaseWhen(AST.Predicate condition, Expr result)
+            {
+                Condition = condition;
+                Result = result;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _whenToken;
+                foreach (Token token in Condition.DescendantTokens())
+                    yield return token;
+                yield return _thenToken;
+                foreach (Token token in Result.DescendantTokens())
+                    yield return token;
+            }
+        }
+
+        /// <summary>
+        /// CAST(expr AS type) or TRY_CAST(expr AS type)
+        /// </summary>
+        public class CastExpression : Expr
+        {
+            public Expr Expression { get; }
+            public DataType DataType { get; }
+
+            internal Token _castKeyword;
+            internal Token _leftParen;
+            internal Token _asToken;
+            internal Token _rightParen;
+
+            public CastExpression(Expr expression, DataType dataType)
+            {
+                Expression = expression;
+                DataType = dataType;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitCastExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _castKeyword;
+                yield return _leftParen;
+                foreach (Token token in Expression.DescendantTokens())
+                    yield return token;
+                yield return _asToken;
+                foreach (Token token in DataType.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
+            }
+        }
+
+        /// <summary>
+        /// CONVERT(type, expr [, style]) or TRY_CONVERT(type, expr [, style])
+        /// </summary>
+        public class ConvertExpression : Expr
+        {
+            public DataType DataType { get; }
+            public Expr Expression { get; }
+            public Expr Style { get; }
+
+            internal Token _convertKeyword;
+            internal Token _leftParen;
+            internal Token _commaAfterType;
+            internal Token _commaAfterExpr;
+            internal Token _rightParen;
+
+            public ConvertExpression(DataType dataType, Expr expression, Expr style)
+            {
+                DataType = dataType;
+                Expression = expression;
+                Style = style;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitConvertExpr(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _convertKeyword;
+                yield return _leftParen;
+                foreach (Token token in DataType.DescendantTokens())
+                    yield return token;
+                yield return _commaAfterType;
+                foreach (Token token in Expression.DescendantTokens())
+                    yield return token;
+                if (Style != null)
+                {
+                    yield return _commaAfterExpr;
+                    foreach (Token token in Style.DescendantTokens())
+                        yield return token;
+                }
+                yield return _rightParen;
+            }
+        }
     }
 
     #region Window Function Support
@@ -702,6 +921,41 @@ namespace TSQL
     }
 
     #endregion
+
+    /// <summary>
+    /// Represents a SQL data type: INT, VARCHAR(50), DECIMAL(10, 2), etc.
+    /// </summary>
+    public class DataType : SyntaxElement
+    {
+        public Token TypeName { get; }
+        public SyntaxElementList<Expr> Parameters { get; }
+
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public DataType(Token typeName, SyntaxElementList<Expr> parameters)
+        {
+            TypeName = typeName;
+            Parameters = parameters;
+        }
+
+        public DataType(Token typeName)
+        {
+            TypeName = typeName;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return TypeName;
+            if (Parameters != null)
+            {
+                yield return _leftParen;
+                foreach (Token token in Parameters.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
+            }
+        }
+    }
 
     public class SelectExpression : SyntaxElement
     {

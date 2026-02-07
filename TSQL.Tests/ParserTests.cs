@@ -1733,5 +1733,203 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region NULL Literal Tests
+
+        [Theory]
+        [InlineData("SELECT NULL")]
+        [InlineData("SELECT a FROM T WHERE a IS NULL")]
+        [InlineData("SELECT NULL, a, NULL FROM T")]
+        public void Parse_NullLiteral_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_NullLiteral_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT NULL");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Literal lit = Assert.IsType<Expr.Literal>(col.Expression);
+            Assert.Null(lit.Value);
+        }
+
+        #endregion
+
+        #region Modulo Tests
+
+        [Theory]
+        [InlineData("SELECT a % b FROM T")]
+        [InlineData("SELECT 10 % 3")]
+        [InlineData("SELECT a % b % c FROM T")]
+        [InlineData("SELECT a + b % c FROM T")]
+        public void Parse_Modulo_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Modulo_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT 10 % 3");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Binary bin = Assert.IsType<Expr.Binary>(col.Expression);
+            Assert.Equal(TokenType.MODULO, bin.Operator.Type);
+        }
+
+        #endregion
+
+        #region CASE Expression Tests
+
+        [Theory]
+        [InlineData("SELECT CASE x WHEN 1 THEN 'a' WHEN 2 THEN 'b' END FROM T")]
+        [InlineData("SELECT CASE x WHEN 1 THEN 'a' ELSE 'z' END FROM T")]
+        [InlineData("SELECT CASE x WHEN 1 THEN 'a' WHEN 2 THEN 'b' ELSE 'z' END FROM T")]
+        [InlineData("SELECT CASE WHEN x > 1 THEN 'a' WHEN x > 2 THEN 'b' END FROM T")]
+        [InlineData("SELECT CASE WHEN x > 1 THEN 'a' ELSE 'z' END FROM T")]
+        [InlineData("SELECT CASE WHEN x > 1 THEN 'a' WHEN x > 2 THEN 'b' ELSE 'z' END FROM T")]
+        [InlineData("SELECT CASE WHEN x IS NULL THEN 0 ELSE x END FROM T")]
+        [InlineData("SELECT CASE status WHEN 1 THEN 'Active' WHEN 2 THEN 'Inactive' WHEN 3 THEN 'Deleted' ELSE 'Unknown' END AS StatusText FROM Users")]
+        public void Parse_CaseExpression_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_SimpleCase_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT CASE x WHEN 1 THEN 'a' WHEN 2 THEN 'b' ELSE 'z' END");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.SimpleCase sc = Assert.IsType<Expr.SimpleCase>(col.Expression);
+
+            Assert.IsType<Expr.ColumnIdentifier>(sc.Operand);
+            Assert.Equal(2, sc.WhenClauses.Count);
+            Assert.NotNull(sc.ElseResult);
+        }
+
+        [Fact]
+        public void Parse_SearchedCase_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT CASE WHEN x > 1 THEN 'a' WHEN x > 2 THEN 'b' ELSE 'z' END");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.SearchedCase sc = Assert.IsType<Expr.SearchedCase>(col.Expression);
+
+            Assert.Equal(2, sc.WhenClauses.Count);
+            Assert.NotNull(sc.ElseResult);
+            Assert.IsType<AST.Predicate.Comparison>(sc.WhenClauses[0].Condition);
+        }
+
+        [Fact]
+        public void Parse_CaseExpression_NoElse()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT CASE x WHEN 1 THEN 'a' END");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.SimpleCase sc = Assert.IsType<Expr.SimpleCase>(col.Expression);
+            Assert.Null(sc.ElseResult);
+        }
+
+        #endregion
+
+        #region CAST / TRY_CAST Tests
+
+        [Theory]
+        [InlineData("SELECT CAST(x AS INT) FROM T")]
+        [InlineData("SELECT CAST(x AS VARCHAR(50)) FROM T")]
+        [InlineData("SELECT CAST(x AS DECIMAL(10, 2)) FROM T")]
+        [InlineData("SELECT TRY_CAST(x AS INT) FROM T")]
+        [InlineData("SELECT TRY_CAST(x AS NVARCHAR(MAX)) FROM T")]
+        [InlineData("SELECT CAST(x + 1 AS BIGINT) FROM T")]
+        public void Parse_Cast_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Cast_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT CAST(x AS VARCHAR(50))");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.CastExpression cast = Assert.IsType<Expr.CastExpression>(col.Expression);
+
+            Assert.IsType<Expr.ColumnIdentifier>(cast.Expression);
+            Assert.Equal("VARCHAR", cast.DataType.TypeName.Lexeme);
+            Assert.Single(cast.DataType.Parameters);
+            Assert.Equal(TokenType.CAST, cast._castKeyword.Type);
+        }
+
+        [Fact]
+        public void Parse_TryCast_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT TRY_CAST(x AS INT)");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.CastExpression cast = Assert.IsType<Expr.CastExpression>(col.Expression);
+            Assert.Equal(TokenType.TRY_CAST, cast._castKeyword.Type);
+            Assert.Null(cast.DataType.Parameters);
+        }
+
+        #endregion
+
+        #region CONVERT / TRY_CONVERT Tests
+
+        [Theory]
+        [InlineData("SELECT CONVERT(INT, x) FROM T")]
+        [InlineData("SELECT CONVERT(VARCHAR(50), x) FROM T")]
+        [InlineData("SELECT CONVERT(VARCHAR(10), x, 121) FROM T")]
+        [InlineData("SELECT TRY_CONVERT(INT, x) FROM T")]
+        [InlineData("SELECT TRY_CONVERT(DATE, x, 103) FROM T")]
+        public void Parse_Convert_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Convert_WithStyle_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT CONVERT(VARCHAR(10), x, 121)");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.ConvertExpression conv = Assert.IsType<Expr.ConvertExpression>(col.Expression);
+
+            Assert.Equal("VARCHAR", conv.DataType.TypeName.Lexeme);
+            Assert.Single(conv.DataType.Parameters);
+            Assert.IsType<Expr.ColumnIdentifier>(conv.Expression);
+            Assert.NotNull(conv.Style);
+            Assert.Equal(TokenType.CONVERT, conv._convertKeyword.Type);
+        }
+
+        [Fact]
+        public void Parse_Convert_WithoutStyle_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT CONVERT(INT, x)");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.ConvertExpression conv = Assert.IsType<Expr.ConvertExpression>(col.Expression);
+            Assert.Null(conv.Style);
+        }
+
+        [Fact]
+        public void Parse_TryConvert_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT TRY_CONVERT(DATE, x, 103)");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.ConvertExpression conv = Assert.IsType<Expr.ConvertExpression>(col.Expression);
+            Assert.Equal(TokenType.TRY_CONVERT, conv._convertKeyword.Type);
+        }
+
+        #endregion
+
+        #region Integration Tests - CASE/CAST/CONVERT Combinations
+
+        [Theory]
+        [InlineData("SELECT CASE WHEN CAST(x AS INT) > 1 THEN 'yes' ELSE 'no' END FROM T")]
+        [InlineData("SELECT CAST(CASE WHEN x > 1 THEN x ELSE 0 END AS VARCHAR(10)) FROM T")]
+        [InlineData("SELECT CONVERT(VARCHAR(10), CASE status WHEN 1 THEN 'A' ELSE 'B' END) FROM T")]
+        [InlineData("SELECT a, CASE WHEN a % 2 = 0 THEN 'even' ELSE 'odd' END FROM T")]
+        [InlineData("SELECT COALESCE(CAST(x AS INT), 0) FROM T")]
+        [InlineData("SELECT CASE WHEN x IS NULL THEN CAST(0 AS INT) ELSE CAST(x AS INT) END FROM T")]
+        public void Parse_CaseCastConvert_Integration_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
     }
 }

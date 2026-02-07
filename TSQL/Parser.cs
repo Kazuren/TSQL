@@ -10,8 +10,6 @@ namespace TSQL
     // ## @variable.function_call
     //  - reason: @variable must be a CLR user-defined type, something that's rare and not worth implementing unless needed
 
-    // TODO: support CAST(exp AS data_type) SYNTAX. special case? or support it everywhere?
-
     // dollar sign ($) columns need no unique handling, column identifier already handles them just fine
     /*
     Legend:
@@ -34,13 +32,18 @@ namespace TSQL
         Expressions:
             expression -> term
             term -> factor ( ("-" | "+") factor )*
-            factor -> unary ( ( "/" | "*") unary )*
+            factor -> unary ( ( "/" | "*" | "%") unary )*
             unary -> ("-") scalar_subquery | scalar_subquery
             scalar_subquery -> ( "(" select_expression ")" ) | primary
-            primary -> 
+            primary ->
                 "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
-                | column_expression | ( "(" expression ")" ) 
+                | case_expression | cast_expression | convert_expression
+                | column_expression | ( "(" expression ")" )
                 | scalar_function | window_function
+            case_expression -> "CASE" (expression WHEN_clause_simple+ | WHEN_clause_searched+) ("ELSE" expression)? "END"
+            cast_expression -> ("CAST" | "TRY_CAST") "(" expression "AS" data_type ")"
+            convert_expression -> ("CONVERT" | "TRY_CONVERT") "(" data_type "," expression ("," expression)? ")"
+            data_type -> IDENTIFIER ("(" expression ("," expression)* ")")?
         
 
         Syntax nodes:
@@ -1407,7 +1410,7 @@ namespace TSQL
         {
             Expr expr = Unary();
 
-            while (Match(TokenType.STAR, TokenType.SLASH, out Token op))
+            while (Match(TokenType.STAR, TokenType.SLASH, TokenType.MODULO, out Token op))
             {
                 Expr right = Unary();
                 expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
@@ -1447,6 +1450,30 @@ namespace TSQL
             if (Match(TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING, out Token literalToken))
             {
                 return new Expr.Literal(literalToken);
+            }
+
+            // NULL
+            if (Match(TokenType.NULL, out Token nullToken))
+            {
+                return new Expr.Literal(nullToken);
+            }
+
+            // CASE WHEN ... THEN ... ELSE ... END
+            if (Check(TokenType.CASE))
+            {
+                return ParseCaseExpression();
+            }
+
+            // CAST(expr AS type) or TRY_CAST(expr AS type)
+            if (Check(TokenType.CAST) || Check(TokenType.TRY_CAST))
+            {
+                return ParseCast();
+            }
+
+            // CONVERT(type, expr [, style]) or TRY_CONVERT(type, expr [, style])
+            if (Check(TokenType.CONVERT) || Check(TokenType.TRY_CONVERT))
+            {
+                return ParseConvert();
             }
 
             if (Check(TokenType.LEFT_PAREN))
@@ -2022,6 +2049,171 @@ namespace TSQL
             SyntaxElementList<Expr> expressions = ParseExpressionList();
             Token closeParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after composite group");
             return new GroupByComposite(leftParen, expressions, closeParen);
+        }
+
+        #endregion
+
+        #region CASE / CAST / CONVERT Parsing
+
+        /// <summary>
+        /// CASE expr WHEN val THEN result ... END  (simple)
+        /// CASE WHEN condition THEN result ... END  (searched)
+        /// </summary>
+        private Expr ParseCaseExpression()
+        {
+            Token caseToken = Consume(TokenType.CASE, "Expected CASE");
+
+            // Searched CASE: CASE WHEN ...
+            if (Check(TokenType.WHEN))
+            {
+                return ParseSearchedCase(caseToken);
+            }
+
+            // Simple CASE: CASE expr WHEN ...
+            return ParseSimpleCase(caseToken);
+        }
+
+        /// <summary>
+        /// CASE expr WHEN val THEN result [...] [ELSE default] END
+        /// </summary>
+        private Expr ParseSimpleCase(Token caseToken)
+        {
+            Expr operand = Expression();
+
+            List<Expr.SimpleCaseWhen> whenClauses = new List<Expr.SimpleCaseWhen>();
+            while (Check(TokenType.WHEN))
+            {
+                Token whenToken = Advance();
+                Expr value = Expression();
+                Token thenToken = Consume(TokenType.THEN, "Expected THEN after WHEN value");
+                Expr result = Expression();
+
+                Expr.SimpleCaseWhen when = new Expr.SimpleCaseWhen(value, result);
+                when._whenToken = whenToken;
+                when._thenToken = thenToken;
+                whenClauses.Add(when);
+            }
+
+            Expr elseResult = null;
+            Token elseToken = null;
+            if (Match(TokenType.ELSE, out elseToken))
+            {
+                elseResult = Expression();
+            }
+
+            Token endToken = Consume(TokenType.END, "Expected END after CASE expression");
+
+            Expr.SimpleCase simpleCase = new Expr.SimpleCase(operand, whenClauses, elseResult);
+            simpleCase._caseToken = caseToken;
+            simpleCase._elseToken = elseToken;
+            simpleCase._endToken = endToken;
+            return simpleCase;
+        }
+
+        /// <summary>
+        /// CASE WHEN condition THEN result [...] [ELSE default] END
+        /// </summary>
+        private Expr ParseSearchedCase(Token caseToken)
+        {
+            List<Expr.SearchedCaseWhen> whenClauses = new List<Expr.SearchedCaseWhen>();
+            while (Check(TokenType.WHEN))
+            {
+                Token whenToken = Advance();
+                Predicate condition = SearchCondition();
+                Token thenToken = Consume(TokenType.THEN, "Expected THEN after WHEN condition");
+                Expr result = Expression();
+
+                Expr.SearchedCaseWhen when = new Expr.SearchedCaseWhen(condition, result);
+                when._whenToken = whenToken;
+                when._thenToken = thenToken;
+                whenClauses.Add(when);
+            }
+
+            Expr elseResult = null;
+            Token elseToken = null;
+            if (Match(TokenType.ELSE, out elseToken))
+            {
+                elseResult = Expression();
+            }
+
+            Token endToken = Consume(TokenType.END, "Expected END after CASE expression");
+
+            Expr.SearchedCase searchedCase = new Expr.SearchedCase(whenClauses, elseResult);
+            searchedCase._caseToken = caseToken;
+            searchedCase._elseToken = elseToken;
+            searchedCase._endToken = endToken;
+            return searchedCase;
+        }
+
+        /// <summary>
+        /// CAST(expr AS VARCHAR(50)) or TRY_CAST(expr AS INT)
+        /// </summary>
+        private Expr ParseCast()
+        {
+            Token keyword = Advance(); // CAST or TRY_CAST
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after " + keyword.Lexeme);
+            Expr expression = Expression();
+            Token asToken = Consume(TokenType.AS, "Expected AS in " + keyword.Lexeme + " expression");
+            DataType dataType = ParseDataType();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after " + keyword.Lexeme + " expression");
+
+            Expr.CastExpression cast = new Expr.CastExpression(expression, dataType);
+            cast._castKeyword = keyword;
+            cast._leftParen = leftParen;
+            cast._asToken = asToken;
+            cast._rightParen = rightParen;
+            return cast;
+        }
+
+        /// <summary>
+        /// CONVERT(INT, expr) or TRY_CONVERT(VARCHAR(50), expr, 121)
+        /// </summary>
+        private Expr ParseConvert()
+        {
+            Token keyword = Advance(); // CONVERT or TRY_CONVERT
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after " + keyword.Lexeme);
+            DataType dataType = ParseDataType();
+            Token commaAfterType = Consume(TokenType.COMMA, "Expected ',' after data type in " + keyword.Lexeme);
+            Expr expression = Expression();
+
+            Expr style = null;
+            Token commaAfterExpr = null;
+            if (Match(TokenType.COMMA, out commaAfterExpr))
+            {
+                style = Expression();
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after " + keyword.Lexeme + " expression");
+
+            Expr.ConvertExpression convert = new Expr.ConvertExpression(dataType, expression, style);
+            convert._convertKeyword = keyword;
+            convert._leftParen = leftParen;
+            convert._commaAfterType = commaAfterType;
+            convert._commaAfterExpr = commaAfterExpr;
+            convert._rightParen = rightParen;
+            return convert;
+        }
+
+        /// <summary>
+        /// INT | VARCHAR(50) | DECIMAL(10, 2) | NVARCHAR(MAX)
+        /// </summary>
+        private DataType ParseDataType()
+        {
+            Token typeName = ConsumeIdentifierOrContextualKeyword("Expected data type name");
+
+            if (!Check(TokenType.LEFT_PAREN))
+            {
+                return new DataType(typeName);
+            }
+
+            Token leftParen = Advance();
+            SyntaxElementList<Expr> parameters = ParseExpressionList();
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after data type parameters");
+
+            DataType dt = new DataType(typeName, parameters);
+            dt._leftParen = leftParen;
+            dt._rightParen = rightParen;
+            return dt;
         }
 
         #endregion
