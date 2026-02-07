@@ -1991,7 +1991,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM T OPTION (OPTIMIZE FOR (@x = 1, @y UNKNOWN))")]
         [InlineData("SELECT a FROM T OPTION (USE HINT ('ENABLE_HIST_AMENDMENT_FOR_ASC_KEYS'))")]
         [InlineData("SELECT a FROM T OPTION (USE HINT ('FORCE_LEGACY_CARDINALITY_ESTIMATION', 'ENABLE_QUERY_OPTIMIZER_HOTFIXES'))")]
-        [InlineData("SELECT a FROM T OPTION (USE PLAN '<xml/>')")]
+        [InlineData("SELECT a FROM T OPTION (USE PLAN N'<xml/>')")]
         [InlineData("SELECT a FROM T OPTION (TABLE HINT (T, NOLOCK))")]
         [InlineData("SELECT a FROM T OPTION (TABLE HINT (dbo.T, INDEX(1), NOLOCK))")]
         [InlineData("SELECT a FROM T OPTION (FOR TIMESTAMP AS OF '2024-01-01')")]
@@ -2076,6 +2076,29 @@ namespace TSQL.Tests
             Assert.NotNull(hint.TableHintObjectName);
             Assert.Equal(1, hint.TableHints.Count);
             Assert.Equal(TableHintType.NoLock, hint.TableHints[0].HintType);
+        }
+
+        #endregion
+
+        #region Unicode String Prefix Tests
+
+        [Theory]
+        [InlineData("SELECT N'hello'")]
+        [InlineData("SELECT N'hello world' FROM T")]
+        [InlineData("SELECT a FROM T WHERE name = N'test'")]
+        [InlineData("SELECT N'it''s escaped'")]
+        public void Parse_UnicodeStringPrefix_RoundTrip(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_UnicodeStringPrefix_Structure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT N'hello'");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Literal lit = Assert.IsType<Expr.Literal>(col.Expression);
+            Assert.Equal("hello", lit.Value);
         }
 
         #endregion

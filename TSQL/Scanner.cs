@@ -135,6 +135,18 @@ namespace TSQL
                 case '@':
                     Variable();
                     break;
+                case 'N':
+                case 'n':
+                    if (Peek() == '\'')
+                    {
+                        Advance(); // consume the opening quote
+                        String();
+                    }
+                    else
+                    {
+                        Identifier();
+                    }
+                    break;
                 default:
                     if (Char.IsWhiteSpace(c))
                     {
