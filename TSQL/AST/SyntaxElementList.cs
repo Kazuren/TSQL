@@ -27,11 +27,6 @@ namespace TSQL
             }
         }
 
-        public void AddItem(T item)
-        {
-            _items.Add(item);
-        }
-
         public Token GetSeparator(int index)
         {
             if (index < _separators.Count)

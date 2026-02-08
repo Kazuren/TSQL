@@ -1396,9 +1396,8 @@ namespace TSQL
         {
             Expr expr = Factor();
 
-            while (Match(TokenType.PLUS, TokenType.MINUS))
+            while (Match(TokenType.PLUS, TokenType.MINUS, out Token op))
             {
-                Token op = Previous();
                 Expr right = Factor();
                 expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
             }
@@ -2738,13 +2737,6 @@ namespace TSQL
 
         #endregion
 
-        private bool IsJoinKeyword()
-        {
-            return Check(TokenType.INNER, TokenType.LEFT, TokenType.RIGHT,
-                         TokenType.FULL, TokenType.CROSS, TokenType.JOIN);
-        }
-
-
         private (Token token, bool negated) TryConsumeNot()
         {
             if (Match(TokenType.NOT, out Token notToken))
@@ -2868,12 +2860,6 @@ namespace TSQL
             if (IsAtEnd()) return false;
             var currentType = Peek().Type;
             return currentType == type1 || currentType == type2 || currentType == type3;
-        }
-
-        private bool Check(params TokenType[] types)
-        {
-            if (IsAtEnd()) return false;
-            return types.Contains(Peek().Type);
         }
 
         private bool CheckNext(TokenType type)
