@@ -137,9 +137,8 @@ namespace TSQL
                     break;
                 case 'N':
                 case 'n':
-                    if (Peek() == '\'')
+                    if (Match('\''))
                     {
-                        Advance(); // consume the opening quote
                         String();
                     }
                     else
