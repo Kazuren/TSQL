@@ -69,6 +69,25 @@ namespace TSQL
             }
         }
 
+        /// <summary>
+        /// Copies the leading trivia from one node's first token to another's,
+        /// replacing any existing leading trivia on the target.
+        /// Used by property setters to preserve whitespace when replacing child nodes.
+        /// </summary>
+        internal static void TransferLeadingTrivia(ISyntaxElement from, ISyntaxElement to)
+        {
+            Token fromToken = null;
+            foreach (Token t in from.DescendantTokens()) { fromToken = t; break; }
+
+            Token toToken = null;
+            foreach (Token t in to.DescendantTokens()) { toToken = t; break; }
+
+            if (fromToken == null || toToken == null || ReferenceEquals(fromToken, toToken)) return;
+
+            toToken.ClearLeadingTrivia();
+            toToken.AddLeadingTrivia(fromToken.LeadingTrivia);
+        }
+
         public SyntaxElement Parent { get; internal set; }
         public SyntaxElement SiblingLeft { get; internal set; }
         public SyntaxElement SiblingRight { get; internal set; }

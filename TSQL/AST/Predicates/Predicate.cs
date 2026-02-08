@@ -26,15 +26,25 @@ namespace TSQL.AST
 
         public class Comparison : Predicate
         {
-            public Expr Left { get; set; }
+            private Expr _left;
+            public Expr Left
+            {
+                get => _left;
+                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            }
             public Token Operator { get; set; }
-            public Expr Right { get; set; }
+            private Expr _right;
+            public Expr Right
+            {
+                get => _right;
+                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            }
 
             public Comparison(Expr left, Token @operator, Expr right)
             {
-                Left = left;
+                _left = left;
                 Operator = @operator;
-                Right = right;
+                _right = right;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitComparisonPredicate(this);
@@ -55,9 +65,24 @@ namespace TSQL.AST
 
         public class Like : Predicate
         {
-            public Expr Left { get; set; }
-            public Expr Pattern { get; set; }
-            public Expr EscapeExpr { get; set; }
+            private Expr _left;
+            public Expr Left
+            {
+                get => _left;
+                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            }
+            private Expr _pattern;
+            public Expr Pattern
+            {
+                get => _pattern;
+                set { if (_pattern != null && value != null) TransferLeadingTrivia(_pattern, value); _pattern = value; }
+            }
+            private Expr _escapeExpr;
+            public Expr EscapeExpr
+            {
+                get => _escapeExpr;
+                set { if (_escapeExpr != null && value != null) TransferLeadingTrivia(_escapeExpr, value); _escapeExpr = value; }
+            }
             public bool Negated { get; set; }
 
             internal Token _notToken;
@@ -66,9 +91,9 @@ namespace TSQL.AST
 
             public Like(Expr left, Expr pattern, Expr escapeExpr, bool negated)
             {
-                Left = left;
-                Pattern = pattern;
-                EscapeExpr = escapeExpr;
+                _left = left;
+                _pattern = pattern;
+                _escapeExpr = escapeExpr;
                 Negated = negated;
             }
 
@@ -98,9 +123,24 @@ namespace TSQL.AST
 
         public class Between : Predicate
         {
-            public Expr Expr { get; set; }
-            public Expr LowRangeExpr { get; set; }
-            public Expr HighRangeExpr { get; set; }
+            private Expr _expr;
+            public Expr Expr
+            {
+                get => _expr;
+                set { if (_expr != null && value != null) TransferLeadingTrivia(_expr, value); _expr = value; }
+            }
+            private Expr _lowRangeExpr;
+            public Expr LowRangeExpr
+            {
+                get => _lowRangeExpr;
+                set { if (_lowRangeExpr != null && value != null) TransferLeadingTrivia(_lowRangeExpr, value); _lowRangeExpr = value; }
+            }
+            private Expr _highRangeExpr;
+            public Expr HighRangeExpr
+            {
+                get => _highRangeExpr;
+                set { if (_highRangeExpr != null && value != null) TransferLeadingTrivia(_highRangeExpr, value); _highRangeExpr = value; }
+            }
             public bool Negated { get; set; }
 
             internal Token _notToken;
@@ -109,9 +149,9 @@ namespace TSQL.AST
 
             public Between(Expr expr, Expr lowRangeExpr, Expr highRangeExpr, bool negated)
             {
-                Expr = expr;
-                LowRangeExpr = lowRangeExpr;
-                HighRangeExpr = highRangeExpr;
+                _expr = expr;
+                _lowRangeExpr = lowRangeExpr;
+                _highRangeExpr = highRangeExpr;
                 Negated = negated;
             }
 
@@ -138,7 +178,12 @@ namespace TSQL.AST
 
         public class Null : Predicate
         {
-            public Expr Expr { get; set; }
+            private Expr _expr;
+            public Expr Expr
+            {
+                get => _expr;
+                set { if (_expr != null && value != null) TransferLeadingTrivia(_expr, value); _expr = value; }
+            }
             public bool Negated { get; set; }
 
             internal Token _isToken;
@@ -147,7 +192,7 @@ namespace TSQL.AST
 
             public Null(Expr expr, bool negated)
             {
-                Expr = expr;
+                _expr = expr;
                 Negated = negated;
             }
 
@@ -170,8 +215,18 @@ namespace TSQL.AST
 
         public class Contains : Predicate
         {
-            public Expr Column { get; set; }
-            public Expr SearchCondition { get; set; }
+            private Expr _column;
+            public Expr Column
+            {
+                get => _column;
+                set { if (_column != null && value != null) TransferLeadingTrivia(_column, value); _column = value; }
+            }
+            private Expr _searchCondition;
+            public Expr SearchCondition
+            {
+                get => _searchCondition;
+                set { if (_searchCondition != null && value != null) TransferLeadingTrivia(_searchCondition, value); _searchCondition = value; }
+            }
 
             internal Token _containsToken;
             internal Token _leftParen;
@@ -180,8 +235,8 @@ namespace TSQL.AST
 
             public Contains(Expr column, Expr searchCondition)
             {
-                Column = column;
-                SearchCondition = searchCondition;
+                _column = column;
+                _searchCondition = searchCondition;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitContainsPredicate(this);
@@ -205,10 +260,20 @@ namespace TSQL.AST
 
         public class In : Predicate
         {
-            public Expr Expr { get; set; }
+            private Expr _expr;
+            public Expr Expr
+            {
+                get => _expr;
+                set { if (_expr != null && value != null) TransferLeadingTrivia(_expr, value); _expr = value; }
+            }
             public bool Negated { get; set; }
             public SyntaxElementList<Expr> ValueList { get; set; }
-            public Expr.Subquery Subquery { get; set; }
+            private Expr.Subquery _subquery;
+            public Expr.Subquery Subquery
+            {
+                get => _subquery;
+                set { if (_subquery != null && value != null) TransferLeadingTrivia(_subquery, value); _subquery = value; }
+            }
 
             internal Token _notToken;
             internal Token _inToken;
@@ -217,16 +282,16 @@ namespace TSQL.AST
 
             public In(Expr expr, bool negated, SyntaxElementList<Expr> valueList)
             {
-                Expr = expr;
+                _expr = expr;
                 Negated = negated;
                 ValueList = valueList;
             }
 
             public In(Expr expr, bool negated, Expr.Subquery subquery)
             {
-                Expr = expr;
+                _expr = expr;
                 Negated = negated;
-                Subquery = subquery;
+                _subquery = subquery;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitInPredicate(this);
@@ -259,20 +324,30 @@ namespace TSQL.AST
 
         public class Quantifier : Predicate
         {
-            public Expr Left { get; set; }
+            private Expr _left;
+            public Expr Left
+            {
+                get => _left;
+                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            }
             public Token Operator { get; set; }
             public Token QuantifierKeyword { get; set; }
-            public Expr.Subquery Subquery { get; set; }
+            private Expr.Subquery _subquery;
+            public Expr.Subquery Subquery
+            {
+                get => _subquery;
+                set { if (_subquery != null && value != null) TransferLeadingTrivia(_subquery, value); _subquery = value; }
+            }
 
             internal Token _leftParen;
             internal Token _rightParen;
 
             public Quantifier(Expr left, Token @operator, Token quantifierKeyword, Expr.Subquery subquery)
             {
-                Left = left;
+                _left = left;
                 Operator = @operator;
                 QuantifierKeyword = quantifierKeyword;
-                Subquery = subquery;
+                _subquery = subquery;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitQuantifierPredicate(this);
@@ -296,13 +371,18 @@ namespace TSQL.AST
 
         public class Exists : Predicate
         {
-            public Expr.Subquery Subquery { get; set; }
+            private Expr.Subquery _subquery;
+            public Expr.Subquery Subquery
+            {
+                get => _subquery;
+                set { if (_subquery != null && value != null) TransferLeadingTrivia(_subquery, value); _subquery = value; }
+            }
 
             internal Token _existsToken;
 
             public Exists(Expr.Subquery subquery)
             {
-                Subquery = subquery;
+                _subquery = subquery;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitExistsPredicate(this);
@@ -321,14 +401,19 @@ namespace TSQL.AST
 
         public class Grouping : Predicate
         {
-            public Predicate Predicate { get; set; }
+            private Predicate _predicate;
+            public Predicate Predicate
+            {
+                get => _predicate;
+                set { if (_predicate != null && value != null) TransferLeadingTrivia(_predicate, value); _predicate = value; }
+            }
 
             internal Token _leftParen;
             internal Token _rightParen;
 
             public Grouping(Predicate predicate)
             {
-                Predicate = predicate;
+                _predicate = predicate;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitGroupingPredicate(this);
@@ -348,15 +433,25 @@ namespace TSQL.AST
 
         public class And : Predicate
         {
-            public Predicate Left { get; set; }
-            public Predicate Right { get; set; }
+            private Predicate _left;
+            public Predicate Left
+            {
+                get => _left;
+                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            }
+            private Predicate _right;
+            public Predicate Right
+            {
+                get => _right;
+                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            }
 
             internal Token _andToken;
 
             public And(Predicate left, Predicate right)
             {
-                Left = left;
-                Right = right;
+                _left = left;
+                _right = right;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitAndPredicate(this);
@@ -373,15 +468,25 @@ namespace TSQL.AST
 
         public class Or : Predicate
         {
-            public Predicate Left { get; set; }
-            public Predicate Right { get; set; }
+            private Predicate _left;
+            public Predicate Left
+            {
+                get => _left;
+                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            }
+            private Predicate _right;
+            public Predicate Right
+            {
+                get => _right;
+                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            }
 
             internal Token _orToken;
 
             public Or(Predicate left, Predicate right)
             {
-                Left = left;
-                Right = right;
+                _left = left;
+                _right = right;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitOrPredicate(this);
@@ -398,13 +503,18 @@ namespace TSQL.AST
 
         public class Not : Predicate
         {
-            public Predicate Predicate { get; set; }
+            private Predicate _predicate;
+            public Predicate Predicate
+            {
+                get => _predicate;
+                set { if (_predicate != null && value != null) TransferLeadingTrivia(_predicate, value); _predicate = value; }
+            }
 
             internal Token _notToken;
 
             public Not(Predicate predicate)
             {
-                Predicate = predicate;
+                _predicate = predicate;
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitNotPredicate(this);

@@ -226,7 +226,12 @@ namespace TSQL
 
     public class OrderByItem : SyntaxElement
     {
-        public Expr Expression { get; set; }
+        private Expr _expression;
+        public Expr Expression
+        {
+            get => _expression;
+            set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+        }
         public bool Descending { get; set; }
 
 
@@ -308,14 +313,19 @@ namespace TSQL
 
     public class TableReference : TableSource
     {
-        public Expr.ObjectIdentifier TableName { get; set; }
+        private Expr.ObjectIdentifier _tableName;
+        public Expr.ObjectIdentifier TableName
+        {
+            get => _tableName;
+            set { if (_tableName != null && value != null) TransferLeadingTrivia(_tableName, value); _tableName = value; }
+        }
         public ForSystemTimeClause ForSystemTime { get; set; }
         public TablesampleClause Tablesample { get; set; }
         public TableHintClause TableHints { get; set; }
 
         public TableReference(Expr.ObjectIdentifier tableName)
         {
-            TableName = tableName;
+            _tableName = tableName;
         }
 
         public override T Accept<T>(Visitor<T> visitor)
@@ -397,11 +407,26 @@ namespace TSQL
 
     public class QualifiedJoin : TableSource
     {
-        public TableSource Left { get; set; }
-        public TableSource Right { get; set; }
+        private TableSource _left;
+        public TableSource Left
+        {
+            get => _left;
+            set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+        }
+        private TableSource _right;
+        public TableSource Right
+        {
+            get => _right;
+            set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+        }
         public JoinType JoinType { get; set; }
         public JoinHint? JoinHint { get; set; }
-        public AST.Predicate OnCondition { get; set; }
+        private AST.Predicate _onCondition;
+        public AST.Predicate OnCondition
+        {
+            get => _onCondition;
+            set { if (_onCondition != null && value != null) TransferLeadingTrivia(_onCondition, value); _onCondition = value; }
+        }
 
         internal Token _joinHintToken;    // LOOP, HASH, MERGE, REMOTE (optional)
         internal Token _joinTypeToken;    // INNER, LEFT, RIGHT, FULL (optional for bare JOIN)
@@ -411,10 +436,10 @@ namespace TSQL
 
         public QualifiedJoin(TableSource left, TableSource right, JoinType joinType, AST.Predicate onCondition, JoinHint? joinHint = null)
         {
-            Left = left;
-            Right = right;
+            _left = left;
+            _right = right;
             JoinType = joinType;
-            OnCondition = onCondition;
+            _onCondition = onCondition;
             JoinHint = joinHint;
         }
 
@@ -444,16 +469,26 @@ namespace TSQL
 
     public class CrossJoin : TableSource
     {
-        public TableSource Left { get; set; }
-        public TableSource Right { get; set; }
+        private TableSource _left;
+        public TableSource Left
+        {
+            get => _left;
+            set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+        }
+        private TableSource _right;
+        public TableSource Right
+        {
+            get => _right;
+            set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+        }
 
         internal Token _crossToken;
         internal Token _joinToken;
 
         public CrossJoin(TableSource left, TableSource right)
         {
-            Left = left;
-            Right = right;
+            _left = left;
+            _right = right;
         }
 
         public override T Accept<T>(Visitor<T> visitor)
@@ -474,8 +509,18 @@ namespace TSQL
 
     public class ApplyJoin : TableSource
     {
-        public TableSource Left { get; set; }
-        public TableSource Right { get; set; }
+        private TableSource _left;
+        public TableSource Left
+        {
+            get => _left;
+            set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+        }
+        private TableSource _right;
+        public TableSource Right
+        {
+            get => _right;
+            set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+        }
         public ApplyType ApplyType { get; set; }
 
         internal Token _applyTypeToken;  // CROSS or OUTER
@@ -483,8 +528,8 @@ namespace TSQL
 
         public ApplyJoin(TableSource left, TableSource right, ApplyType applyType)
         {
-            Left = left;
-            Right = right;
+            _left = left;
+            _right = right;
             ApplyType = applyType;
         }
 
@@ -506,14 +551,19 @@ namespace TSQL
 
     public class ParenthesizedTableSource : TableSource
     {
-        public TableSource Inner { get; set; }
+        private TableSource _inner;
+        public TableSource Inner
+        {
+            get => _inner;
+            set { if (_inner != null && value != null) TransferLeadingTrivia(_inner, value); _inner = value; }
+        }
 
         internal Token _leftParen;
         internal Token _rightParen;
 
         public ParenthesizedTableSource(TableSource inner)
         {
-            Inner = inner;
+            _inner = inner;
         }
 
         public override T Accept<T>(Visitor<T> visitor)
@@ -535,7 +585,12 @@ namespace TSQL
 
     public class PivotTableSource : TableSource
     {
-        public TableSource Source { get; set; }
+        private TableSource _source;
+        public TableSource Source
+        {
+            get => _source;
+            set { if (_source != null && value != null) TransferLeadingTrivia(_source, value); _source = value; }
+        }
         public Expr.FunctionCall AggregateFunction { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
         public SyntaxElementList<ColumnName> ValueList { get; }
@@ -550,7 +605,7 @@ namespace TSQL
 
         public PivotTableSource(TableSource source, Expr.FunctionCall aggregateFunction, Expr.ObjectIdentifier pivotColumn, SyntaxElementList<ColumnName> valueList)
         {
-            Source = source;
+            _source = source;
             AggregateFunction = aggregateFunction;
             PivotColumn = pivotColumn;
             ValueList = valueList;
@@ -586,7 +641,12 @@ namespace TSQL
 
     public class UnpivotTableSource : TableSource
     {
-        public TableSource Source { get; set; }
+        private TableSource _source;
+        public TableSource Source
+        {
+            get => _source;
+            set { if (_source != null && value != null) TransferLeadingTrivia(_source, value); _source = value; }
+        }
         public Expr.ObjectIdentifier ValueColumn { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
         public SyntaxElementList<ColumnName> ColumnList { get; }
@@ -601,7 +661,7 @@ namespace TSQL
 
         public UnpivotTableSource(TableSource source, Expr.ObjectIdentifier valueColumn, Expr.ObjectIdentifier pivotColumn, SyntaxElementList<ColumnName> columnList)
         {
-            Source = source;
+            _source = source;
             ValueColumn = valueColumn;
             PivotColumn = pivotColumn;
             ColumnList = columnList;

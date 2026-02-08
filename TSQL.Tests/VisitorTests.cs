@@ -202,9 +202,7 @@ namespace TSQL.Tests
             Assert.IsType<Expr.Literal>(where.Right);
             where.Right = new Expr.Variable("@P0");
 
-            string result = stmt.ToSource();
-            Assert.Contains("@P0", result);
-            Assert.DoesNotContain("42", result);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0", stmt.ToSource());
         }
 
         [Fact]
@@ -218,9 +216,7 @@ namespace TSQL.Tests
 
             where.Right = new Expr.Variable("@P0");
 
-            string result = stmt.ToSource();
-            Assert.Contains("@P0", result);
-            Assert.DoesNotContain("hello", result);
+            Assert.Equal("SELECT * FROM T WHERE name = @P0", stmt.ToSource());
         }
 
         [Fact]
@@ -231,8 +227,7 @@ namespace TSQL.Tests
 
             where.Right = new Expr.Literal(99);
 
-            string result = stmt.ToSource();
-            Assert.Contains("99", result);
+            Assert.Equal("SELECT * FROM T WHERE x = 99", stmt.ToSource());
         }
 
         #endregion
@@ -245,8 +240,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            Assert.Contains("@P0", result.Sql);
-            Assert.DoesNotContain("42", result.Sql);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0", result.Sql);
             Assert.Single(result.Parameters);
             Assert.Equal(42, result.Parameters["@P0"]);
         }
@@ -257,8 +251,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            Assert.Contains("@P0", result.Sql);
-            Assert.DoesNotContain("hello", result.Sql);
+            Assert.Equal("SELECT * FROM T WHERE name = @P0", result.Sql);
             Assert.Single(result.Parameters);
             Assert.Equal("hello", result.Parameters["@P0"]);
         }
@@ -269,8 +262,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42 AND y = 'hello'");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            Assert.Contains("@P0", result.Sql);
-            Assert.Contains("@P1", result.Sql);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", result.Sql);
             Assert.Equal(2, result.Parameters.Count);
             Assert.Equal(42, result.Parameters["@P0"]);
             Assert.Equal("hello", result.Parameters["@P1"]);
@@ -282,7 +274,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x IS NULL");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            Assert.Contains("NULL", result.Sql);
+            Assert.Equal("SELECT * FROM T WHERE x IS NULL", result.Sql);
             Assert.Empty(result.Parameters);
         }
 
@@ -292,8 +284,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x = @P0 AND y = 42");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            // @P0 is already used, so parameterizer should use @P1
-            Assert.Contains("@P1", result.Sql);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", result.Sql);
             Assert.Single(result.Parameters);
             Assert.Equal(42, result.Parameters["@P1"]);
         }
@@ -304,8 +295,10 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE LEN('test') > 0");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            Assert.DoesNotContain("'test'", result.Sql);
-            Assert.True(result.Parameters.Count >= 1);
+            Assert.Equal("SELECT * FROM T WHERE LEN(@P0) > @P1", result.Sql);
+            Assert.Equal(2, result.Parameters.Count);
+            Assert.Equal("test", result.Parameters["@P0"]);
+            Assert.Equal(0, result.Parameters["@P1"]);
         }
 
         [Fact]
@@ -314,9 +307,10 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x BETWEEN 10 AND 20");
             var result = LiteralParameterizer.Parameterize(stmt);
 
-            Assert.DoesNotContain("10", result.Sql);
-            Assert.DoesNotContain("20", result.Sql);
+            Assert.Equal("SELECT * FROM T WHERE x BETWEEN @P0 AND @P1", result.Sql);
             Assert.Equal(2, result.Parameters.Count);
+            Assert.Equal(10, result.Parameters["@P0"]);
+            Assert.Equal(20, result.Parameters["@P1"]);
         }
 
         [Fact]
@@ -325,7 +319,11 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x IN (1, 2, 3)");
             var result = LiteralParameterizer.Parameterize(stmt);
 
+            Assert.Equal("SELECT * FROM T WHERE x IN (@P0, @P1, @P2)", result.Sql);
             Assert.Equal(3, result.Parameters.Count);
+            Assert.Equal(1, result.Parameters["@P0"]);
+            Assert.Equal(2, result.Parameters["@P1"]);
+            Assert.Equal(3, result.Parameters["@P2"]);
         }
 
         #endregion

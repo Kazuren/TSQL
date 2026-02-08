@@ -146,6 +146,12 @@ namespace TSQL
             return !(left == right);
         }
 
+        internal void ClearLeadingTrivia()
+        {
+            _leadingTriviaSingle = null;
+            _leadingTriviaList = null;
+        }
+
         internal void AddLeadingTrivia(params Trivia[] trivia)
         {
             foreach (var t in trivia)

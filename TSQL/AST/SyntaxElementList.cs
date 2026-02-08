@@ -13,7 +13,12 @@ namespace TSQL
         public T this[int index]
         {
             get { return _items[index]; }
-            set { _items[index] = value; }
+            set
+            {
+                T old = _items[index];
+                if (old != null && value != null) TransferLeadingTrivia(old, value);
+                _items[index] = value;
+            }
         }
 
         private readonly List<T> _items = new List<T>();

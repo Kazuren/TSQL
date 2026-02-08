@@ -283,7 +283,12 @@ namespace TSQL
 
         public class FunctionCall : Expr
         {
-            public ObjectIdentifier Callee { get; set; }
+            private ObjectIdentifier _callee;
+            public ObjectIdentifier Callee
+            {
+                get => _callee;
+                set { if (_callee != null && value != null) TransferLeadingTrivia(_callee, value); _callee = value; }
+            }
             public SyntaxElementList<Expr> Arguments { get; set; }
 
             internal Token _leftParen;
@@ -291,7 +296,7 @@ namespace TSQL
 
             public FunctionCall(ObjectIdentifier callee, SyntaxElementList<Expr> args)
             {
-                Callee = callee;
+                _callee = callee;
                 Arguments = args;
             }
 
@@ -320,9 +325,19 @@ namespace TSQL
 
         public class Binary : Expr
         {
-            public Expr Left { get; set; }
+            private Expr _left;
+            public Expr Left
+            {
+                get => _left;
+                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            }
             public Token Operator { get; set; }
-            public Expr Right { get; set; }
+            private Expr _right;
+            public Expr Right
+            {
+                get => _right;
+                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            }
 
             public override T Accept<T>(Expr.Visitor<T> visitor)
             {
@@ -419,12 +434,17 @@ namespace TSQL
         {
 
             public Token Operator { get; set; }
-            public Expr Right { get; set; }
+            private Expr _right;
+            public Expr Right
+            {
+                get => _right;
+                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            }
 
             public Unary(Token @operator, Expr right)
             {
                 Operator = @operator;
-                Right = right;
+                _right = right;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -443,19 +463,24 @@ namespace TSQL
 
         public class Grouping : Expr
         {
-            public Expr Expression { get; set; }
+            private Expr _expression;
+            public Expr Expression
+            {
+                get => _expression;
+                set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+            }
 
             internal Token _leftParen;
             internal Token _rightParen;
 
             public Grouping(Expr expression)
             {
-                Expression = expression;
+                _expression = expression;
             }
 
             internal Grouping(Expr expression, Token leftParen, Token rightParen)
             {
-                Expression = expression;
+                _expression = expression;
                 _leftParen = leftParen;
                 _rightParen = rightParen;
             }
@@ -480,13 +505,18 @@ namespace TSQL
 
         public class Subquery : Expr
         {
-            public SelectExpression SelectExpression { get; set; }
+            private SelectExpression _selectExpression;
+            public SelectExpression SelectExpression
+            {
+                get => _selectExpression;
+                set { if (_selectExpression != null && value != null) TransferLeadingTrivia(_selectExpression, value); _selectExpression = value; }
+            }
             internal Token _leftParen;
             internal Token _rightParen;
 
             public Subquery(SelectExpression selectExpression, Token leftParen, Token rightParen)
             {
-                SelectExpression = selectExpression;
+                _selectExpression = selectExpression;
                 _leftParen = leftParen;
                 _rightParen = rightParen;
             }
@@ -514,13 +544,23 @@ namespace TSQL
         /// </summary>
         public class WindowFunction : Expr
         {
-            public FunctionCall Function { get; set; }
-            public OverClause Over { get; set; }
+            private FunctionCall _function;
+            public FunctionCall Function
+            {
+                get => _function;
+                set { if (_function != null && value != null) TransferLeadingTrivia(_function, value); _function = value; }
+            }
+            private OverClause _over;
+            public OverClause Over
+            {
+                get => _over;
+                set { if (_over != null && value != null) TransferLeadingTrivia(_over, value); _over = value; }
+            }
 
             public WindowFunction(FunctionCall function, OverClause over)
             {
-                Function = function;
-                Over = over;
+                _function = function;
+                _over = over;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -547,9 +587,19 @@ namespace TSQL
         /// </summary>
         public class SimpleCase : Expr
         {
-            public Expr Operand { get; set; }
+            private Expr _operand;
+            public Expr Operand
+            {
+                get => _operand;
+                set { if (_operand != null && value != null) TransferLeadingTrivia(_operand, value); _operand = value; }
+            }
             public List<SimpleCaseWhen> WhenClauses { get; set; }
-            public Expr ElseResult { get; set; }
+            private Expr _elseResult;
+            public Expr ElseResult
+            {
+                get => _elseResult;
+                set { if (_elseResult != null && value != null) TransferLeadingTrivia(_elseResult, value); _elseResult = value; }
+            }
 
             internal Token _caseToken;
             internal Token _elseToken;
@@ -557,9 +607,9 @@ namespace TSQL
 
             public SimpleCase(Expr operand, List<SimpleCaseWhen> whenClauses, Expr elseResult)
             {
-                Operand = operand;
+                _operand = operand;
                 WhenClauses = whenClauses;
-                ElseResult = elseResult;
+                _elseResult = elseResult;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -587,16 +637,26 @@ namespace TSQL
 
         public class SimpleCaseWhen : SyntaxElement
         {
-            public Expr Value { get; set; }
-            public Expr Result { get; set; }
+            private Expr _value;
+            public Expr Value
+            {
+                get => _value;
+                set { if (_value != null && value != null) TransferLeadingTrivia(_value, value); _value = value; }
+            }
+            private Expr _result;
+            public Expr Result
+            {
+                get => _result;
+                set { if (_result != null && value != null) TransferLeadingTrivia(_result, value); _result = value; }
+            }
 
             internal Token _whenToken;
             internal Token _thenToken;
 
             public SimpleCaseWhen(Expr value, Expr result)
             {
-                Value = value;
-                Result = result;
+                _value = value;
+                _result = result;
             }
 
             public override IEnumerable<Token> DescendantTokens()
@@ -616,7 +676,12 @@ namespace TSQL
         public class SearchedCase : Expr
         {
             public List<SearchedCaseWhen> WhenClauses { get; set; }
-            public Expr ElseResult { get; set; }
+            private Expr _elseResult;
+            public Expr ElseResult
+            {
+                get => _elseResult;
+                set { if (_elseResult != null && value != null) TransferLeadingTrivia(_elseResult, value); _elseResult = value; }
+            }
 
             internal Token _caseToken;
             internal Token _elseToken;
@@ -625,7 +690,7 @@ namespace TSQL
             public SearchedCase(List<SearchedCaseWhen> whenClauses, Expr elseResult)
             {
                 WhenClauses = whenClauses;
-                ElseResult = elseResult;
+                _elseResult = elseResult;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -651,16 +716,26 @@ namespace TSQL
 
         public class SearchedCaseWhen : SyntaxElement
         {
-            public AST.Predicate Condition { get; set; }
-            public Expr Result { get; set; }
+            private AST.Predicate _condition;
+            public AST.Predicate Condition
+            {
+                get => _condition;
+                set { if (_condition != null && value != null) TransferLeadingTrivia(_condition, value); _condition = value; }
+            }
+            private Expr _result;
+            public Expr Result
+            {
+                get => _result;
+                set { if (_result != null && value != null) TransferLeadingTrivia(_result, value); _result = value; }
+            }
 
             internal Token _whenToken;
             internal Token _thenToken;
 
             public SearchedCaseWhen(AST.Predicate condition, Expr result)
             {
-                Condition = condition;
-                Result = result;
+                _condition = condition;
+                _result = result;
             }
 
             public override IEnumerable<Token> DescendantTokens()
@@ -679,7 +754,12 @@ namespace TSQL
         /// </summary>
         public class CastExpression : Expr
         {
-            public Expr Expression { get; set; }
+            private Expr _expression;
+            public Expr Expression
+            {
+                get => _expression;
+                set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+            }
             public DataType DataType { get; set; }
 
             internal Token _castKeyword;
@@ -689,7 +769,7 @@ namespace TSQL
 
             public CastExpression(Expr expression, DataType dataType)
             {
-                Expression = expression;
+                _expression = expression;
                 DataType = dataType;
             }
 
@@ -717,8 +797,18 @@ namespace TSQL
         public class ConvertExpression : Expr
         {
             public DataType DataType { get; set; }
-            public Expr Expression { get; set; }
-            public Expr Style { get; set; }
+            private Expr _expression;
+            public Expr Expression
+            {
+                get => _expression;
+                set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+            }
+            private Expr _style;
+            public Expr Style
+            {
+                get => _style;
+                set { if (_style != null && value != null) TransferLeadingTrivia(_style, value); _style = value; }
+            }
 
             internal Token _convertKeyword;
             internal Token _leftParen;
@@ -729,8 +819,8 @@ namespace TSQL
             public ConvertExpression(DataType dataType, Expr expression, Expr style)
             {
                 DataType = dataType;
-                Expression = expression;
-                Style = style;
+                _expression = expression;
+                _style = style;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -979,9 +1069,19 @@ namespace TSQL
         public TopClause Top { get; set; }
         public SyntaxElementList<SelectItem> Columns { get; set; } = new SyntaxElementList<SelectItem>();
         public FromClause From { get; set; }
-        public AST.Predicate Where { get; set; }
+        private AST.Predicate _where;
+        public AST.Predicate Where
+        {
+            get => _where;
+            set { if (_where != null && value != null) TransferLeadingTrivia(_where, value); _where = value; }
+        }
         public GroupByClause GroupBy { get; set; }
-        public AST.Predicate Having { get; set; }
+        private AST.Predicate _having;
+        public AST.Predicate Having
+        {
+            get => _having;
+            set { if (_having != null && value != null) TransferLeadingTrivia(_having, value); _having = value; }
+        }
         public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
         public OptionClause Option { get; set; }
 
