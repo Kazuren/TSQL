@@ -30,14 +30,14 @@ namespace TSQL.AST
             public Expr Left
             {
                 get => _left;
-                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+                set => SetWithTrivia(ref _left, value);
             }
             public Token Operator { get; set; }
             private Expr _right;
             public Expr Right
             {
                 get => _right;
-                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+                set => SetWithTrivia(ref _right, value);
             }
 
             public Comparison(Expr left, Token @operator, Expr right)
@@ -69,19 +69,19 @@ namespace TSQL.AST
             public Expr Left
             {
                 get => _left;
-                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+                set => SetWithTrivia(ref _left, value);
             }
             private Expr _pattern;
             public Expr Pattern
             {
                 get => _pattern;
-                set { if (_pattern != null && value != null) TransferLeadingTrivia(_pattern, value); _pattern = value; }
+                set => SetWithTrivia(ref _pattern, value);
             }
             private Expr _escapeExpr;
             public Expr EscapeExpr
             {
                 get => _escapeExpr;
-                set { if (_escapeExpr != null && value != null) TransferLeadingTrivia(_escapeExpr, value); _escapeExpr = value; }
+                set => SetWithTrivia(ref _escapeExpr, value);
             }
             public bool Negated { get; set; }
 
@@ -127,19 +127,19 @@ namespace TSQL.AST
             public Expr Expr
             {
                 get => _expr;
-                set { if (_expr != null && value != null) TransferLeadingTrivia(_expr, value); _expr = value; }
+                set => SetWithTrivia(ref _expr, value);
             }
             private Expr _lowRangeExpr;
             public Expr LowRangeExpr
             {
                 get => _lowRangeExpr;
-                set { if (_lowRangeExpr != null && value != null) TransferLeadingTrivia(_lowRangeExpr, value); _lowRangeExpr = value; }
+                set => SetWithTrivia(ref _lowRangeExpr, value);
             }
             private Expr _highRangeExpr;
             public Expr HighRangeExpr
             {
                 get => _highRangeExpr;
-                set { if (_highRangeExpr != null && value != null) TransferLeadingTrivia(_highRangeExpr, value); _highRangeExpr = value; }
+                set => SetWithTrivia(ref _highRangeExpr, value);
             }
             public bool Negated { get; set; }
 
@@ -182,7 +182,7 @@ namespace TSQL.AST
             public Expr Expr
             {
                 get => _expr;
-                set { if (_expr != null && value != null) TransferLeadingTrivia(_expr, value); _expr = value; }
+                set => SetWithTrivia(ref _expr, value);
             }
             public bool Negated { get; set; }
 
@@ -219,13 +219,13 @@ namespace TSQL.AST
             public Expr Column
             {
                 get => _column;
-                set { if (_column != null && value != null) TransferLeadingTrivia(_column, value); _column = value; }
+                set => SetWithTrivia(ref _column, value);
             }
             private Expr _searchCondition;
             public Expr SearchCondition
             {
                 get => _searchCondition;
-                set { if (_searchCondition != null && value != null) TransferLeadingTrivia(_searchCondition, value); _searchCondition = value; }
+                set => SetWithTrivia(ref _searchCondition, value);
             }
 
             internal Token _containsToken;
@@ -264,7 +264,7 @@ namespace TSQL.AST
             public Expr Expr
             {
                 get => _expr;
-                set { if (_expr != null && value != null) TransferLeadingTrivia(_expr, value); _expr = value; }
+                set => SetWithTrivia(ref _expr, value);
             }
             public bool Negated { get; set; }
             public SyntaxElementList<Expr> ValueList { get; set; }
@@ -272,7 +272,7 @@ namespace TSQL.AST
             public Expr.Subquery Subquery
             {
                 get => _subquery;
-                set { if (_subquery != null && value != null) TransferLeadingTrivia(_subquery, value); _subquery = value; }
+                set => SetWithTrivia(ref _subquery, value);
             }
 
             internal Token _notToken;
@@ -328,7 +328,7 @@ namespace TSQL.AST
             public Expr Left
             {
                 get => _left;
-                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+                set => SetWithTrivia(ref _left, value);
             }
             public Token Operator { get; set; }
             public Token QuantifierKeyword { get; set; }
@@ -336,7 +336,7 @@ namespace TSQL.AST
             public Expr.Subquery Subquery
             {
                 get => _subquery;
-                set { if (_subquery != null && value != null) TransferLeadingTrivia(_subquery, value); _subquery = value; }
+                set => SetWithTrivia(ref _subquery, value);
             }
 
             internal Token _leftParen;
@@ -375,7 +375,7 @@ namespace TSQL.AST
             public Expr.Subquery Subquery
             {
                 get => _subquery;
-                set { if (_subquery != null && value != null) TransferLeadingTrivia(_subquery, value); _subquery = value; }
+                set => SetWithTrivia(ref _subquery, value);
             }
 
             internal Token _existsToken;
@@ -405,7 +405,7 @@ namespace TSQL.AST
             public Predicate Predicate
             {
                 get => _predicate;
-                set { if (_predicate != null && value != null) TransferLeadingTrivia(_predicate, value); _predicate = value; }
+                set => SetWithTrivia(ref _predicate, value);
             }
 
             internal Token _leftParen;
@@ -437,13 +437,13 @@ namespace TSQL.AST
             public Predicate Left
             {
                 get => _left;
-                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+                set => SetWithTrivia(ref _left, value);
             }
             private Predicate _right;
             public Predicate Right
             {
                 get => _right;
-                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+                set => SetWithTrivia(ref _right, value);
             }
 
             internal Token _andToken;
@@ -472,13 +472,13 @@ namespace TSQL.AST
             public Predicate Left
             {
                 get => _left;
-                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+                set => SetWithTrivia(ref _left, value);
             }
             private Predicate _right;
             public Predicate Right
             {
                 get => _right;
-                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+                set => SetWithTrivia(ref _right, value);
             }
 
             internal Token _orToken;
@@ -507,7 +507,7 @@ namespace TSQL.AST
             public Predicate Predicate
             {
                 get => _predicate;
-                set { if (_predicate != null && value != null) TransferLeadingTrivia(_predicate, value); _predicate = value; }
+                set => SetWithTrivia(ref _predicate, value);
             }
 
             internal Token _notToken;

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Collections.Generic;
 using System.Text;
 
 namespace TSQL
@@ -26,19 +24,23 @@ namespace TSQL
         public string ToSource()
         {
             StringBuilder sb = new StringBuilder();
-            try
+            foreach (Token token in DescendantTokens())
             {
-                foreach (Token token in DescendantTokens())
-                {
-                    sb.Append(token.ToSource());
-                }
-                return sb.ToString();
+                sb.Append(token.ToSource());
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.ToString());
-                return sb.ToString();
-            }
+            return sb.ToString();
+        }
+
+        internal Token FirstToken()
+        {
+            foreach (Token t in DescendantTokens()) return t;
+            return null;
+        }
+
+        internal static Token FirstTokenOf(ISyntaxElement element)
+        {
+            foreach (Token t in element.DescendantTokens()) return t;
+            return null;
         }
 
         /// <summary>
@@ -47,12 +49,10 @@ namespace TSQL
         /// </summary>
         public void AddLeadingComment(string comment)
         {
-            foreach (Token token in DescendantTokens())
-            {
-                token.AddLeadingTrivia(new Comment("-- " + comment));
-                token.AddLeadingTrivia(new Whitespace("\n"));
-                return;
-            }
+            Token token = FirstToken();
+            if (token == null) return;
+            token.AddLeadingTrivia(new Comment("-- " + comment));
+            token.AddLeadingTrivia(new Whitespace("\n"));
         }
 
         /// <summary>
@@ -61,12 +61,10 @@ namespace TSQL
         /// </summary>
         public void AddLeadingBlockComment(string comment)
         {
-            foreach (Token token in DescendantTokens())
-            {
-                token.AddLeadingTrivia(new Comment("/* " + comment + " */"));
-                token.AddLeadingTrivia(new Whitespace(" "));
-                return;
-            }
+            Token token = FirstToken();
+            if (token == null) return;
+            token.AddLeadingTrivia(new Comment("/* " + comment + " */"));
+            token.AddLeadingTrivia(new Whitespace(" "));
         }
 
         /// <summary>
@@ -76,11 +74,8 @@ namespace TSQL
         /// </summary>
         internal static void TransferLeadingTrivia(ISyntaxElement from, ISyntaxElement to)
         {
-            Token fromToken = null;
-            foreach (Token t in from.DescendantTokens()) { fromToken = t; break; }
-
-            Token toToken = null;
-            foreach (Token t in to.DescendantTokens()) { toToken = t; break; }
+            Token fromToken = FirstTokenOf(from);
+            Token toToken = FirstTokenOf(to);
 
             // Same-token guard: when a property setter is called with the same node
             // (e.g. pred.Left = TryReplace(pred.Left) where TryReplace returns the original),
@@ -89,6 +84,24 @@ namespace TSQL
 
             toToken.ClearLeadingTrivia();
             toToken.AddLeadingTrivia(fromToken.LeadingTrivia);
+        }
+
+        /// <summary>
+        /// Transfers leading trivia from the old value to the new value when both are non-null,
+        /// then returns the new value. This is the single source of truth for trivia-aware replacement.
+        /// </summary>
+        internal static T SetWithTrivia<T>(T oldValue, T newValue) where T : class, ISyntaxElement
+        {
+            if (oldValue != null && newValue != null) TransferLeadingTrivia(oldValue, newValue);
+            return newValue;
+        }
+
+        /// <summary>
+        /// Convenience overload that assigns directly to a backing field.
+        /// </summary>
+        internal static void SetWithTrivia<T>(ref T field, T value) where T : class, ISyntaxElement
+        {
+            field = SetWithTrivia(field, value);
         }
 
         public SyntaxElement Parent { get; internal set; }

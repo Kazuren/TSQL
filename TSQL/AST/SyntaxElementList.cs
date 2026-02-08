@@ -7,18 +7,13 @@ namespace TSQL
     /// A list of syntax nodes separated by tokens (like commas).
     /// Preserves the separator tokens to maintain trivia.
     /// </summary>
-    public class SyntaxElementList<T> : SyntaxElement, IEnumerable<T> where T : ISyntaxElement
+    public class SyntaxElementList<T> : SyntaxElement, IEnumerable<T> where T : class, ISyntaxElement
     {
         public int Count => _items.Count;
         public T this[int index]
         {
             get { return _items[index]; }
-            set
-            {
-                T old = _items[index];
-                if (old != null && value != null) TransferLeadingTrivia(old, value);
-                _items[index] = value;
-            }
+            set => _items[index] = SetWithTrivia(_items[index], value);
         }
 
         private readonly List<T> _items = new List<T>();

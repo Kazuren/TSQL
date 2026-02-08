@@ -287,7 +287,7 @@ namespace TSQL
             public ObjectIdentifier Callee
             {
                 get => _callee;
-                set { if (_callee != null && value != null) TransferLeadingTrivia(_callee, value); _callee = value; }
+                set => SetWithTrivia(ref _callee, value);
             }
             public SyntaxElementList<Expr> Arguments { get; set; }
 
@@ -329,17 +329,17 @@ namespace TSQL
             public Expr Left
             {
                 get => _left;
-                set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+                set => SetWithTrivia(ref _left, value);
             }
             public Token Operator { get; set; }
             private Expr _right;
             public Expr Right
             {
                 get => _right;
-                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+                set => SetWithTrivia(ref _right, value);
             }
 
-            public override T Accept<T>(Expr.Visitor<T> visitor)
+            public override T Accept<T>(Visitor<T> visitor)
             {
                 return visitor.VisitBinaryExpr(this);
             }
@@ -420,7 +420,7 @@ namespace TSQL
                 _token = token;
             }
 
-            public override T Accept<T>(Expr.Visitor<T> visitor)
+            public override T Accept<T>(Visitor<T> visitor)
             {
                 return visitor.VisitLiteralExpr(this);
             }
@@ -438,7 +438,7 @@ namespace TSQL
             public Expr Right
             {
                 get => _right;
-                set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+                set => SetWithTrivia(ref _right, value);
             }
 
             public Unary(Token @operator, Expr right)
@@ -467,7 +467,7 @@ namespace TSQL
             public Expr Expression
             {
                 get => _expression;
-                set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+                set => SetWithTrivia(ref _expression, value);
             }
 
             internal Token _leftParen;
@@ -509,7 +509,7 @@ namespace TSQL
             public SelectExpression SelectExpression
             {
                 get => _selectExpression;
-                set { if (_selectExpression != null && value != null) TransferLeadingTrivia(_selectExpression, value); _selectExpression = value; }
+                set => SetWithTrivia(ref _selectExpression, value);
             }
             internal Token _leftParen;
             internal Token _rightParen;
@@ -548,13 +548,13 @@ namespace TSQL
             public FunctionCall Function
             {
                 get => _function;
-                set { if (_function != null && value != null) TransferLeadingTrivia(_function, value); _function = value; }
+                set => SetWithTrivia(ref _function, value);
             }
             private OverClause _over;
             public OverClause Over
             {
                 get => _over;
-                set { if (_over != null && value != null) TransferLeadingTrivia(_over, value); _over = value; }
+                set => SetWithTrivia(ref _over, value);
             }
 
             public WindowFunction(FunctionCall function, OverClause over)
@@ -591,14 +591,14 @@ namespace TSQL
             public Expr Operand
             {
                 get => _operand;
-                set { if (_operand != null && value != null) TransferLeadingTrivia(_operand, value); _operand = value; }
+                set => SetWithTrivia(ref _operand, value);
             }
             public List<SimpleCaseWhen> WhenClauses { get; set; }
             private Expr _elseResult;
             public Expr ElseResult
             {
                 get => _elseResult;
-                set { if (_elseResult != null && value != null) TransferLeadingTrivia(_elseResult, value); _elseResult = value; }
+                set => SetWithTrivia(ref _elseResult, value);
             }
 
             internal Token _caseToken;
@@ -641,13 +641,13 @@ namespace TSQL
             public Expr Value
             {
                 get => _value;
-                set { if (_value != null && value != null) TransferLeadingTrivia(_value, value); _value = value; }
+                set => SetWithTrivia(ref _value, value);
             }
             private Expr _result;
             public Expr Result
             {
                 get => _result;
-                set { if (_result != null && value != null) TransferLeadingTrivia(_result, value); _result = value; }
+                set => SetWithTrivia(ref _result, value);
             }
 
             internal Token _whenToken;
@@ -680,7 +680,7 @@ namespace TSQL
             public Expr ElseResult
             {
                 get => _elseResult;
-                set { if (_elseResult != null && value != null) TransferLeadingTrivia(_elseResult, value); _elseResult = value; }
+                set => SetWithTrivia(ref _elseResult, value);
             }
 
             internal Token _caseToken;
@@ -720,13 +720,13 @@ namespace TSQL
             public AST.Predicate Condition
             {
                 get => _condition;
-                set { if (_condition != null && value != null) TransferLeadingTrivia(_condition, value); _condition = value; }
+                set => SetWithTrivia(ref _condition, value);
             }
             private Expr _result;
             public Expr Result
             {
                 get => _result;
-                set { if (_result != null && value != null) TransferLeadingTrivia(_result, value); _result = value; }
+                set => SetWithTrivia(ref _result, value);
             }
 
             internal Token _whenToken;
@@ -758,7 +758,7 @@ namespace TSQL
             public Expr Expression
             {
                 get => _expression;
-                set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+                set => SetWithTrivia(ref _expression, value);
             }
             public DataType DataType { get; set; }
 
@@ -801,13 +801,13 @@ namespace TSQL
             public Expr Expression
             {
                 get => _expression;
-                set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+                set => SetWithTrivia(ref _expression, value);
             }
             private Expr _style;
             public Expr Style
             {
                 get => _style;
-                set { if (_style != null && value != null) TransferLeadingTrivia(_style, value); _style = value; }
+                set => SetWithTrivia(ref _style, value);
             }
 
             internal Token _convertKeyword;
@@ -1073,14 +1073,14 @@ namespace TSQL
         public AST.Predicate Where
         {
             get => _where;
-            set { if (_where != null && value != null) TransferLeadingTrivia(_where, value); _where = value; }
+            set => SetWithTrivia(ref _where, value);
         }
         public GroupByClause GroupBy { get; set; }
         private AST.Predicate _having;
         public AST.Predicate Having
         {
             get => _having;
-            set { if (_having != null && value != null) TransferLeadingTrivia(_having, value); _having = value; }
+            set => SetWithTrivia(ref _having, value);
         }
         public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
         public OptionClause Option { get; set; }

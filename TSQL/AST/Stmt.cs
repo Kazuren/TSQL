@@ -13,15 +13,20 @@ namespace TSQL
 
         public class Select : Stmt
         {
-            public Cte CteStmt;
-            public SelectExpression SelectExpression;
+            public Cte CteStmt { get; set; }
+            private SelectExpression _selectExpression;
+            public SelectExpression SelectExpression
+            {
+                get => _selectExpression;
+                set => SetWithTrivia(ref _selectExpression, value);
+            }
 
             public Select(SelectExpression selectExpression)
             {
-                SelectExpression = selectExpression;
+                _selectExpression = selectExpression;
             }
 
-            public override T Accept<T>(Stmt.Visitor<T> visitor)
+            public override T Accept<T>(Visitor<T> visitor)
             {
                 return visitor.VisitSelectStmt(this);
             }
@@ -230,7 +235,7 @@ namespace TSQL
         public Expr Expression
         {
             get => _expression;
-            set { if (_expression != null && value != null) TransferLeadingTrivia(_expression, value); _expression = value; }
+            set => SetWithTrivia(ref _expression, value);
         }
         public bool Descending { get; set; }
 
@@ -317,7 +322,7 @@ namespace TSQL
         public Expr.ObjectIdentifier TableName
         {
             get => _tableName;
-            set { if (_tableName != null && value != null) TransferLeadingTrivia(_tableName, value); _tableName = value; }
+            set => SetWithTrivia(ref _tableName, value);
         }
         public ForSystemTimeClause ForSystemTime { get; set; }
         public TablesampleClause Tablesample { get; set; }
@@ -411,13 +416,13 @@ namespace TSQL
         public TableSource Left
         {
             get => _left;
-            set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            set => SetWithTrivia(ref _left, value);
         }
         private TableSource _right;
         public TableSource Right
         {
             get => _right;
-            set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            set => SetWithTrivia(ref _right, value);
         }
         public JoinType JoinType { get; set; }
         public JoinHint? JoinHint { get; set; }
@@ -425,7 +430,7 @@ namespace TSQL
         public AST.Predicate OnCondition
         {
             get => _onCondition;
-            set { if (_onCondition != null && value != null) TransferLeadingTrivia(_onCondition, value); _onCondition = value; }
+            set => SetWithTrivia(ref _onCondition, value);
         }
 
         internal Token _joinHintToken;    // LOOP, HASH, MERGE, REMOTE (optional)
@@ -473,13 +478,13 @@ namespace TSQL
         public TableSource Left
         {
             get => _left;
-            set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            set => SetWithTrivia(ref _left, value);
         }
         private TableSource _right;
         public TableSource Right
         {
             get => _right;
-            set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            set => SetWithTrivia(ref _right, value);
         }
 
         internal Token _crossToken;
@@ -513,13 +518,13 @@ namespace TSQL
         public TableSource Left
         {
             get => _left;
-            set { if (_left != null && value != null) TransferLeadingTrivia(_left, value); _left = value; }
+            set => SetWithTrivia(ref _left, value);
         }
         private TableSource _right;
         public TableSource Right
         {
             get => _right;
-            set { if (_right != null && value != null) TransferLeadingTrivia(_right, value); _right = value; }
+            set => SetWithTrivia(ref _right, value);
         }
         public ApplyType ApplyType { get; set; }
 
@@ -555,7 +560,7 @@ namespace TSQL
         public TableSource Inner
         {
             get => _inner;
-            set { if (_inner != null && value != null) TransferLeadingTrivia(_inner, value); _inner = value; }
+            set => SetWithTrivia(ref _inner, value);
         }
 
         internal Token _leftParen;
@@ -589,7 +594,7 @@ namespace TSQL
         public TableSource Source
         {
             get => _source;
-            set { if (_source != null && value != null) TransferLeadingTrivia(_source, value); _source = value; }
+            set => SetWithTrivia(ref _source, value);
         }
         public Expr.FunctionCall AggregateFunction { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
@@ -645,7 +650,7 @@ namespace TSQL
         public TableSource Source
         {
             get => _source;
-            set { if (_source != null && value != null) TransferLeadingTrivia(_source, value); _source = value; }
+            set => SetWithTrivia(ref _source, value);
         }
         public Expr.ObjectIdentifier ValueColumn { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
