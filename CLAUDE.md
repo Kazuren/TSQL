@@ -286,4 +286,22 @@ public QueryHint ParseQueryHint() { ... }
 
 **Tactical vs. strategic programming.** Working code is necessary but not sufficient. Every change should leave the system a little cleaner than you found it. Tactical programming — "just make it work, clean up later" — accumulates complexity that never gets cleaned up. Think about the *right* design before writing code, even when the quick fix is obvious.
 
+**Prefer explicit control flow.** Verbosity in control flow aids readability. Always write the `else` branch — every `if` has an `else`, even if the language lets you omit it. Prefer `if/else` over ternary operators. The goal is code that reads linearly and makes every path visible, not code that's compact.
+
+```csharp
+// Bad: compact but hides the alternative path
+TokenType type = TryGetKeyword(slice, out var value) ? value : TokenType.IDENTIFIER;
+
+// Good: both paths are explicit and scannable
+TokenType type;
+if (TryGetKeyword(slice, out TokenType value))
+{
+    type = value;
+}
+else
+{
+    type = TokenType.IDENTIFIER;
+}
+```
+
 **Say no to complexity you don't need.** If there are two ways to solve a problem and one is simpler, pick the simpler one. Don't add layers of abstraction for a single use case. Don't add configuration for things that can be constants. Don't add indirection that exists only to "keep options open." Wait until a pattern repeats naturally before extracting it. Three similar lines are better than a premature abstraction.
