@@ -82,6 +82,9 @@ namespace TSQL
             Token toToken = null;
             foreach (Token t in to.DescendantTokens()) { toToken = t; break; }
 
+            // Same-token guard: when a property setter is called with the same node
+            // (e.g. pred.Left = TryReplace(pred.Left) where TryReplace returns the original),
+            // ClearLeadingTrivia would destroy the trivia before AddLeadingTrivia can copy it.
             if (fromToken == null || toToken == null || ReferenceEquals(fromToken, toToken)) return;
 
             toToken.ClearLeadingTrivia();
