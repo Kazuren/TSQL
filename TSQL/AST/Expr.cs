@@ -12,6 +12,9 @@ namespace TSQL
             T VisitBinaryExpr(Binary expr);
             T VisitLiteralExpr(Literal expr);
             T VisitColumnIdentifierExpr(ColumnIdentifier expr);
+            T VisitObjectIdentifierExpr(ObjectIdentifier expr);
+            T VisitWildcardExpr(Wildcard expr);
+            T VisitQualifiedWildcardExpr(QualifiedWildcard expr);
             T VisitUnaryExpr(Unary expr);
             T VisitGroupingExpr(Grouping expr);
             T VisitSubqueryExpr(Subquery expr);
@@ -106,7 +109,7 @@ namespace TSQL
 
             public override T Accept<T>(Visitor<T> visitor)
             {
-                throw new System.NotImplementedException();
+                return visitor.VisitObjectIdentifierExpr(this);
             }
 
             public override IEnumerable<Token> DescendantTokens()
@@ -151,7 +154,7 @@ namespace TSQL
 
             public override T Accept<T>(Visitor<T> visitor)
             {
-                throw new NotImplementedException();
+                return visitor.VisitWildcardExpr(this);
             }
 
             public override IEnumerable<Token> DescendantTokens()
@@ -204,7 +207,7 @@ namespace TSQL
 
             public override T Accept<T>(Visitor<T> visitor)
             {
-                throw new System.NotImplementedException();
+                return visitor.VisitQualifiedWildcardExpr(this);
             }
 
             public override IEnumerable<Token> DescendantTokens()
@@ -263,7 +266,7 @@ namespace TSQL
 
             public override T Accept<T>(Visitor<T> visitor)
             {
-                throw new System.NotImplementedException();
+                return visitor.VisitColumnIdentifierExpr(this);
             }
 
             public override IEnumerable<Token> DescendantTokens()
@@ -346,6 +349,12 @@ namespace TSQL
             public string Name { get => _token.Lexeme; }
             private readonly Token _token;
 
+            public Variable(string name)
+            {
+                _token = new ConcreteToken(TokenType.VARIABLE, name, null);
+                _token.AddLeadingTrivia(new Whitespace(" "));
+            }
+
             internal Variable(Token token)
             {
                 _token = token;
@@ -369,20 +378,27 @@ namespace TSQL
             private readonly Token _token;
             public Literal(object value)
             {
-                if (value is string)
+                if (value == null)
                 {
-                    _token = new ConcreteToken(TokenType.STRING, "", value);
+                    _token = new ConcreteToken(TokenType.NULL, "NULL", null);
                 }
-                else if (value is int)
+                else if (value is string s)
                 {
-                    _token = new ConcreteToken(TokenType.WHOLE_NUMBER, "", value);
+                    _token = new ConcreteToken(TokenType.STRING, "'" + s.Replace("'", "''") + "'", value);
+                }
+                else if (value is int i)
+                {
+                    _token = new ConcreteToken(TokenType.WHOLE_NUMBER, i.ToString(), value);
                 }
                 else if (value is double || value is decimal || value is float)
                 {
-                    _token = new ConcreteToken(TokenType.DECIMAL, "", value);
+                    _token = new ConcreteToken(TokenType.DECIMAL, value.ToString(), value);
                 }
-
-                throw new ArgumentException($"Expected literal to be either a string, int, double, float or decimal but got: {value.GetType().FullName}", nameof(value));
+                else
+                {
+                    throw new ArgumentException($"Expected literal to be null, string, int, double, float or decimal but got: {value.GetType().FullName}", nameof(value));
+                }
+                _token.AddLeadingTrivia(new Whitespace(" "));
             }
             internal Literal(Token token)
             {
@@ -402,8 +418,8 @@ namespace TSQL
         public class Unary : Expr
         {
 
-            public Token Operator { get; }
-            public Expr Right { get; }
+            public Token Operator { get; set; }
+            public Expr Right { get; set; }
 
             public Unary(Token @operator, Expr right)
             {
@@ -427,7 +443,7 @@ namespace TSQL
 
         public class Grouping : Expr
         {
-            public Expr Expression { get; }
+            public Expr Expression { get; set; }
 
             internal Token _leftParen;
             internal Token _rightParen;
@@ -464,7 +480,7 @@ namespace TSQL
 
         public class Subquery : Expr
         {
-            public SelectExpression SelectExpression { get; }
+            public SelectExpression SelectExpression { get; set; }
             internal Token _leftParen;
             internal Token _rightParen;
 
@@ -498,8 +514,8 @@ namespace TSQL
         /// </summary>
         public class WindowFunction : Expr
         {
-            public FunctionCall Function { get; }
-            public OverClause Over { get; }
+            public FunctionCall Function { get; set; }
+            public OverClause Over { get; set; }
 
             public WindowFunction(FunctionCall function, OverClause over)
             {
@@ -531,9 +547,9 @@ namespace TSQL
         /// </summary>
         public class SimpleCase : Expr
         {
-            public Expr Operand { get; }
-            public List<SimpleCaseWhen> WhenClauses { get; }
-            public Expr ElseResult { get; }
+            public Expr Operand { get; set; }
+            public List<SimpleCaseWhen> WhenClauses { get; set; }
+            public Expr ElseResult { get; set; }
 
             internal Token _caseToken;
             internal Token _elseToken;
@@ -571,8 +587,8 @@ namespace TSQL
 
         public class SimpleCaseWhen : SyntaxElement
         {
-            public Expr Value { get; }
-            public Expr Result { get; }
+            public Expr Value { get; set; }
+            public Expr Result { get; set; }
 
             internal Token _whenToken;
             internal Token _thenToken;
@@ -599,8 +615,8 @@ namespace TSQL
         /// </summary>
         public class SearchedCase : Expr
         {
-            public List<SearchedCaseWhen> WhenClauses { get; }
-            public Expr ElseResult { get; }
+            public List<SearchedCaseWhen> WhenClauses { get; set; }
+            public Expr ElseResult { get; set; }
 
             internal Token _caseToken;
             internal Token _elseToken;
@@ -635,8 +651,8 @@ namespace TSQL
 
         public class SearchedCaseWhen : SyntaxElement
         {
-            public AST.Predicate Condition { get; }
-            public Expr Result { get; }
+            public AST.Predicate Condition { get; set; }
+            public Expr Result { get; set; }
 
             internal Token _whenToken;
             internal Token _thenToken;
@@ -663,8 +679,8 @@ namespace TSQL
         /// </summary>
         public class CastExpression : Expr
         {
-            public Expr Expression { get; }
-            public DataType DataType { get; }
+            public Expr Expression { get; set; }
+            public DataType DataType { get; set; }
 
             internal Token _castKeyword;
             internal Token _leftParen;
@@ -700,9 +716,9 @@ namespace TSQL
         /// </summary>
         public class ConvertExpression : Expr
         {
-            public DataType DataType { get; }
-            public Expr Expression { get; }
-            public Expr Style { get; }
+            public DataType DataType { get; set; }
+            public Expr Expression { get; set; }
+            public Expr Style { get; set; }
 
             internal Token _convertKeyword;
             internal Token _leftParen;

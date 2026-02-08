@@ -41,6 +41,34 @@ namespace TSQL
             }
         }
 
+        /// <summary>
+        /// Attaches a single-line comment (-- comment) before this node.
+        /// The comment appears on the line before the node in the output.
+        /// </summary>
+        public void AddLeadingComment(string comment)
+        {
+            foreach (Token token in DescendantTokens())
+            {
+                token.AddLeadingTrivia(new Comment("-- " + comment));
+                token.AddLeadingTrivia(new Whitespace("\n"));
+                return;
+            }
+        }
+
+        /// <summary>
+        /// Attaches an inline block comment (/* comment */) before this node.
+        /// The comment appears immediately before the node in the output.
+        /// </summary>
+        public void AddLeadingBlockComment(string comment)
+        {
+            foreach (Token token in DescendantTokens())
+            {
+                token.AddLeadingTrivia(new Comment("/* " + comment + " */"));
+                token.AddLeadingTrivia(new Whitespace(" "));
+                return;
+            }
+        }
+
         public SyntaxElement Parent { get; internal set; }
         public SyntaxElement SiblingLeft { get; internal set; }
         public SyntaxElement SiblingRight { get; internal set; }

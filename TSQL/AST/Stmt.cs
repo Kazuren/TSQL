@@ -287,11 +287,28 @@ namespace TSQL
     public abstract class TableSource : SyntaxElement
     {
         public Alias Alias { get; set; }
+
+        public abstract T Accept<T>(Visitor<T> visitor);
+
+        public interface Visitor<T>
+        {
+            T VisitTableReference(TableReference source);
+            T VisitSubqueryReference(SubqueryReference source);
+            T VisitTableVariableReference(TableVariableReference source);
+            T VisitQualifiedJoin(QualifiedJoin source);
+            T VisitCrossJoin(CrossJoin source);
+            T VisitApplyJoin(ApplyJoin source);
+            T VisitParenthesizedTableSource(ParenthesizedTableSource source);
+            T VisitPivotTableSource(PivotTableSource source);
+            T VisitUnpivotTableSource(UnpivotTableSource source);
+            T VisitValuesTableSource(ValuesTableSource source);
+            T VisitRowsetFunctionReference(RowsetFunctionReference source);
+        }
     }
 
     public class TableReference : TableSource
     {
-        public Expr.ObjectIdentifier TableName { get; }
+        public Expr.ObjectIdentifier TableName { get; set; }
         public ForSystemTimeClause ForSystemTime { get; set; }
         public TablesampleClause Tablesample { get; set; }
         public TableHintClause TableHints { get; set; }
@@ -299,6 +316,11 @@ namespace TSQL
         public TableReference(Expr.ObjectIdentifier tableName)
         {
             TableName = tableName;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitTableReference(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -330,6 +352,11 @@ namespace TSQL
             Subquery = subquery;
         }
 
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitSubqueryReference(this);
+        }
+
         public override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Subquery.DescendantTokens())
@@ -354,6 +381,11 @@ namespace TSQL
             _variableToken = variableToken;
         }
 
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitTableVariableReference(this);
+        }
+
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _variableToken;
@@ -365,11 +397,11 @@ namespace TSQL
 
     public class QualifiedJoin : TableSource
     {
-        public TableSource Left { get; }
-        public TableSource Right { get; }
-        public JoinType JoinType { get; }
-        public JoinHint? JoinHint { get; }
-        public AST.Predicate OnCondition { get; }
+        public TableSource Left { get; set; }
+        public TableSource Right { get; set; }
+        public JoinType JoinType { get; set; }
+        public JoinHint? JoinHint { get; set; }
+        public AST.Predicate OnCondition { get; set; }
 
         internal Token _joinHintToken;    // LOOP, HASH, MERGE, REMOTE (optional)
         internal Token _joinTypeToken;    // INNER, LEFT, RIGHT, FULL (optional for bare JOIN)
@@ -384,6 +416,11 @@ namespace TSQL
             JoinType = joinType;
             OnCondition = onCondition;
             JoinHint = joinHint;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitQualifiedJoin(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -407,8 +444,8 @@ namespace TSQL
 
     public class CrossJoin : TableSource
     {
-        public TableSource Left { get; }
-        public TableSource Right { get; }
+        public TableSource Left { get; set; }
+        public TableSource Right { get; set; }
 
         internal Token _crossToken;
         internal Token _joinToken;
@@ -417,6 +454,11 @@ namespace TSQL
         {
             Left = left;
             Right = right;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitCrossJoin(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -432,9 +474,9 @@ namespace TSQL
 
     public class ApplyJoin : TableSource
     {
-        public TableSource Left { get; }
-        public TableSource Right { get; }
-        public ApplyType ApplyType { get; }
+        public TableSource Left { get; set; }
+        public TableSource Right { get; set; }
+        public ApplyType ApplyType { get; set; }
 
         internal Token _applyTypeToken;  // CROSS or OUTER
         internal Token _applyToken;      // APPLY
@@ -444,6 +486,11 @@ namespace TSQL
             Left = left;
             Right = right;
             ApplyType = applyType;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitApplyJoin(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -459,7 +506,7 @@ namespace TSQL
 
     public class ParenthesizedTableSource : TableSource
     {
-        public TableSource Inner { get; }
+        public TableSource Inner { get; set; }
 
         internal Token _leftParen;
         internal Token _rightParen;
@@ -467,6 +514,11 @@ namespace TSQL
         public ParenthesizedTableSource(TableSource inner)
         {
             Inner = inner;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitParenthesizedTableSource(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -483,7 +535,7 @@ namespace TSQL
 
     public class PivotTableSource : TableSource
     {
-        public TableSource Source { get; }
+        public TableSource Source { get; set; }
         public Expr.FunctionCall AggregateFunction { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
         public SyntaxElementList<ColumnName> ValueList { get; }
@@ -502,6 +554,11 @@ namespace TSQL
             AggregateFunction = aggregateFunction;
             PivotColumn = pivotColumn;
             ValueList = valueList;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitPivotTableSource(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -529,7 +586,7 @@ namespace TSQL
 
     public class UnpivotTableSource : TableSource
     {
-        public TableSource Source { get; }
+        public TableSource Source { get; set; }
         public Expr.ObjectIdentifier ValueColumn { get; }
         public Expr.ObjectIdentifier PivotColumn { get; }
         public SyntaxElementList<ColumnName> ColumnList { get; }
@@ -548,6 +605,11 @@ namespace TSQL
             ValueColumn = valueColumn;
             PivotColumn = pivotColumn;
             ColumnList = columnList;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitUnpivotTableSource(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -587,6 +649,11 @@ namespace TSQL
             Rows = rows;
         }
 
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitValuesTableSource(this);
+        }
+
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _outerLeftParen;
@@ -610,6 +677,11 @@ namespace TSQL
         public RowsetFunctionReference(Expr.FunctionCall functionCall)
         {
             FunctionCall = functionCall;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitRowsetFunctionReference(this);
         }
 
         public override IEnumerable<Token> DescendantTokens()

@@ -10,7 +10,11 @@ namespace TSQL
     public class SyntaxElementList<T> : SyntaxElement, IEnumerable<T> where T : ISyntaxElement
     {
         public int Count => _items.Count;
-        public T this[int index] => _items[index];
+        public T this[int index]
+        {
+            get { return _items[index]; }
+            set { _items[index] = value; }
+        }
 
         private readonly List<T> _items = new List<T>();
         private readonly List<Token> _separators = new List<Token>();

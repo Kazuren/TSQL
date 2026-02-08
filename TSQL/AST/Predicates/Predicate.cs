@@ -26,9 +26,9 @@ namespace TSQL.AST
 
         public class Comparison : Predicate
         {
-            public Expr Left { get; }
-            public Token Operator { get; }
-            public Expr Right { get; }
+            public Expr Left { get; set; }
+            public Token Operator { get; set; }
+            public Expr Right { get; set; }
 
             public Comparison(Expr left, Token @operator, Expr right)
             {
@@ -55,10 +55,10 @@ namespace TSQL.AST
 
         public class Like : Predicate
         {
-            public Expr Left { get; }
-            public Expr Pattern { get; }
-            public Expr EscapeExpr { get; }
-            public bool Negated { get; }
+            public Expr Left { get; set; }
+            public Expr Pattern { get; set; }
+            public Expr EscapeExpr { get; set; }
+            public bool Negated { get; set; }
 
             internal Token _notToken;
             internal Token _likeToken;
@@ -98,10 +98,10 @@ namespace TSQL.AST
 
         public class Between : Predicate
         {
-            public Expr Expr { get; }
-            public Expr LowRangeExpr { get; }
-            public Expr HighRangeExpr { get; }
-            public bool Negated { get; }
+            public Expr Expr { get; set; }
+            public Expr LowRangeExpr { get; set; }
+            public Expr HighRangeExpr { get; set; }
+            public bool Negated { get; set; }
 
             internal Token _notToken;
             internal Token _betweenToken;
@@ -138,8 +138,8 @@ namespace TSQL.AST
 
         public class Null : Predicate
         {
-            public Expr Expr { get; }
-            public bool Negated { get; }
+            public Expr Expr { get; set; }
+            public bool Negated { get; set; }
 
             internal Token _isToken;
             internal Token _notToken;
@@ -170,8 +170,8 @@ namespace TSQL.AST
 
         public class Contains : Predicate
         {
-            public Expr Column { get; }
-            public Expr SearchCondition { get; }
+            public Expr Column { get; set; }
+            public Expr SearchCondition { get; set; }
 
             internal Token _containsToken;
             internal Token _leftParen;
@@ -205,10 +205,10 @@ namespace TSQL.AST
 
         public class In : Predicate
         {
-            public Expr Expr { get; }
-            public bool Negated { get; }
-            public SyntaxElementList<Expr> ValueList { get; }
-            public Expr.Subquery Subquery { get; }
+            public Expr Expr { get; set; }
+            public bool Negated { get; set; }
+            public SyntaxElementList<Expr> ValueList { get; set; }
+            public Expr.Subquery Subquery { get; set; }
 
             internal Token _notToken;
             internal Token _inToken;
@@ -259,10 +259,10 @@ namespace TSQL.AST
 
         public class Quantifier : Predicate
         {
-            public Expr Left { get; }
-            public Token Operator { get; }
-            public Token QuantifierKeyword { get; }
-            public Expr.Subquery Subquery { get; }
+            public Expr Left { get; set; }
+            public Token Operator { get; set; }
+            public Token QuantifierKeyword { get; set; }
+            public Expr.Subquery Subquery { get; set; }
 
             internal Token _leftParen;
             internal Token _rightParen;
@@ -296,7 +296,7 @@ namespace TSQL.AST
 
         public class Exists : Predicate
         {
-            public Expr.Subquery Subquery { get; }
+            public Expr.Subquery Subquery { get; set; }
 
             internal Token _existsToken;
 
@@ -321,7 +321,7 @@ namespace TSQL.AST
 
         public class Grouping : Predicate
         {
-            public Predicate Predicate { get; }
+            public Predicate Predicate { get; set; }
 
             internal Token _leftParen;
             internal Token _rightParen;
@@ -348,8 +348,8 @@ namespace TSQL.AST
 
         public class And : Predicate
         {
-            public Predicate Left { get; }
-            public Predicate Right { get; }
+            public Predicate Left { get; set; }
+            public Predicate Right { get; set; }
 
             internal Token _andToken;
 
@@ -373,8 +373,8 @@ namespace TSQL.AST
 
         public class Or : Predicate
         {
-            public Predicate Left { get; }
-            public Predicate Right { get; }
+            public Predicate Left { get; set; }
+            public Predicate Right { get; set; }
 
             internal Token _orToken;
 
@@ -398,7 +398,7 @@ namespace TSQL.AST
 
         public class Not : Predicate
         {
-            public Predicate Predicate { get; }
+            public Predicate Predicate { get; set; }
 
             internal Token _notToken;
 
