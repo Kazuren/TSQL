@@ -49,7 +49,8 @@ namespace TSQL
             fully_qualified_identifier -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
 
             scalar_function -> function_call
-            function_call -> fully_qualified_identifier "(" (expression_list)? ")" 
+            function_call -> fully_qualified_identifier "(" (expression_list)? ")" (within_group_clause)?
+            within_group_clause -> "WITHIN" "GROUP" "(" "ORDER" "BY" order_by_item ("," order_by_item)* ")"
             expression_list -> expression ("," expression)*
 
             select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)? (option_clause)?
@@ -1712,6 +1713,12 @@ namespace TSQL
                     ObjectIdentifier functionIdentifier = FunctionIdentifier(parts);
                     FunctionCall functionCall = FinishCall(functionIdentifier);
 
+                    // Check for optional WITHIN GROUP clause
+                    if (Check(TokenType.WITHIN))
+                    {
+                        functionCall.WithinGroup = ParseWithinGroupClause();
+                    }
+
                     // Check for optional OVER clause
                     if (Check(TokenType.OVER))
                     {
@@ -1788,6 +1795,37 @@ namespace TSQL
         {
             return Check(TokenType.ROW_NUMBER) || Check(TokenType.RANK) ||
                    Check(TokenType.DENSE_RANK) || Check(TokenType.NTILE);
+        }
+
+        /// <summary>
+        /// Parses: WITHIN GROUP (ORDER BY order_by_item (, order_by_item)*)
+        /// </summary>
+        private Expr.WithinGroupClause ParseWithinGroupClause()
+        {
+            Token withinToken = Consume(TokenType.WITHIN, "Expected WITHIN");
+            Token groupToken = Consume(TokenType.GROUP, "Expected GROUP after WITHIN");
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after WITHIN GROUP");
+            Token orderToken = Consume(TokenType.ORDER, "Expected ORDER BY in WITHIN GROUP");
+            Token byToken = Consume(TokenType.BY, "Expected BY after ORDER");
+
+            SyntaxElementList<OrderByItem> orderBy = new SyntaxElementList<OrderByItem>();
+            orderBy.Add(ParseOrderByItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                orderBy.Add(ParseOrderByItem(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after WITHIN GROUP clause");
+
+            Expr.WithinGroupClause clause = new Expr.WithinGroupClause(orderBy);
+            clause._withinKeyword = withinToken;
+            clause._groupKeyword = groupToken;
+            clause._leftParen = leftParen;
+            clause._orderKeyword = orderToken;
+            clause._byKeyword = byToken;
+            clause._rightParen = rightParen;
+            return clause;
         }
 
         /// <summary>

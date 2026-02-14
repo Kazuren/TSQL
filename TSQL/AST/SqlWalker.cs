@@ -93,6 +93,13 @@ namespace TSQL
             {
                 Walk(arg);
             }
+            if (expr.WithinGroup != null)
+            {
+                foreach (OrderByItem item in expr.WithinGroup.OrderBy)
+                {
+                    Walk(item.Expression);
+                }
+            }
         }
 
         protected virtual void VisitVariable(Expr.Variable expr) { }

@@ -279,6 +279,35 @@ namespace TSQL
             }
         }
 
+        public class WithinGroupClause : SyntaxElement
+        {
+            public SyntaxElementList<OrderByItem> OrderBy { get; }
+
+            internal Token _withinKeyword;
+            internal Token _groupKeyword;
+            internal Token _leftParen;
+            internal Token _orderKeyword;
+            internal Token _byKeyword;
+            internal Token _rightParen;
+
+            public WithinGroupClause(SyntaxElementList<OrderByItem> orderBy)
+            {
+                OrderBy = orderBy;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _withinKeyword;
+                yield return _groupKeyword;
+                yield return _leftParen;
+                yield return _orderKeyword;
+                yield return _byKeyword;
+                foreach (Token token in OrderBy.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
+            }
+        }
+
         public class FunctionCall : Expr
         {
             private ObjectIdentifier _callee;
@@ -288,6 +317,7 @@ namespace TSQL
                 set => SetWithTrivia(ref _callee, value);
             }
             public SyntaxElementList<Expr> Arguments { get; set; }
+            public WithinGroupClause WithinGroup { get; set; }
 
             internal Token _leftParen;
             internal Token _rightParen;
@@ -318,6 +348,12 @@ namespace TSQL
                 }
 
                 yield return _rightParen;
+
+                if (WithinGroup != null)
+                {
+                    foreach (Token token in WithinGroup.DescendantTokens())
+                        yield return token;
+                }
             }
         }
 

@@ -2172,6 +2172,39 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region WITHIN GROUP Tests
+
+        [Theory]
+        [InlineData("SELECT STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY name) FROM T")]
+        [InlineData("SELECT STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY name ASC) FROM T")]
+        [InlineData("SELECT STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY name DESC) FROM T")]
+        [InlineData("SELECT STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY last_name, first_name) FROM T")]
+        public void Parse_WithinGroup_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_WithinGroup_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT STRING_AGG(name, ', ') WITHIN GROUP (ORDER BY name) FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
+            Assert.NotNull(call.WithinGroup);
+            Assert.Single(call.WithinGroup.OrderBy);
+        }
+
+        [Fact]
+        public void Parse_WithinGroup_WithoutClause()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT STRING_AGG(name, ', ') FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
+            Assert.Null(call.WithinGroup);
+        }
+
+        #endregion
+
         #region AT TIME ZONE Tests
 
         [Theory]
