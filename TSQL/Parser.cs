@@ -76,7 +76,9 @@ namespace TSQL
             like_predicate -> expression ("NOT")? "LIKE" expression ("ESCAPE" STRING)?
             between_predicate -> expression ("NOT")? "BETWEEN" expression "AND" expression
             null_predicate -> expression IS ("NOT")? "NULL"
-            contains_predicate -> "CONTAINS" "(" ( fully_qualified_identifier | "*" ) , STRING ")"
+            full_text_columns -> "*" | column_identifier | "(" column_identifier ("," column_identifier)* ")"
+            contains_predicate -> "CONTAINS" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
+            freetext_predicate -> "FREETEXT" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
             in_predicate -> expression ("NOT")? IN "(" ( select_expression | ( expression ("," expression)* ) ) ")"
             quantifier_predicate -> expression comparison_operator ("ALL" | "SOME" | "ANY" ) "(" select_expression ")"
             exists_predicate -> "EXISTS" "(" select_expression ")"
@@ -88,9 +90,9 @@ namespace TSQL
             or_predicate ->  and_predicate ("OR" and_predicate)*
             and_predicate -> unary_predicate ("AND" unary_predicate)*
             unary_predicate -> ("NOT")? unary_predicate | primary_predicate
-            primary_predicate -> 
-                comparison_predicate | like_comparison | between_predicate | 
-                null_predicate | contains_predicate | in_predicate | 
+            primary_predicate ->
+                comparison_predicate | like_comparison | between_predicate |
+                null_predicate | contains_predicate | freetext_predicate | in_predicate |
                 quantifier_predicate | exists_predicate | "(" predicate ")"
             ---------------- WHERE ---------------
     
@@ -217,6 +219,7 @@ namespace TSQL
             TokenType.CUBE,
             TokenType.GROUPING,
             TokenType.SETS,
+            TokenType.LANGUAGE,
             TokenType.TIES
         };
 
@@ -1202,6 +1205,48 @@ namespace TSQL
         }
 
 
+        /// <summary>
+        /// Parses the column argument for CONTAINS/FREETEXT: * | column | (column_list)
+        /// </summary>
+        private Predicate.FullTextColumns ParseFullTextColumns()
+        {
+            if (Check(TokenType.STAR))
+            {
+                Predicate.FullTextAllColumns allColumns = new Predicate.FullTextAllColumns();
+                allColumns._wildcardToken = Advance();
+                return allColumns;
+            }
+
+            if (Match(TokenType.LEFT_PAREN, out Token leftParen))
+            {
+                SyntaxElementList<Expr.ColumnIdentifier> columns = new SyntaxElementList<Expr.ColumnIdentifier>();
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
+                columns.Add(ColumnIdentifier(parts));
+
+                while (Match(TokenType.COMMA, out Token comma))
+                {
+                    parts = CollectIdentifierParts();
+                    columns.Add(ColumnIdentifier(parts), comma);
+                }
+
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after column list");
+
+                Predicate.FullTextColumnNames columnNames = new Predicate.FullTextColumnNames(columns);
+                columnNames._leftParen = leftParen;
+                columnNames._rightParen = rightParen;
+                return columnNames;
+            }
+
+            {
+                SyntaxElementList<Expr.ColumnIdentifier> columns = new SyntaxElementList<Expr.ColumnIdentifier>();
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
+                columns.Add(ColumnIdentifier(parts));
+
+                Predicate.FullTextColumnNames columnNames = new Predicate.FullTextColumnNames(columns);
+                return columnNames;
+            }
+        }
+
         #region Search Condition Parsing
 
         private Predicate SearchCondition()
@@ -1263,29 +1308,64 @@ namespace TSQL
                 return exists;
             }
 
-            // CONTAINS (column, search_condition)
+            // CONTAINS ( { column | (column_list) | * } , search_condition [, LANGUAGE language_term] )
             if (Match(TokenType.CONTAINS, out Token containsToken))
             {
-                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected ( after CONTAINS");
-                Expr column;
-                if (Check(TokenType.STAR))
-                {
-                    column = new Expr.Wildcard(Advance());
-                }
-                else
-                {
-                    column = Expression();
-                }
-                Token comma = Consume(TokenType.COMMA, "Expected , in CONTAINS");
+                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after CONTAINS");
+                Predicate.FullTextColumns columns = ParseFullTextColumns();
+                Token comma = Consume(TokenType.COMMA, "Expected ',' in CONTAINS");
                 Expr searchExpr = Expression();
-                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after CONTAINS");
 
-                Predicate.Contains contains = new Predicate.Contains(column, searchExpr);
+                Token languageComma = null;
+                Token languageKeyword = null;
+                Expr language = null;
+                if (Match(TokenType.COMMA, out languageComma))
+                {
+                    languageKeyword = Consume(TokenType.LANGUAGE, "Expected LANGUAGE keyword");
+                    language = Expression();
+                }
+
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after CONTAINS");
+
+                Predicate.Contains contains = new Predicate.Contains(columns, searchExpr);
                 contains._containsToken = containsToken;
                 contains._leftParen = leftParen;
                 contains._comma = comma;
+                contains._languageComma = languageComma;
+                contains._languageKeyword = languageKeyword;
+                contains.Language = language;
                 contains._rightParen = rightParen;
                 return contains;
+            }
+
+            // FREETEXT ( { column | (column_list) | * } , freetext_string [, LANGUAGE language_term] )
+            if (Match(TokenType.FREETEXT, out Token freetextToken))
+            {
+                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after FREETEXT");
+                Predicate.FullTextColumns columns = ParseFullTextColumns();
+                Token comma = Consume(TokenType.COMMA, "Expected ',' in FREETEXT");
+                Expr searchExpr = Expression();
+
+                Token languageComma = null;
+                Token languageKeyword = null;
+                Expr language = null;
+                if (Match(TokenType.COMMA, out languageComma))
+                {
+                    languageKeyword = Consume(TokenType.LANGUAGE, "Expected LANGUAGE keyword");
+                    language = Expression();
+                }
+
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after FREETEXT");
+
+                Predicate.Freetext freetext = new Predicate.Freetext(columns, searchExpr);
+                freetext._freetextToken = freetextToken;
+                freetext._leftParen = leftParen;
+                freetext._comma = comma;
+                freetext._languageComma = languageComma;
+                freetext._languageKeyword = languageKeyword;
+                freetext.Language = language;
+                freetext._rightParen = rightParen;
+                return freetext;
             }
 
             // Grouped predicate: (search_condition)

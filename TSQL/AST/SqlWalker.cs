@@ -191,8 +191,33 @@ namespace TSQL
 
         protected virtual void VisitContains(Predicate.Contains pred)
         {
-            Walk(pred.Column);
+            WalkFullTextColumns(pred.Columns);
             Walk(pred.SearchCondition);
+            if (pred.Language != null)
+            {
+                Walk(pred.Language);
+            }
+        }
+
+        protected virtual void VisitFreetext(Predicate.Freetext pred)
+        {
+            WalkFullTextColumns(pred.Columns);
+            Walk(pred.SearchCondition);
+            if (pred.Language != null)
+            {
+                Walk(pred.Language);
+            }
+        }
+
+        private void WalkFullTextColumns(Predicate.FullTextColumns columns)
+        {
+            if (columns is Predicate.FullTextColumnNames columnNames)
+            {
+                foreach (Expr.ColumnIdentifier col in columnNames.Columns)
+                {
+                    Walk(col);
+                }
+            }
         }
 
         protected virtual void VisitIn(Predicate.In pred)
@@ -424,6 +449,7 @@ namespace TSQL
         object Predicate.Visitor<object>.VisitBetweenPredicate(Predicate.Between pred) { VisitBetween(pred); return null; }
         object Predicate.Visitor<object>.VisitNullPredicate(Predicate.Null pred) { VisitNull(pred); return null; }
         object Predicate.Visitor<object>.VisitContainsPredicate(Predicate.Contains pred) { VisitContains(pred); return null; }
+        object Predicate.Visitor<object>.VisitFreetextPredicate(Predicate.Freetext pred) { VisitFreetext(pred); return null; }
         object Predicate.Visitor<object>.VisitInPredicate(Predicate.In pred) { VisitIn(pred); return null; }
         object Predicate.Visitor<object>.VisitQuantifierPredicate(Predicate.Quantifier pred) { VisitQuantifier(pred); return null; }
         object Predicate.Visitor<object>.VisitExistsPredicate(Predicate.Exists pred) { VisitExists(pred); return null; }

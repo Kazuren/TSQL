@@ -190,8 +190,20 @@ namespace TSQL.StandardLibrary.Visitors
 
             protected override void VisitContains(Predicate.Contains pred)
             {
-                pred.Column = TryReplace(pred.Column);
                 pred.SearchCondition = TryReplace(pred.SearchCondition);
+                if (pred.Language != null)
+                {
+                    pred.Language = TryReplace(pred.Language);
+                }
+            }
+
+            protected override void VisitFreetext(Predicate.Freetext pred)
+            {
+                pred.SearchCondition = TryReplace(pred.SearchCondition);
+                if (pred.Language != null)
+                {
+                    pred.Language = TryReplace(pred.Language);
+                }
             }
 
             protected override void VisitIn(Predicate.In pred)

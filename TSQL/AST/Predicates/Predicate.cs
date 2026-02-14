@@ -13,6 +13,7 @@ namespace TSQL.AST
             T VisitBetweenPredicate(Between predicate);
             T VisitNullPredicate(Null predicate);
             T VisitContainsPredicate(Contains predicate);
+            T VisitFreetextPredicate(Freetext predicate);
             T VisitInPredicate(In predicate);
             T VisitQuantifierPredicate(Quantifier predicate);
             T VisitExistsPredicate(Exists predicate);
@@ -211,31 +212,77 @@ namespace TSQL.AST
 
         #endregion
 
+        #region Full-Text Column Argument
+
+        /// <summary>
+        /// Column argument for CONTAINS/FREETEXT: either * or a list of column identifiers.
+        /// </summary>
+        public abstract class FullTextColumns : SyntaxElement { }
+
+        /// <summary>All full-text indexed columns: *</summary>
+        public class FullTextAllColumns : FullTextColumns
+        {
+            internal Token _wildcardToken;
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _wildcardToken;
+            }
+        }
+
+        /// <summary>One or more column identifiers, optionally parenthesized.</summary>
+        public class FullTextColumnNames : FullTextColumns
+        {
+            public SyntaxElementList<Expr.ColumnIdentifier> Columns { get; }
+
+            internal Token _leftParen;
+            internal Token _rightParen;
+
+            public FullTextColumnNames(SyntaxElementList<Expr.ColumnIdentifier> columns)
+            {
+                Columns = columns;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                if (_leftParen != null)
+                {
+                    yield return _leftParen;
+                }
+                foreach (Token token in Columns.DescendantTokens())
+                    yield return token;
+                if (_rightParen != null)
+                {
+                    yield return _rightParen;
+                }
+            }
+        }
+
+        #endregion
+
         #region CONTAINS Predicate
 
         public class Contains : Predicate
         {
-            private Expr _column;
-            public Expr Column
-            {
-                get => _column;
-                set => SetWithTrivia(ref _column, value);
-            }
+            public FullTextColumns Columns { get; }
             private Expr _searchCondition;
             public Expr SearchCondition
             {
                 get => _searchCondition;
                 set => SetWithTrivia(ref _searchCondition, value);
             }
+            public Expr Language { get; set; }
 
             internal Token _containsToken;
             internal Token _leftParen;
             internal Token _comma;
+            internal Token _languageComma;
+            internal Token _languageKeyword;
             internal Token _rightParen;
 
-            public Contains(Expr column, Expr searchCondition)
+            public Contains(FullTextColumns columns, Expr searchCondition)
             {
-                _column = column;
+                Columns = columns;
                 _searchCondition = searchCondition;
             }
 
@@ -245,11 +292,68 @@ namespace TSQL.AST
             {
                 yield return _containsToken;
                 yield return _leftParen;
-                foreach (Token token in Column.DescendantTokens())
+                foreach (Token token in Columns.DescendantTokens())
                     yield return token;
                 yield return _comma;
                 foreach (Token token in SearchCondition.DescendantTokens())
                     yield return token;
+                if (Language != null)
+                {
+                    yield return _languageComma;
+                    yield return _languageKeyword;
+                    foreach (Token token in Language.DescendantTokens())
+                        yield return token;
+                }
+                yield return _rightParen;
+            }
+        }
+
+        #endregion
+
+        #region FREETEXT Predicate
+
+        public class Freetext : Predicate
+        {
+            public FullTextColumns Columns { get; }
+            private Expr _searchCondition;
+            public Expr SearchCondition
+            {
+                get => _searchCondition;
+                set => SetWithTrivia(ref _searchCondition, value);
+            }
+            public Expr Language { get; set; }
+
+            internal Token _freetextToken;
+            internal Token _leftParen;
+            internal Token _comma;
+            internal Token _languageComma;
+            internal Token _languageKeyword;
+            internal Token _rightParen;
+
+            public Freetext(FullTextColumns columns, Expr searchCondition)
+            {
+                Columns = columns;
+                _searchCondition = searchCondition;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitFreetextPredicate(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _freetextToken;
+                yield return _leftParen;
+                foreach (Token token in Columns.DescendantTokens())
+                    yield return token;
+                yield return _comma;
+                foreach (Token token in SearchCondition.DescendantTokens())
+                    yield return token;
+                if (Language != null)
+                {
+                    yield return _languageComma;
+                    yield return _languageKeyword;
+                    foreach (Token token in Language.DescendantTokens())
+                        yield return token;
+                }
                 yield return _rightParen;
             }
         }

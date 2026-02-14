@@ -55,6 +55,9 @@ namespace TSQL
         // GROUP BY keywords (contextual - can also be used as identifiers)
         ROLLUP, CUBE, GROUPING, SETS,
 
+        // Full-text search keywords (contextual - can also be used as identifiers)
+        LANGUAGE,
+
         // TOP clause keywords (contextual - can also be used as identifiers)
         TIES
     }

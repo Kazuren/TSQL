@@ -2171,5 +2171,95 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region CONTAINS / FREETEXT Tests
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE CONTAINS(a, 'test')")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS(*, 'test')")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS((a, b), 'test')")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS((a, b, c), 'test')")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS(a, 'test', LANGUAGE 1033)")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS(*, 'test', LANGUAGE @lang)")]
+        [InlineData("SELECT a FROM T WHERE CONTAINS(dbo.T.col, 'test')")]
+        public void Parse_Contains_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE FREETEXT(a, 'search term')")]
+        [InlineData("SELECT a FROM T WHERE FREETEXT(*, 'search term')")]
+        [InlineData("SELECT a FROM T WHERE FREETEXT((a, b), 'search term')")]
+        [InlineData("SELECT a FROM T WHERE FREETEXT((a, b, c), 'search term')")]
+        [InlineData("SELECT a FROM T WHERE FREETEXT(a, 'search term', LANGUAGE 1033)")]
+        [InlineData("SELECT a FROM T WHERE FREETEXT(*, 'search term', LANGUAGE @lang)")]
+        public void Parse_Freetext_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Contains_WithStar_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE CONTAINS(*, 'test')");
+            AST.Predicate.Contains contains = Assert.IsType<AST.Predicate.Contains>(stmt.SelectExpression.Where);
+            Assert.IsType<AST.Predicate.FullTextAllColumns>(contains.Columns);
+        }
+
+        [Fact]
+        public void Parse_Contains_WithSingleColumn_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE CONTAINS(col1, 'test')");
+            AST.Predicate.Contains contains = Assert.IsType<AST.Predicate.Contains>(stmt.SelectExpression.Where);
+            AST.Predicate.FullTextColumnNames columnNames = Assert.IsType<AST.Predicate.FullTextColumnNames>(contains.Columns);
+            Assert.Single(columnNames.Columns);
+            Assert.Equal("col1", columnNames.Columns[0].ColumnName.Name);
+        }
+
+        [Fact]
+        public void Parse_Contains_WithColumnList_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE CONTAINS((col1, col2), 'test')");
+            AST.Predicate.Contains contains = Assert.IsType<AST.Predicate.Contains>(stmt.SelectExpression.Where);
+            AST.Predicate.FullTextColumnNames columnNames = Assert.IsType<AST.Predicate.FullTextColumnNames>(contains.Columns);
+            Assert.Equal(2, columnNames.Columns.Count);
+            Assert.Equal("col1", columnNames.Columns[0].ColumnName.Name);
+            Assert.Equal("col2", columnNames.Columns[1].ColumnName.Name);
+        }
+
+        [Fact]
+        public void Parse_Contains_WithLanguage_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE CONTAINS(a, 'test', LANGUAGE 1033)");
+            AST.Predicate.Contains contains = Assert.IsType<AST.Predicate.Contains>(stmt.SelectExpression.Where);
+            Assert.NotNull(contains.Language);
+        }
+
+        [Fact]
+        public void Parse_Freetext_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE FREETEXT(col1, 'search')");
+            AST.Predicate.Freetext freetext = Assert.IsType<AST.Predicate.Freetext>(stmt.SelectExpression.Where);
+            AST.Predicate.FullTextColumnNames columnNames = Assert.IsType<AST.Predicate.FullTextColumnNames>(freetext.Columns);
+            Assert.Single(columnNames.Columns);
+            Assert.Equal("col1", columnNames.Columns[0].ColumnName.Name);
+        }
+
+        [Fact]
+        public void Parse_Language_WorksAsIdentifier()
+        {
+            string source = "SELECT LANGUAGE FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Language_WorksAsAlias()
+        {
+            string source = "SELECT a AS LANGUAGE FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
     }
 }
