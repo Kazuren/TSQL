@@ -3017,23 +3017,13 @@ namespace TSQL
             // LOOP JOIN
             if (Check(TokenType.LOOP))
             {
-                Token hintToken = Advance();
-                Token second = Consume(TokenType.JOIN, "Expected JOIN after LOOP");
-                QueryHint hint = new QueryHint(QueryHintType.LoopJoin);
-                hint._hintToken = hintToken;
-                hint._hintToken2 = second;
-                return hint;
+                return ParseTwoTokenQueryHint(QueryHintType.LoopJoin, TokenType.JOIN);
             }
 
             // ORDER GROUP
             if (Check(TokenType.ORDER))
             {
-                Token hintToken = Advance();
-                Token second = Consume(TokenType.GROUP, "Expected GROUP after ORDER");
-                QueryHint hint = new QueryHint(QueryHintType.OrderGroup);
-                hint._hintToken = hintToken;
-                hint._hintToken2 = second;
-                return hint;
+                return ParseTwoTokenQueryHint(QueryHintType.OrderGroup, TokenType.GROUP);
             }
 
             // USE HINT / USE PLAN
@@ -3096,7 +3086,7 @@ namespace TSQL
             // EXPAND VIEWS
             if (Check(TokenType.EXPAND))
             {
-                return ParseTwoTokenHint(QueryHintType.ExpandViews, TokenType.VIEWS);
+                return ParseTwoTokenQueryHint(QueryHintType.ExpandViews, TokenType.VIEWS);
             }
 
             // FORCE ORDER / FORCE EXTERNALPUSHDOWN / FORCE SCALEOUTEXECUTION
@@ -3124,59 +3114,68 @@ namespace TSQL
             // KEEP PLAN
             if (Check(TokenType.KEEP))
             {
-                return ParseTwoTokenHintWithPlan(QueryHintType.KeepPlan);
+                return ParseTwoTokenQueryHint(QueryHintType.KeepPlan, TokenType.PLAN);
             }
 
             // KEEPFIXED PLAN
             if (Check(TokenType.KEEPFIXED))
             {
-                return ParseTwoTokenHintWithPlan(QueryHintType.KeepfixedPlan);
+                return ParseTwoTokenQueryHint(QueryHintType.KeepfixedPlan, TokenType.PLAN);
             }
 
             // ROBUST PLAN
             if (Check(TokenType.ROBUST))
             {
-                return ParseTwoTokenHintWithPlan(QueryHintType.RobustPlan);
+                return ParseTwoTokenQueryHint(QueryHintType.RobustPlan, TokenType.PLAN);
             }
 
             // CONCAT UNION
             if (Check(TokenType.CONCAT))
             {
-                Token hintToken = Advance();
-                Token second = Consume(TokenType.UNION, "Expected UNION after CONCAT");
-                QueryHint hint = new QueryHint(QueryHintType.ConcatUnion);
-                hint._hintToken = hintToken;
-                hint._hintToken2 = second;
-                return hint;
+                return ParseTwoTokenQueryHint(QueryHintType.ConcatUnion, TokenType.UNION);
             }
 
             // FAST N
             if (Check(TokenType.FAST))
+            {
                 return ParseValueHint(QueryHintType.Fast);
+            }
 
             // MAXDOP N
             if (Check(TokenType.MAXDOP))
+            {
                 return ParseValueHint(QueryHintType.Maxdop);
+            }
 
             // MAXRECURSION N
             if (Check(TokenType.MAXRECURSION))
+            {
                 return ParseValueHint(QueryHintType.Maxrecursion);
+            }
 
             // QUERYTRACEON N
             if (Check(TokenType.QUERYTRACEON))
+            {
                 return ParseValueHint(QueryHintType.QueryTraceOn);
+            }
 
             // MAX_GRANT_PERCENT = N
             if (Check(TokenType.MAX_GRANT_PERCENT))
+            {
                 return ParseEqualsValueHint(QueryHintType.MaxGrantPercent);
+            }
 
             // MIN_GRANT_PERCENT = N
             if (Check(TokenType.MIN_GRANT_PERCENT))
+            {
                 return ParseEqualsValueHint(QueryHintType.MinGrantPercent);
+            }
 
             // LABEL = 'name'
             if (Check(TokenType.LABEL))
+            {
                 return ParseEqualsValueHint(QueryHintType.Label);
+            }
 
             // PARAMETERIZATION { SIMPLE | FORCED }
             if (Check(TokenType.PARAMETERIZATION))
@@ -3198,25 +3197,12 @@ namespace TSQL
         }
 
         /// <summary>
-        /// Helper: two-token hint where second token is an identifier (e.g., EXPAND VIEWS)
+        /// Helper: two-token query hint (e.g., EXPAND VIEWS, KEEP PLAN, LOOP JOIN)
         /// </summary>
-        private QueryHint ParseTwoTokenHint(QueryHintType type, TokenType expectedSecond)
+        private QueryHint ParseTwoTokenQueryHint(QueryHintType type, TokenType expectedSecond)
         {
             Token hintToken = Advance();
             Token second = Consume(expectedSecond, "Expected " + expectedSecond);
-            QueryHint hint = new QueryHint(type);
-            hint._hintToken = hintToken;
-            hint._hintToken2 = second;
-            return hint;
-        }
-
-        /// <summary>
-        /// Helper: two-token hint where second token is PLAN keyword (KEEP PLAN, KEEPFIXED PLAN, ROBUST PLAN)
-        /// </summary>
-        private QueryHint ParseTwoTokenHintWithPlan(QueryHintType type)
-        {
-            Token hintToken = Advance();
-            Token second = Consume(TokenType.PLAN, "Expected PLAN");
             QueryHint hint = new QueryHint(type);
             hint._hintToken = hintToken;
             hint._hintToken2 = second;
