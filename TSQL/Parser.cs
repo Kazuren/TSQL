@@ -260,7 +260,57 @@ namespace TSQL
             TokenType.XSINIL,
             TokenType.ABSENT,
             TokenType.INCLUDE_NULL_VALUES,
-            TokenType.WITHOUT_ARRAY_WRAPPER
+            TokenType.WITHOUT_ARRAY_WRAPPER,
+            // Table hint keywords
+            TokenType.NOEXPAND,
+            TokenType.FORCESCAN,
+            TokenType.FORCESEEK,
+            TokenType.NOLOCK,
+            TokenType.NOWAIT,
+            TokenType.PAGLOCK,
+            TokenType.READCOMMITTED,
+            TokenType.READCOMMITTEDLOCK,
+            TokenType.READPAST,
+            TokenType.READUNCOMMITTED,
+            TokenType.REPEATABLEREAD,
+            TokenType.ROWLOCK,
+            TokenType.SERIALIZABLE,
+            TokenType.SNAPSHOT,
+            TokenType.SPATIAL_WINDOW_MAX_CELLS,
+            TokenType.TABLOCK,
+            TokenType.TABLOCKX,
+            TokenType.UPDLOCK,
+            TokenType.XLOCK,
+            // Query hint keywords
+            TokenType.CONCAT,
+            TokenType.DISABLE,
+            TokenType.DISABLE_OPTIMIZED_PLAN_FORCING,
+            TokenType.EXPAND,
+            TokenType.EXTERNALPUSHDOWN,
+            TokenType.FAST,
+            TokenType.FORCE,
+            TokenType.HINT,
+            TokenType.IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX,
+            TokenType.KEEP,
+            TokenType.KEEPFIXED,
+            TokenType.LABEL,
+            TokenType.MAX_GRANT_PERCENT,
+            TokenType.MAXDOP,
+            TokenType.MAXRECURSION,
+            TokenType.MIN_GRANT_PERCENT,
+            TokenType.NO_PERFORMANCE_SPOOL,
+            TokenType.OPTIMIZE,
+            TokenType.PARAMETERIZATION,
+            TokenType.QUERYTRACEON,
+            TokenType.RECOMPILE,
+            TokenType.ROBUST,
+            TokenType.SCALEOUTEXECUTION,
+            TokenType.UNKNOWN,
+            TokenType.VIEWS,
+            // Temporal table keywords
+            TokenType.SYSTEM_TIME,
+            // Miscellaneous hint keywords
+            TokenType.TIMESTAMP
         };
 
         public Parser(IEnumerable<Token> tokens)
@@ -847,14 +897,13 @@ namespace TSQL
         private bool IsSystemTimeLookahead()
         {
             Token next = PeekNext();
-            return next != null && next.Type == TokenType.IDENTIFIER &&
-                   next.Lexeme.Equals("SYSTEM_TIME", StringComparison.OrdinalIgnoreCase);
+            return next != null && next.Type == TokenType.SYSTEM_TIME;
         }
 
         private ForSystemTimeClause ParseForSystemTimeClause()
         {
             Token forToken = Consume(TokenType.FOR, "Expected FOR");
-            Token systemTimeToken = Consume(TokenType.IDENTIFIER, "Expected SYSTEM_TIME");
+            Token systemTimeToken = Consume(TokenType.SYSTEM_TIME, "Expected SYSTEM_TIME");
 
             if (Match(TokenType.AS, out Token asToken))
             {
@@ -990,26 +1039,26 @@ namespace TSQL
             return clause;
         }
 
-        private static readonly Dictionary<string, TableHintType> SimpleTableHints =
-            new Dictionary<string, TableHintType>(StringComparer.OrdinalIgnoreCase)
+        private static readonly Dictionary<TokenType, TableHintType> SimpleTableHints =
+            new Dictionary<TokenType, TableHintType>
             {
-                { "NOEXPAND", TableHintType.NoExpand },
-                { "FORCESCAN", TableHintType.ForceScan },
-                { "NOLOCK", TableHintType.NoLock },
-                { "NOWAIT", TableHintType.NoWait },
-                { "PAGLOCK", TableHintType.PageLock },
-                { "READCOMMITTED", TableHintType.ReadCommitted },
-                { "READCOMMITTEDLOCK", TableHintType.ReadCommittedLock },
-                { "READPAST", TableHintType.ReadPast },
-                { "READUNCOMMITTED", TableHintType.ReadUncommitted },
-                { "REPEATABLEREAD", TableHintType.RepeatableRead },
-                { "ROWLOCK", TableHintType.RowLock },
-                { "SERIALIZABLE", TableHintType.Serializable },
-                { "SNAPSHOT", TableHintType.Snapshot },
-                { "TABLOCK", TableHintType.TabLock },
-                { "TABLOCKX", TableHintType.TabLockX },
-                { "UPDLOCK", TableHintType.UpdLock },
-                { "XLOCK", TableHintType.XLock },
+                { TokenType.NOEXPAND, TableHintType.NoExpand },
+                { TokenType.FORCESCAN, TableHintType.ForceScan },
+                { TokenType.NOLOCK, TableHintType.NoLock },
+                { TokenType.NOWAIT, TableHintType.NoWait },
+                { TokenType.PAGLOCK, TableHintType.PageLock },
+                { TokenType.READCOMMITTED, TableHintType.ReadCommitted },
+                { TokenType.READCOMMITTEDLOCK, TableHintType.ReadCommittedLock },
+                { TokenType.READPAST, TableHintType.ReadPast },
+                { TokenType.READUNCOMMITTED, TableHintType.ReadUncommitted },
+                { TokenType.REPEATABLEREAD, TableHintType.RepeatableRead },
+                { TokenType.ROWLOCK, TableHintType.RowLock },
+                { TokenType.SERIALIZABLE, TableHintType.Serializable },
+                { TokenType.SNAPSHOT, TableHintType.Snapshot },
+                { TokenType.TABLOCK, TableHintType.TabLock },
+                { TokenType.TABLOCKX, TableHintType.TabLockX },
+                { TokenType.UPDLOCK, TableHintType.UpdLock },
+                { TokenType.XLOCK, TableHintType.XLock },
             };
 
         private TableHintClause ParseTableHintClause()
@@ -1079,65 +1128,59 @@ namespace TSQL
                 return hint;
             }
 
-            // Identifier-based hints
-            if (Check(TokenType.IDENTIFIER))
+            // Simple keyword hints
+            if (SimpleTableHints.TryGetValue(hintToken.Type, out TableHintType hintType))
             {
-                string lexeme = hintToken.Lexeme;
+                Advance();
+                TableHint hint = new TableHint(hintType);
+                hint._hintToken = hintToken;
+                return hint;
+            }
 
-                // Simple keyword hints
-                if (SimpleTableHints.TryGetValue(lexeme, out TableHintType hintType))
+            // FORCESEEK with optional parameters
+            if (Check(TokenType.FORCESEEK))
+            {
+                Advance();
+                TableHint hint;
+                if (Check(TokenType.LEFT_PAREN))
                 {
-                    Advance();
-                    TableHint hint = new TableHint(hintType);
-                    hint._hintToken = hintToken;
-                    return hint;
-                }
-
-                // FORCESEEK with optional parameters
-                if (lexeme.Equals("FORCESEEK", StringComparison.OrdinalIgnoreCase))
-                {
-                    Advance();
-                    TableHint hint;
-                    if (Check(TokenType.LEFT_PAREN))
+                    Token fsLeftParen = Advance();
+                    Expr indexValue = Expression();
+                    Token innerLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
+                    SyntaxElementList<ColumnName> columns = new SyntaxElementList<ColumnName>();
+                    columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+                    while (Match(TokenType.COMMA, out Token comma))
                     {
-                        Token fsLeftParen = Advance();
-                        Expr indexValue = Expression();
-                        Token innerLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
-                        SyntaxElementList<ColumnName> columns = new SyntaxElementList<ColumnName>();
-                        columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
-                        while (Match(TokenType.COMMA, out Token comma))
-                        {
-                            columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
-                        }
-                        Token innerRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
-                        Token fsRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+                        columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                    }
+                    Token innerRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+                    Token fsRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
 
-                        hint = new TableHint(TableHintType.ForceSeek, indexValue, columns);
-                        hint._leftParen = fsLeftParen;
-                        hint._innerLeftParen = innerLeftParen;
-                        hint._innerRightParen = innerRightParen;
-                        hint._rightParen = fsRightParen;
-                    }
-                    else
-                    {
-                        hint = new TableHint(TableHintType.ForceSeek);
-                    }
-                    hint._hintToken = hintToken;
-                    return hint;
+                    hint = new TableHint(TableHintType.ForceSeek, indexValue, columns);
+                    hint._leftParen = fsLeftParen;
+                    hint._innerLeftParen = innerLeftParen;
+                    hint._innerRightParen = innerRightParen;
+                    hint._rightParen = fsRightParen;
                 }
-
-                // SPATIAL_WINDOW_MAX_CELLS = N
-                if (lexeme.Equals("SPATIAL_WINDOW_MAX_CELLS", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    Advance();
-                    Token equalsToken = Consume(TokenType.EQUAL, "Expected =");
-                    Expr value = Expression();
-
-                    TableHint hint = new TableHint(TableHintType.SpatialWindowMaxCells, value);
-                    hint._hintToken = hintToken;
-                    hint._equalsToken = equalsToken;
-                    return hint;
+                    hint = new TableHint(TableHintType.ForceSeek);
                 }
+                hint._hintToken = hintToken;
+                return hint;
+            }
+
+            // SPATIAL_WINDOW_MAX_CELLS = N
+            if (Check(TokenType.SPATIAL_WINDOW_MAX_CELLS))
+            {
+                Advance();
+                Token equalsToken = Consume(TokenType.EQUAL, "Expected =");
+                Expr value = Expression();
+
+                TableHint hint = new TableHint(TableHintType.SpatialWindowMaxCells, value);
+                hint._hintToken = hintToken;
+                hint._equalsToken = equalsToken;
+                return hint;
             }
 
             throw Error(Peek(), "Expected table hint");
@@ -2651,13 +2694,13 @@ namespace TSQL
 
         #region OPTION / Query Hint Parsing
 
-        private static readonly Dictionary<string, QueryHintType> SimpleQueryHints =
-            new Dictionary<string, QueryHintType>(StringComparer.OrdinalIgnoreCase)
+        private static readonly Dictionary<TokenType, QueryHintType> SimpleQueryHints =
+            new Dictionary<TokenType, QueryHintType>
             {
-                { "RECOMPILE", QueryHintType.Recompile },
-                { "NO_PERFORMANCE_SPOOL", QueryHintType.NoPerformanceSpool },
-                { "IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX", QueryHintType.IgnoreNonclusteredColumnstoreIndex },
-                { "DISABLE_OPTIMIZED_PLAN_FORCING", QueryHintType.DisableOptimizedPlanForcing },
+                { TokenType.RECOMPILE, QueryHintType.Recompile },
+                { TokenType.NO_PERFORMANCE_SPOOL, QueryHintType.NoPerformanceSpool },
+                { TokenType.IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX, QueryHintType.IgnoreNonclusteredColumnstoreIndex },
+                { TokenType.DISABLE_OPTIMIZED_PLAN_FORCING, QueryHintType.DisableOptimizedPlanForcing },
             };
 
         #region FOR Clause
@@ -2997,7 +3040,7 @@ namespace TSQL
             if (Check(TokenType.USE))
             {
                 Token hintToken = Advance();
-                if (IsIdentifierWithLexeme("HINT"))
+                if (Check(TokenType.HINT))
                 {
                     return ParseUseHint(hintToken);
                 }
@@ -3014,7 +3057,7 @@ namespace TSQL
             if (Check(TokenType.FOR))
             {
                 Token forToken = Advance();
-                if (IsIdentifierWithLexeme("TIMESTAMP"))
+                if (Check(TokenType.TIMESTAMP))
                 {
                     Token timestampToken = Advance();
                     Token asToken = Consume(TokenType.AS, "Expected AS after TIMESTAMP");
@@ -3034,127 +3077,121 @@ namespace TSQL
             if (Check(TokenType.TABLE))
             {
                 Token tableToken = Advance();
-                if (IsIdentifierWithLexeme("HINT"))
+                if (Check(TokenType.HINT))
                 {
                     return ParseTableHintQueryHint(tableToken);
                 }
                 throw Error(Peek(), "Expected HINT after TABLE");
             }
 
-            // --- Identifier lexeme dispatch ---
-            if (IsIdentifierOrContextualKeyword())
+            // Simple single-token hints
+            if (SimpleQueryHints.TryGetValue(Peek().Type, out QueryHintType simpleType))
             {
-                string lexeme = Peek().Lexeme;
+                Token hintToken = Advance();
+                QueryHint hint = new QueryHint(simpleType);
+                hint._hintToken = hintToken;
+                return hint;
+            }
 
-                // Simple single-token hints
-                if (SimpleQueryHints.TryGetValue(lexeme, out QueryHintType simpleType))
-                {
-                    Token hintToken = Advance();
-                    QueryHint hint = new QueryHint(simpleType);
-                    hint._hintToken = hintToken;
-                    return hint;
-                }
+            // EXPAND VIEWS
+            if (Check(TokenType.EXPAND))
+            {
+                return ParseTwoTokenHint(QueryHintType.ExpandViews, TokenType.VIEWS);
+            }
 
-                // EXPAND VIEWS
-                if (lexeme.Equals("EXPAND", StringComparison.OrdinalIgnoreCase))
+            // FORCE ORDER / FORCE EXTERNALPUSHDOWN / FORCE SCALEOUTEXECUTION
+            if (Check(TokenType.FORCE))
+            {
+                Token hintToken = Advance();
+                if (Check(TokenType.ORDER))
                 {
-                    return ParseTwoTokenHint(QueryHintType.ExpandViews, "VIEWS");
-                }
-
-                // FORCE ORDER / FORCE EXTERNALPUSHDOWN / FORCE SCALEOUTEXECUTION
-                if (lexeme.Equals("FORCE", StringComparison.OrdinalIgnoreCase))
-                {
-                    Token hintToken = Advance();
-                    if (Check(TokenType.ORDER))
-                    {
-                        Token second = Advance();
-                        QueryHint hint = new QueryHint(QueryHintType.ForceOrder);
-                        hint._hintToken = hintToken;
-                        hint._hintToken2 = second;
-                        return hint;
-                    }
-                    return ParseForceOrDisableHint(hintToken, true);
-                }
-
-                // DISABLE EXTERNALPUSHDOWN / DISABLE SCALEOUTEXECUTION
-                if (lexeme.Equals("DISABLE", StringComparison.OrdinalIgnoreCase))
-                {
-                    Token hintToken = Advance();
-                    return ParseForceOrDisableHint(hintToken, false);
-                }
-
-                // KEEP PLAN
-                if (lexeme.Equals("KEEP", StringComparison.OrdinalIgnoreCase))
-                {
-                    return ParseTwoTokenHintWithPlan(QueryHintType.KeepPlan);
-                }
-
-                // KEEPFIXED PLAN
-                if (lexeme.Equals("KEEPFIXED", StringComparison.OrdinalIgnoreCase))
-                {
-                    return ParseTwoTokenHintWithPlan(QueryHintType.KeepfixedPlan);
-                }
-
-                // ROBUST PLAN
-                if (lexeme.Equals("ROBUST", StringComparison.OrdinalIgnoreCase))
-                {
-                    return ParseTwoTokenHintWithPlan(QueryHintType.RobustPlan);
-                }
-
-                // CONCAT UNION
-                if (lexeme.Equals("CONCAT", StringComparison.OrdinalIgnoreCase))
-                {
-                    Token hintToken = Advance();
-                    Token second = Consume(TokenType.UNION, "Expected UNION after CONCAT");
-                    QueryHint hint = new QueryHint(QueryHintType.ConcatUnion);
+                    Token second = Advance();
+                    QueryHint hint = new QueryHint(QueryHintType.ForceOrder);
                     hint._hintToken = hintToken;
                     hint._hintToken2 = second;
                     return hint;
                 }
+                return ParseForceOrDisableHint(hintToken, true);
+            }
 
-                // FAST N
-                if (lexeme.Equals("FAST", StringComparison.OrdinalIgnoreCase))
-                    return ParseValueHint(QueryHintType.Fast);
+            // DISABLE EXTERNALPUSHDOWN / DISABLE SCALEOUTEXECUTION
+            if (Check(TokenType.DISABLE))
+            {
+                Token hintToken = Advance();
+                return ParseForceOrDisableHint(hintToken, false);
+            }
 
-                // MAXDOP N
-                if (lexeme.Equals("MAXDOP", StringComparison.OrdinalIgnoreCase))
-                    return ParseValueHint(QueryHintType.Maxdop);
+            // KEEP PLAN
+            if (Check(TokenType.KEEP))
+            {
+                return ParseTwoTokenHintWithPlan(QueryHintType.KeepPlan);
+            }
 
-                // MAXRECURSION N
-                if (lexeme.Equals("MAXRECURSION", StringComparison.OrdinalIgnoreCase))
-                    return ParseValueHint(QueryHintType.Maxrecursion);
+            // KEEPFIXED PLAN
+            if (Check(TokenType.KEEPFIXED))
+            {
+                return ParseTwoTokenHintWithPlan(QueryHintType.KeepfixedPlan);
+            }
 
-                // QUERYTRACEON N
-                if (lexeme.Equals("QUERYTRACEON", StringComparison.OrdinalIgnoreCase))
-                    return ParseValueHint(QueryHintType.QueryTraceOn);
+            // ROBUST PLAN
+            if (Check(TokenType.ROBUST))
+            {
+                return ParseTwoTokenHintWithPlan(QueryHintType.RobustPlan);
+            }
 
-                // MAX_GRANT_PERCENT = N
-                if (lexeme.Equals("MAX_GRANT_PERCENT", StringComparison.OrdinalIgnoreCase))
-                    return ParseEqualsValueHint(QueryHintType.MaxGrantPercent);
+            // CONCAT UNION
+            if (Check(TokenType.CONCAT))
+            {
+                Token hintToken = Advance();
+                Token second = Consume(TokenType.UNION, "Expected UNION after CONCAT");
+                QueryHint hint = new QueryHint(QueryHintType.ConcatUnion);
+                hint._hintToken = hintToken;
+                hint._hintToken2 = second;
+                return hint;
+            }
 
-                // MIN_GRANT_PERCENT = N
-                if (lexeme.Equals("MIN_GRANT_PERCENT", StringComparison.OrdinalIgnoreCase))
-                    return ParseEqualsValueHint(QueryHintType.MinGrantPercent);
+            // FAST N
+            if (Check(TokenType.FAST))
+                return ParseValueHint(QueryHintType.Fast);
 
-                // LABEL = 'name'
-                if (lexeme.Equals("LABEL", StringComparison.OrdinalIgnoreCase))
-                    return ParseEqualsValueHint(QueryHintType.Label);
+            // MAXDOP N
+            if (Check(TokenType.MAXDOP))
+                return ParseValueHint(QueryHintType.Maxdop);
 
-                // PARAMETERIZATION { SIMPLE | FORCED }
-                if (lexeme.Equals("PARAMETERIZATION", StringComparison.OrdinalIgnoreCase))
-                {
-                    Token hintToken = Advance();
-                    Token modeToken = ConsumeIdentifierOrContextualKeyword("Expected SIMPLE or FORCED");
-                    QueryHint hint = new QueryHint(QueryHintType.Parameterization, modeToken);
-                    hint._hintToken = hintToken;
-                    return hint;
-                }
+            // MAXRECURSION N
+            if (Check(TokenType.MAXRECURSION))
+                return ParseValueHint(QueryHintType.Maxrecursion);
 
-                // OPTIMIZE FOR UNKNOWN / OPTIMIZE FOR ( @var ... )
-                if (lexeme.Equals("OPTIMIZE", StringComparison.OrdinalIgnoreCase))
-                {
-                    return ParseOptimizeHint();
-                }
+            // QUERYTRACEON N
+            if (Check(TokenType.QUERYTRACEON))
+                return ParseValueHint(QueryHintType.QueryTraceOn);
+
+            // MAX_GRANT_PERCENT = N
+            if (Check(TokenType.MAX_GRANT_PERCENT))
+                return ParseEqualsValueHint(QueryHintType.MaxGrantPercent);
+
+            // MIN_GRANT_PERCENT = N
+            if (Check(TokenType.MIN_GRANT_PERCENT))
+                return ParseEqualsValueHint(QueryHintType.MinGrantPercent);
+
+            // LABEL = 'name'
+            if (Check(TokenType.LABEL))
+                return ParseEqualsValueHint(QueryHintType.Label);
+
+            // PARAMETERIZATION { SIMPLE | FORCED }
+            if (Check(TokenType.PARAMETERIZATION))
+            {
+                Token hintToken = Advance();
+                Token modeToken = ConsumeIdentifierOrContextualKeyword("Expected SIMPLE or FORCED");
+                QueryHint hint = new QueryHint(QueryHintType.Parameterization, modeToken);
+                hint._hintToken = hintToken;
+                return hint;
+            }
+
+            // OPTIMIZE FOR UNKNOWN / OPTIMIZE FOR ( @var ... )
+            if (Check(TokenType.OPTIMIZE))
+            {
+                return ParseOptimizeHint();
             }
 
             throw Error(Peek(), "Expected query hint");
@@ -3163,10 +3200,10 @@ namespace TSQL
         /// <summary>
         /// Helper: two-token hint where second token is an identifier (e.g., EXPAND VIEWS)
         /// </summary>
-        private QueryHint ParseTwoTokenHint(QueryHintType type, string expectedSecond)
+        private QueryHint ParseTwoTokenHint(QueryHintType type, TokenType expectedSecond)
         {
             Token hintToken = Advance();
-            Token second = ConsumeIdentifierOrContextualKeyword("Expected " + expectedSecond);
+            Token second = Consume(expectedSecond, "Expected " + expectedSecond);
             QueryHint hint = new QueryHint(type);
             hint._hintToken = hintToken;
             hint._hintToken2 = second;
@@ -3218,14 +3255,22 @@ namespace TSQL
         /// </summary>
         private QueryHint ParseForceOrDisableHint(Token hintToken, bool isForce)
         {
-            Token second = ConsumeIdentifierOrContextualKeyword("Expected EXTERNALPUSHDOWN or SCALEOUTEXECUTION");
             QueryHintType type;
-            if (second.Lexeme.Equals("EXTERNALPUSHDOWN", StringComparison.OrdinalIgnoreCase))
+            Token second;
+            if (Check(TokenType.EXTERNALPUSHDOWN))
+            {
+                second = Advance();
                 type = isForce ? QueryHintType.ForceExternalPushdown : QueryHintType.DisableExternalPushdown;
-            else if (second.Lexeme.Equals("SCALEOUTEXECUTION", StringComparison.OrdinalIgnoreCase))
+            }
+            else if (Check(TokenType.SCALEOUTEXECUTION))
+            {
+                second = Advance();
                 type = isForce ? QueryHintType.ForceScaleoutExecution : QueryHintType.DisableScaleoutExecution;
+            }
             else
-                throw Error(second, "Expected EXTERNALPUSHDOWN or SCALEOUTEXECUTION");
+            {
+                throw Error(Peek(), "Expected EXTERNALPUSHDOWN or SCALEOUTEXECUTION");
+            }
             QueryHint hint = new QueryHint(type);
             hint._hintToken = hintToken;
             hint._hintToken2 = second;
@@ -3240,7 +3285,7 @@ namespace TSQL
             Token optimizeToken = Advance();
             Token forToken = Consume(TokenType.FOR, "Expected FOR after OPTIMIZE");
 
-            if (IsIdentifierWithLexeme("UNKNOWN"))
+            if (Check(TokenType.UNKNOWN))
             {
                 Token unknownToken = Advance();
                 QueryHint hint = new QueryHint(QueryHintType.OptimizeForUnknown);
@@ -3276,7 +3321,7 @@ namespace TSQL
         {
             Token variable = Consume(TokenType.VARIABLE, "Expected @variable");
 
-            if (IsIdentifierWithLexeme("UNKNOWN"))
+            if (Check(TokenType.UNKNOWN))
             {
                 Token unknownToken = Advance();
                 OptimizeForVariable ofv = new OptimizeForVariable(variable);
@@ -3361,17 +3406,6 @@ namespace TSQL
             hint._hintToken = useToken;
             hint._hintToken2 = planToken;
             return hint;
-        }
-
-        /// <summary>
-        /// Checks if the current token is an identifier (or contextual keyword) with a specific lexeme.
-        /// </summary>
-        private bool IsIdentifierWithLexeme(string lexeme)
-        {
-            if (IsAtEnd()) return false;
-            Token token = Peek();
-            return (token.Type == TokenType.IDENTIFIER || ContextualKeywords.Contains(token.Type))
-                && token.Lexeme.Equals(lexeme, StringComparison.OrdinalIgnoreCase);
         }
 
         #endregion

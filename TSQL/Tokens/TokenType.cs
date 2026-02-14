@@ -73,6 +73,26 @@ namespace TSQL
         // FOR clause keywords (contextual - can also be used as identifiers)
         XML, JSON, RAW, AUTO, EXPLICIT, PATH, ROOT, ELEMENTS, TYPE,
         BINARY, BASE64, XMLDATA, XMLSCHEMA, XSINIL, ABSENT,
-        INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+        INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER,
+
+        // Table hint keywords (contextual - can also be used as identifiers)
+        NOEXPAND, FORCESCAN, FORCESEEK, NOLOCK, NOWAIT, PAGLOCK,
+        READCOMMITTED, READCOMMITTEDLOCK, READPAST, READUNCOMMITTED,
+        REPEATABLEREAD, ROWLOCK, SERIALIZABLE, SNAPSHOT,
+        SPATIAL_WINDOW_MAX_CELLS, TABLOCK, TABLOCKX, UPDLOCK, XLOCK,
+
+        // Query hint keywords (contextual - can also be used as identifiers)
+        CONCAT, DISABLE, DISABLE_OPTIMIZED_PLAN_FORCING, EXPAND,
+        EXTERNALPUSHDOWN, FAST, FORCE, HINT,
+        IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX, KEEP, KEEPFIXED, LABEL,
+        MAX_GRANT_PERCENT, MAXDOP, MAXRECURSION, MIN_GRANT_PERCENT,
+        NO_PERFORMANCE_SPOOL, OPTIMIZE, PARAMETERIZATION, QUERYTRACEON,
+        RECOMPILE, ROBUST, SCALEOUTEXECUTION, UNKNOWN, VIEWS,
+
+        // Temporal table keywords (contextual - can also be used as identifiers)
+        SYSTEM_TIME,
+
+        // Miscellaneous hint keywords (contextual - can also be used as identifiers)
+        TIMESTAMP
     }
 }
