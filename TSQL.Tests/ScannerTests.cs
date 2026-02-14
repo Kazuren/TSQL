@@ -17,7 +17,11 @@
                 { "=", TokenType.EQUAL },
                 { "<", TokenType.LESS },
                 { ">", TokenType.GREATER },
-                { "/", TokenType.SLASH }
+                { "/", TokenType.SLASH },
+                { "&", TokenType.BITWISE_AND },
+                { "|", TokenType.BITWISE_OR },
+                { "^", TokenType.BITWISE_XOR },
+                { "~", TokenType.BITWISE_NOT }
             };
         }
 

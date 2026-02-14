@@ -27,9 +27,9 @@ namespace TSQL
            
         Expressions:
             expression -> term
-            term -> factor ( ("-" | "+") factor )*
+            term -> factor ( ("-" | "+" | "&" | "^" | "|") factor )*
             factor -> unary ( ( "/" | "*" | "%") unary )*
-            unary -> ("-") postfix | postfix
+            unary -> ("-" | "~") postfix | postfix
             postfix -> scalar_subquery ("COLLATE" IDENTIFIER)?
             scalar_subquery -> ( "(" select_expression ")" ) | primary
             primary ->
@@ -1519,7 +1519,7 @@ namespace TSQL
         {
             Expr expr = Factor();
 
-            while (Match(TokenType.PLUS, TokenType.MINUS, out Token op))
+            while (Match(TokenType.PLUS, TokenType.MINUS, TokenType.BITWISE_AND, TokenType.BITWISE_XOR, TokenType.BITWISE_OR, out Token op))
             {
                 Expr right = Factor();
                 expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
@@ -1546,6 +1546,10 @@ namespace TSQL
             if (Match(TokenType.MINUS, out Token minus))
             {
                 return new Expr.Unary(minus, Postfix());
+            }
+            else if (Match(TokenType.BITWISE_NOT, out Token bitwiseNot))
+            {
+                return new Expr.Unary(bitwiseNot, Postfix());
             }
             else
             {
@@ -2927,6 +2931,18 @@ namespace TSQL
         private bool Match(TokenType type1, TokenType type2, TokenType type3, out Token token)
         {
             if (Check(type1) || Check(type2) || Check(type3))
+            {
+                token = Advance();
+                return true;
+            }
+
+            token = null;
+            return false;
+        }
+
+        private bool Match(TokenType type1, TokenType type2, TokenType type3, TokenType type4, TokenType type5, out Token token)
+        {
+            if (Check(type1) || Check(type2) || Check(type3) || Check(type4) || Check(type5))
             {
                 token = Advance();
                 return true;

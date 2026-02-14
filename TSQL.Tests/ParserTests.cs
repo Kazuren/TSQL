@@ -2172,6 +2172,65 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region Bitwise Operator Tests
+
+        [Theory]
+        [InlineData("SELECT a & b FROM T")]
+        [InlineData("SELECT a | b FROM T")]
+        [InlineData("SELECT a ^ b FROM T")]
+        [InlineData("SELECT ~a FROM T")]
+        [InlineData("SELECT a & b | c FROM T")]
+        [InlineData("SELECT a & b ^ c FROM T")]
+        [InlineData("SELECT ~a & b FROM T")]
+        [InlineData("SELECT a | b | c FROM T")]
+        public void Parse_BitwiseOperators_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_BitwiseNot_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT ~a FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Unary unary = Assert.IsType<Expr.Unary>(col.Expression);
+            Assert.IsType<Expr.ColumnIdentifier>(unary.Right);
+        }
+
+        [Fact]
+        public void Parse_BitwiseAnd_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a & b FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Binary binary = Assert.IsType<Expr.Binary>(col.Expression);
+            Assert.IsType<Expr.ColumnIdentifier>(binary.Left);
+            Assert.IsType<Expr.ColumnIdentifier>(binary.Right);
+        }
+
+        [Fact]
+        public void Parse_BitwiseNot_HigherPrecedenceThanMultiply()
+        {
+            // ~a * b should parse as (~a) * b
+            Stmt.Select stmt = ParseSelect("SELECT ~a * b FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Binary binary = Assert.IsType<Expr.Binary>(col.Expression);
+            Assert.IsType<Expr.Unary>(binary.Left);
+            Assert.IsType<Expr.ColumnIdentifier>(binary.Right);
+        }
+
+        [Fact]
+        public void Parse_Bitwise_MultiplyHigherPrecedenceThanAnd()
+        {
+            // a * b & c should parse as (a * b) & c
+            Stmt.Select stmt = ParseSelect("SELECT a * b & c FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Binary outer = Assert.IsType<Expr.Binary>(col.Expression);
+            Assert.IsType<Expr.Binary>(outer.Left);
+            Assert.IsType<Expr.ColumnIdentifier>(outer.Right);
+        }
+
+        #endregion
+
         #region COLLATE Tests
 
         [Theory]

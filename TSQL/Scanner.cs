@@ -132,6 +132,18 @@ namespace TSQL
                 case '"':
                     QuoteDelimitedIdentifier();
                     break;
+                case '&':
+                    AddToken(TokenType.BITWISE_AND);
+                    break;
+                case '|':
+                    AddToken(TokenType.BITWISE_OR);
+                    break;
+                case '^':
+                    AddToken(TokenType.BITWISE_XOR);
+                    break;
+                case '~':
+                    AddToken(TokenType.BITWISE_NOT);
+                    break;
                 case '@':
                     Variable();
                     break;

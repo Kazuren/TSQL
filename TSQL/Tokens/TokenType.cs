@@ -10,7 +10,7 @@ namespace TSQL
         SEMICOLON, COMMA, DOT,
         LEFT_PAREN, RIGHT_PAREN,
         EQUAL, GREATER, GREATER_EQUAL, LESS, LESS_EQUAL, NOT_EQUAL,
-        NOT_LESS, NOT_GREATER, BITWISE_NOT,
+        NOT_LESS, NOT_GREATER, BITWISE_NOT, BITWISE_AND, BITWISE_OR, BITWISE_XOR,
         WHITESPACE, COMMENT,
         EOF,
         // Keywords - This comment is used by a source generator to mark the keywords section, do not delete it.
