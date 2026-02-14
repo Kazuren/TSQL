@@ -80,6 +80,7 @@ namespace TSQL.Tests
             public object? VisitSearchedCaseExpr(Expr.SearchedCase expr) { LastType = "SearchedCase"; return null; }
             public object? VisitCastExpr(Expr.CastExpression expr) { LastType = "Cast"; return null; }
             public object? VisitConvertExpr(Expr.ConvertExpression expr) { LastType = "Convert"; return null; }
+            public object? VisitCollateExpr(Expr.Collate expr) { LastType = "Collate"; return null; }
         }
 
         #endregion

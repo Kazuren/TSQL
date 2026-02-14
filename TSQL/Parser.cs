@@ -29,7 +29,8 @@ namespace TSQL
             expression -> term
             term -> factor ( ("-" | "+") factor )*
             factor -> unary ( ( "/" | "*" | "%") unary )*
-            unary -> ("-") scalar_subquery | scalar_subquery
+            unary -> ("-") postfix | postfix
+            postfix -> scalar_subquery ("COLLATE" IDENTIFIER)?
             scalar_subquery -> ( "(" select_expression ")" ) | primary
             primary ->
                 "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
@@ -1544,12 +1545,28 @@ namespace TSQL
         {
             if (Match(TokenType.MINUS, out Token minus))
             {
-                return new Expr.Unary(minus, Primary());
+                return new Expr.Unary(minus, Postfix());
             }
             else
             {
-                return Primary();
+                return Postfix();
             }
+        }
+
+        private Expr Postfix()
+        {
+            Expr expr = Primary();
+
+            if (Match(TokenType.COLLATE, out Token collateToken))
+            {
+                Token collationName = ConsumeIdentifierOrContextualKeyword("Expected collation name after COLLATE");
+                Expr.Collate collate = new Expr.Collate(expr);
+                collate._collateKeyword = collateToken;
+                collate._collationName = collationName;
+                return collate;
+            }
+
+            return expr;
         }
 
         private Expr Grouping()

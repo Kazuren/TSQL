@@ -2172,6 +2172,49 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region COLLATE Tests
+
+        [Theory]
+        [InlineData("SELECT a COLLATE Latin1_General_CI_AS FROM T")]
+        [InlineData("SELECT a COLLATE SQL_Latin1_General_CP1_CI_AS FROM T")]
+        public void Parse_Collate_InSelect(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Collate_InWhereClause()
+        {
+            string source = "SELECT a FROM T WHERE a COLLATE Latin1_General_CI_AS = 'test'";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Collate_InOrderBy()
+        {
+            string source = "SELECT a FROM T ORDER BY a COLLATE Latin1_General_CI_AS";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Collate_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT a COLLATE Latin1_General_CI_AS FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Collate collate = Assert.IsType<Expr.Collate>(col.Expression);
+            Assert.IsType<Expr.ColumnIdentifier>(collate.Expression);
+            Assert.Equal("Latin1_General_CI_AS", collate.CollationName);
+        }
+
+        [Fact]
+        public void Parse_Collate_WithStringLiteral()
+        {
+            string source = "SELECT 'hello' COLLATE Latin1_General_CI_AS FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
         #region CONTAINS / FREETEXT Tests
 
         [Theory]

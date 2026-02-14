@@ -25,6 +25,7 @@ namespace TSQL
             T VisitSearchedCaseExpr(SearchedCase expr);
             T VisitCastExpr(CastExpression expr);
             T VisitConvertExpr(ConvertExpression expr);
+            T VisitCollateExpr(Collate expr);
         }
 
 
@@ -454,6 +455,36 @@ namespace TSQL
                 {
                     yield return token;
                 }
+            }
+        }
+
+        public class Collate : Expr
+        {
+            private Expr _expression;
+            public Expr Expression
+            {
+                get => _expression;
+                set => SetWithTrivia(ref _expression, value);
+            }
+
+            public string CollationName { get => _collationName.Lexeme; }
+
+            internal Token _collateKeyword;
+            internal Token _collationName;
+
+            public Collate(Expr expression)
+            {
+                _expression = expression;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitCollateExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                foreach (Token token in Expression.DescendantTokens())
+                    yield return token;
+                yield return _collateKeyword;
+                yield return _collationName;
             }
         }
 

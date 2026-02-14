@@ -156,6 +156,11 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
+            protected override void VisitCollate(Expr.Collate expr)
+            {
+                expr.Expression = TryReplace(expr.Expression);
+            }
+
             #endregion
 
             #region Predicate Parents

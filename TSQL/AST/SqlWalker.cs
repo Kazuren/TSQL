@@ -157,6 +157,11 @@ namespace TSQL
             }
         }
 
+        protected virtual void VisitCollate(Expr.Collate expr)
+        {
+            Walk(expr.Expression);
+        }
+
         #endregion
 
         #region Predicate Visit Methods
@@ -443,6 +448,7 @@ namespace TSQL
         object Expr.Visitor<object>.VisitSearchedCaseExpr(Expr.SearchedCase expr) { VisitSearchedCase(expr); return null; }
         object Expr.Visitor<object>.VisitCastExpr(Expr.CastExpression expr) { VisitCast(expr); return null; }
         object Expr.Visitor<object>.VisitConvertExpr(Expr.ConvertExpression expr) { VisitConvert(expr); return null; }
+        object Expr.Visitor<object>.VisitCollateExpr(Expr.Collate expr) { VisitCollate(expr); return null; }
 
         object Predicate.Visitor<object>.VisitComparisonPredicate(Predicate.Comparison pred) { VisitComparison(pred); return null; }
         object Predicate.Visitor<object>.VisitLikePredicate(Predicate.Like pred) { VisitLike(pred); return null; }
