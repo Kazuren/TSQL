@@ -1520,6 +1520,67 @@ namespace TSQL
         internal Token _whereKeyword;
         internal Token _havingKeyword;
 
+        public void AddWhere(AST.Predicate condition)
+        {
+            if (Where == null)
+            {
+                _whereKeyword = new ConcreteToken(TokenType.WHERE, "WHERE", null);
+                _whereKeyword.AddLeadingTrivia(new Whitespace(" "));
+
+                Token conditionFirst = FirstTokenOf(condition);
+                conditionFirst.ClearLeadingTrivia();
+                conditionFirst.AddLeadingTrivia(new Whitespace(" "));
+
+                _where = condition;
+            }
+            else
+            {
+                AST.Predicate existing = _where;
+
+                if (existing is AST.Predicate.Or)
+                {
+                    existing = WrapInGrouping(existing);
+                }
+
+                if (condition is AST.Predicate.Or)
+                {
+                    condition = WrapInGrouping(condition);
+                }
+
+                Token conditionFirst = FirstTokenOf(condition);
+                conditionFirst.ClearLeadingTrivia();
+                conditionFirst.AddLeadingTrivia(new Whitespace(" "));
+
+                var andToken = new ConcreteToken(TokenType.AND, "AND", null);
+                andToken.AddLeadingTrivia(new Whitespace(" "));
+
+                var andPredicate = new AST.Predicate.And(existing, condition);
+                andPredicate._andToken = andToken;
+
+                // Assign directly to avoid SetWithTrivia trivia transfer,
+                // since we manage trivia explicitly above.
+                _where = andPredicate;
+            }
+        }
+
+        private static AST.Predicate WrapInGrouping(AST.Predicate predicate)
+        {
+            var leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+            var rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+
+            Token predicateFirst = FirstTokenOf(predicate);
+            if (predicateFirst != null)
+            {
+                leftParen.AddLeadingTrivia(predicateFirst.LeadingTrivia);
+                predicateFirst.ClearLeadingTrivia();
+            }
+
+            var grouping = new AST.Predicate.Grouping(predicate);
+            grouping._leftParen = leftParen;
+            grouping._rightParen = rightParen;
+            return grouping;
+        }
+
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _selectKeyword;
