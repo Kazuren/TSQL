@@ -65,6 +65,9 @@ namespace TSQL
         AT, TIME, ZONE,
 
         // TOP clause keywords (contextual - can also be used as identifiers)
-        TIES
+        TIES,
+
+        // OFFSET/FETCH keywords (contextual - can also be used as identifiers)
+        OFFSET, FIRST, NEXT, ONLY
     }
 }

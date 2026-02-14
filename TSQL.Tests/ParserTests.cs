@@ -1664,16 +1664,95 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT a, b FROM T ORDER BY a ASC, b DESC");
             var orderBy = stmt.Query.OrderBy;
 
-            Assert.Equal(2, orderBy.Count);
-            Assert.False(orderBy[0].Descending);
-            Assert.True(orderBy[1].Descending);
+            Assert.NotNull(orderBy);
+            Assert.Equal(2, orderBy.Items.Count);
+            Assert.False(orderBy.Items[0].Descending);
+            Assert.True(orderBy.Items[1].Descending);
         }
 
         [Fact]
-        public void Parse_OrderBy_NoOrderBy_IsEmpty()
+        public void Parse_OrderBy_NoOrderBy_IsNull()
         {
             var stmt = ParseSelect("SELECT a FROM T");
-            Assert.Equal(0, stmt.Query.OrderBy.Count);
+            Assert.Null(stmt.Query.OrderBy);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 10 ROWS")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 0 ROWS")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 10 ROW")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET @skip ROWS")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 10 ROWS FETCH FIRST 5 ROWS ONLY")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 10 ROWS FETCH NEXT 5 ROW ONLY")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET 10 ROW FETCH FIRST 1 ROW ONLY")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY")]
+        [InlineData("SELECT a FROM T ORDER BY a OFFSET (2 * 5) ROWS FETCH NEXT (10 + 5) ROWS ONLY")]
+        [InlineData("SELECT a FROM T ORDER BY a ASC, b DESC OFFSET 10 ROWS FETCH NEXT 25 ROWS ONLY")]
+        public void Parse_OffsetFetch(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_OffsetOnly_Structure()
+        {
+            var stmt = ParseSelect("SELECT a FROM T ORDER BY a OFFSET 10 ROWS");
+            var orderBy = stmt.Query.OrderBy;
+
+            Assert.NotNull(orderBy);
+            Assert.Equal(1, orderBy.Items.Count);
+            Assert.IsType<Expr.Literal>(orderBy.OffsetCount);
+            Assert.Null(orderBy.FetchCount);
+        }
+
+        [Fact]
+        public void Parse_OffsetFetch_Structure()
+        {
+            var stmt = ParseSelect("SELECT a FROM T ORDER BY a OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY");
+            var orderBy = stmt.Query.OrderBy;
+
+            Assert.NotNull(orderBy);
+            Assert.IsType<Expr.Literal>(orderBy.OffsetCount);
+            Assert.IsType<Expr.Literal>(orderBy.FetchCount);
+        }
+
+        [Fact]
+        public void Parse_OffsetFetch_NoOffset_IsNull()
+        {
+            var stmt = ParseSelect("SELECT a FROM T ORDER BY a");
+            var orderBy = stmt.Query.OrderBy;
+
+            Assert.NotNull(orderBy);
+            Assert.Null(orderBy.OffsetCount);
+            Assert.Null(orderBy.FetchCount);
+        }
+
+        [Fact]
+        public void Parse_OffsetFetch_WithSetOperation()
+        {
+            string source = "SELECT a FROM T1 UNION ALL SELECT b FROM T2 ORDER BY a OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY";
+            Assert.Equal(source, RoundTrip(source));
+
+            var stmt = ParseSelect(source);
+            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Assert.NotNull(setOp.OrderBy);
+            Assert.IsType<Expr.Literal>(setOp.OrderBy.OffsetCount);
+            Assert.IsType<Expr.Literal>(setOp.OrderBy.FetchCount);
+        }
+
+        [Fact]
+        public void Parse_Offset_AsIdentifier()
+        {
+            string source = "SELECT OFFSET FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Next_AsIdentifier()
+        {
+            string source = "SELECT NEXT FROM T";
+            Assert.Equal(source, RoundTrip(source));
         }
 
         #endregion
@@ -2688,7 +2767,7 @@ namespace TSQL.Tests
         {
             var stmt = ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 ORDER BY a");
             var setOp = Assert.IsType<SetOperation>(stmt.Query);
-            Assert.Equal(1, setOp.OrderBy.Count);
+            Assert.Equal(1, setOp.OrderBy.Items.Count);
         }
 
         [Fact]
@@ -2696,7 +2775,7 @@ namespace TSQL.Tests
         {
             var stmt = ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 ORDER BY a OPTION (RECOMPILE)");
             var setOp = Assert.IsType<SetOperation>(stmt.Query);
-            Assert.Equal(1, setOp.OrderBy.Count);
+            Assert.Equal(1, setOp.OrderBy.Items.Count);
             Assert.NotNull(stmt.Option);
             Assert.Equal(QueryHintType.Recompile, stmt.Option.Hints[0].HintType);
         }
@@ -2734,7 +2813,7 @@ namespace TSQL.Tests
         {
             var stmt = ParseSelect("SELECT a FROM T ORDER BY a");
             Assert.IsType<SelectExpression>(stmt.Query);
-            Assert.Equal(1, stmt.Query.OrderBy.Count);
+            Assert.Equal(1, stmt.Query.OrderBy.Items.Count);
         }
 
         #endregion

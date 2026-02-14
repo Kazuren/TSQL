@@ -380,9 +380,19 @@ namespace TSQL
 
             if (queryExpr.OrderBy != null)
             {
-                foreach (OrderByItem item in queryExpr.OrderBy)
+                foreach (OrderByItem item in queryExpr.OrderBy.Items)
                 {
                     Walk(item.Expression);
+                }
+
+                if (queryExpr.OrderBy.OffsetCount != null)
+                {
+                    Walk(queryExpr.OrderBy.OffsetCount);
+                }
+
+                if (queryExpr.OrderBy.FetchCount != null)
+                {
+                    Walk(queryExpr.OrderBy.FetchCount);
                 }
             }
         }

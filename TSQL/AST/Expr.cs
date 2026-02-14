@@ -1320,25 +1320,51 @@ namespace TSQL
 
     public enum SetOperationType { Union, UnionAll, Intersect, Except }
 
-    public abstract class QueryExpression : SyntaxElement
+    public class OrderByClause : SyntaxElement
     {
-        public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
+        public SyntaxElementList<OrderByItem> Items { get; set; } = new SyntaxElementList<OrderByItem>();
+        public Expr OffsetCount { get; set; }
+        public Expr FetchCount { get; set; }
 
         internal Token _orderKeyword;
         internal Token _orderByKeyword;
+        internal Token _offsetKeyword;
+        internal Token _offsetRowOrRows;
+        internal Token _fetchKeyword;
+        internal Token _firstOrNext;
+        internal Token _fetchRowOrRows;
+        internal Token _onlyKeyword;
 
-        protected IEnumerable<Token> OrderByTokens()
+        public override IEnumerable<Token> DescendantTokens()
         {
-            if (OrderBy != null && OrderBy.Count > 0)
+            yield return _orderKeyword;
+            yield return _orderByKeyword;
+            foreach (Token token in Items.DescendantTokens())
+                yield return token;
+
+            if (OffsetCount != null)
             {
-                yield return _orderKeyword;
-                yield return _orderByKeyword;
-                foreach (Token token in OrderBy.DescendantTokens())
-                {
+                yield return _offsetKeyword;
+                foreach (Token token in OffsetCount.DescendantTokens())
                     yield return token;
+                yield return _offsetRowOrRows;
+
+                if (FetchCount != null)
+                {
+                    yield return _fetchKeyword;
+                    yield return _firstOrNext;
+                    foreach (Token token in FetchCount.DescendantTokens())
+                        yield return token;
+                    yield return _fetchRowOrRows;
+                    yield return _onlyKeyword;
                 }
             }
         }
+    }
+
+    public abstract class QueryExpression : SyntaxElement
+    {
+        public OrderByClause OrderBy { get; set; }
     }
 
     public class SelectExpression : QueryExpression
@@ -1423,9 +1449,10 @@ namespace TSQL
                 }
             }
 
-            foreach (Token token in OrderByTokens())
+            if (OrderBy != null)
             {
-                yield return token;
+                foreach (Token token in OrderBy.DescendantTokens())
+                    yield return token;
             }
         }
     }
@@ -1466,9 +1493,10 @@ namespace TSQL
             foreach (Token token in Right.DescendantTokens())
                 yield return token;
 
-            foreach (Token token in OrderByTokens())
+            if (OrderBy != null)
             {
-                yield return token;
+                foreach (Token token in OrderBy.DescendantTokens())
+                    yield return token;
             }
         }
     }

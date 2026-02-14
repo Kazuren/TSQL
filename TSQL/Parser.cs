@@ -56,7 +56,7 @@ namespace TSQL
             within_group_clause -> "WITHIN" "GROUP" "(" "ORDER" "BY" order_by_item ("," order_by_item)* ")"
             expression_list -> expression ("," expression)*
 
-            query_expression -> union_except (order_by_clause)?
+            query_expression -> union_except (order_by_clause (offset_fetch)?)?
             union_except -> intersect (("UNION" ("ALL")? | "EXCEPT") intersect)*
             intersect -> select_core ("INTERSECT" select_core)*
             select_core -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
@@ -78,6 +78,7 @@ namespace TSQL
             having_clause -> "HAVING" search_condition
             order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
             order_by_item -> expression ("ASC" | "DESC")?
+            offset_fetch -> "OFFSET" expression ("ROW" | "ROWS") ("FETCH" ("FIRST" | "NEXT") expression ("ROW" | "ROWS") "ONLY")?
             comparison_operator = ("=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "!>" | "!<" )
 
             ---------------- WHERE ---------------
@@ -233,7 +234,11 @@ namespace TSQL
             TokenType.AT,
             TokenType.TIME,
             TokenType.ZONE,
-            TokenType.TIES
+            TokenType.TIES,
+            TokenType.OFFSET,
+            TokenType.FIRST,
+            TokenType.NEXT,
+            TokenType.ONLY
         };
 
         public Parser(IEnumerable<Token> tokens)
@@ -298,7 +303,8 @@ namespace TSQL
         }
 
         /// <summary>
-        /// query_expression -> union_except (ORDER BY ...)?
+        /// query_expression -> union_except (order_by_clause)?
+        /// order_by_clause -> ORDER BY items (OFFSET ... (FETCH ...)?)?
         /// </summary>
         private QueryExpression QueryExpression()
         {
@@ -307,9 +313,30 @@ namespace TSQL
             // ORDER BY applies to the entire query expression
             if (Match(TokenType.ORDER, out Token orderToken))
             {
-                result._orderKeyword = orderToken;
-                result._orderByKeyword = Consume(TokenType.BY, "Expected BY after ORDER");
-                result.OrderBy = ParseOrderByList();
+                OrderByClause orderBy = new OrderByClause();
+                orderBy._orderKeyword = orderToken;
+                orderBy._orderByKeyword = Consume(TokenType.BY, "Expected BY after ORDER");
+                orderBy.Items = ParseOrderByList();
+
+                // OFFSET n { ROW | ROWS }
+                if (Match(TokenType.OFFSET, out Token offsetToken))
+                {
+                    orderBy._offsetKeyword = offsetToken;
+                    orderBy.OffsetCount = Expression();
+                    orderBy._offsetRowOrRows = Consume(TokenType.ROW, TokenType.ROWS, "Expected ROW or ROWS after OFFSET expression");
+
+                    // FETCH { FIRST | NEXT } n { ROW | ROWS } ONLY
+                    if (Match(TokenType.FETCH, out Token fetchToken))
+                    {
+                        orderBy._fetchKeyword = fetchToken;
+                        orderBy._firstOrNext = Consume(TokenType.FIRST, TokenType.NEXT, "Expected FIRST or NEXT after FETCH");
+                        orderBy.FetchCount = Expression();
+                        orderBy._fetchRowOrRows = Consume(TokenType.ROW, TokenType.ROWS, "Expected ROW or ROWS after FETCH expression");
+                        orderBy._onlyKeyword = Consume(TokenType.ONLY, "Expected ONLY");
+                    }
+                }
+
+                result.OrderBy = orderBy;
             }
 
             return result;
@@ -3118,6 +3145,14 @@ namespace TSQL
         private Token Consume(TokenType type, string message)
         {
             if (Check(type)) { return Advance(); }
+
+            throw Error(Peek(), message);
+        }
+
+        private Token Consume(TokenType type1, TokenType type2, string message)
+        {
+            if (Check(type1)) { return Advance(); }
+            if (Check(type2)) { return Advance(); }
 
             throw Error(Peek(), message);
         }
