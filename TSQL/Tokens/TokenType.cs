@@ -58,6 +58,9 @@ namespace TSQL
         // Full-text search keywords (contextual - can also be used as identifiers)
         LANGUAGE,
 
+        // Built-in function keywords (contextual - can also be used as identifiers)
+        IIF,
+
         // TOP clause keywords (contextual - can also be used as identifiers)
         TIES
     }

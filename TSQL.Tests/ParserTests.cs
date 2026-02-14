@@ -2172,6 +2172,45 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region IIF Tests
+
+        [Theory]
+        [InlineData("SELECT IIF(a > 0, 'positive', 'non-positive') FROM T")]
+        [InlineData("SELECT IIF(a = 1 AND b = 2, x, y) FROM T")]
+        [InlineData("SELECT IIF(a IS NULL, 0, a) FROM T")]
+        [InlineData("SELECT IIF(a > 0, IIF(a > 10, 'big', 'small'), 'zero') FROM T")]
+        public void Parse_Iif_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Iif_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT IIF(a > 0, 'yes', 'no') FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.Iif iif = Assert.IsType<Expr.Iif>(col.Expression);
+            Assert.IsType<AST.Predicate.Comparison>(iif.Condition);
+            Assert.IsType<Expr.Literal>(iif.TrueValue);
+            Assert.IsType<Expr.Literal>(iif.FalseValue);
+        }
+
+        [Fact]
+        public void Parse_Iif_WorksAsIdentifier()
+        {
+            string source = "SELECT IIF FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Iif_WorksAsAlias()
+        {
+            string source = "SELECT a AS IIF FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
         #region Bitwise Operator Tests
 
         [Theory]

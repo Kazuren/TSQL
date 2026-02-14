@@ -26,6 +26,7 @@ namespace TSQL
             T VisitCastExpr(CastExpression expr);
             T VisitConvertExpr(ConvertExpression expr);
             T VisitCollateExpr(Collate expr);
+            T VisitIifExpr(Iif expr);
         }
 
 
@@ -485,6 +486,58 @@ namespace TSQL
                     yield return token;
                 yield return _collateKeyword;
                 yield return _collationName;
+            }
+        }
+
+        public class Iif : Expr
+        {
+            private AST.Predicate _condition;
+            public AST.Predicate Condition
+            {
+                get => _condition;
+                set => SetWithTrivia(ref _condition, value);
+            }
+            private Expr _trueValue;
+            public Expr TrueValue
+            {
+                get => _trueValue;
+                set => SetWithTrivia(ref _trueValue, value);
+            }
+            private Expr _falseValue;
+            public Expr FalseValue
+            {
+                get => _falseValue;
+                set => SetWithTrivia(ref _falseValue, value);
+            }
+
+            internal Token _iifKeyword;
+            internal Token _leftParen;
+            internal Token _firstComma;
+            internal Token _secondComma;
+            internal Token _rightParen;
+
+            public Iif(AST.Predicate condition, Expr trueValue, Expr falseValue)
+            {
+                _condition = condition;
+                _trueValue = trueValue;
+                _falseValue = falseValue;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitIifExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _iifKeyword;
+                yield return _leftParen;
+                foreach (Token token in Condition.DescendantTokens())
+                    yield return token;
+                yield return _firstComma;
+                foreach (Token token in TrueValue.DescendantTokens())
+                    yield return token;
+                yield return _secondComma;
+                foreach (Token token in FalseValue.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
             }
         }
 

@@ -34,10 +34,11 @@ namespace TSQL
             scalar_subquery -> ( "(" select_expression ")" ) | primary
             primary ->
                 "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
-                | case_expression | cast_expression | convert_expression
+                | case_expression | iif_expression | cast_expression | convert_expression
                 | column_expression | ( "(" expression ")" )
                 | scalar_function | window_function
             case_expression -> "CASE" (expression WHEN_clause_simple+ | WHEN_clause_searched+) ("ELSE" expression)? "END"
+            iif_expression -> "IIF" "(" search_condition "," expression "," expression ")"
             cast_expression -> ("CAST" | "TRY_CAST") "(" expression "AS" data_type ")"
             convert_expression -> ("CONVERT" | "TRY_CONVERT") "(" data_type "," expression ("," expression)? ")"
             data_type -> IDENTIFIER ("(" expression ("," expression)* ")")?
@@ -221,6 +222,7 @@ namespace TSQL
             TokenType.GROUPING,
             TokenType.SETS,
             TokenType.LANGUAGE,
+            TokenType.IIF,
             TokenType.TIES
         };
 
@@ -1639,6 +1641,28 @@ namespace TSQL
             if (Match(TokenType.OPENXML, out Token openXmlToken))
             {
                 return FinishOpenXml(openXmlToken);
+            }
+
+            // Handle IIF(condition, true_value, false_value)
+            // First argument is a search condition (predicate), not an expression
+            if (Check(TokenType.IIF) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                Token iifToken = Advance();
+                Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after IIF");
+                Predicate condition = SearchCondition();
+                Token firstComma = Consume(TokenType.COMMA, "Expected ',' after IIF condition");
+                Expr trueValue = Expression();
+                Token secondComma = Consume(TokenType.COMMA, "Expected ',' after IIF true value");
+                Expr falseValue = Expression();
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after IIF");
+
+                Expr.Iif iif = new Expr.Iif(condition, trueValue, falseValue);
+                iif._iifKeyword = iifToken;
+                iif._leftParen = leftParen;
+                iif._firstComma = firstComma;
+                iif._secondComma = secondComma;
+                iif._rightParen = rightParen;
+                return iif;
             }
 
             // Handle ranking functions - they REQUIRE an OVER clause when used as functions

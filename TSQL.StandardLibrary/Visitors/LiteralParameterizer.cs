@@ -161,6 +161,13 @@ namespace TSQL.StandardLibrary.Visitors
                 expr.Expression = TryReplace(expr.Expression);
             }
 
+            protected override void VisitIif(Expr.Iif expr)
+            {
+                Walk(expr.Condition);
+                expr.TrueValue = TryReplace(expr.TrueValue);
+                expr.FalseValue = TryReplace(expr.FalseValue);
+            }
+
             #endregion
 
             #region Predicate Parents

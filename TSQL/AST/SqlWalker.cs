@@ -162,6 +162,13 @@ namespace TSQL
             Walk(expr.Expression);
         }
 
+        protected virtual void VisitIif(Expr.Iif expr)
+        {
+            Walk(expr.Condition);
+            Walk(expr.TrueValue);
+            Walk(expr.FalseValue);
+        }
+
         #endregion
 
         #region Predicate Visit Methods
@@ -449,6 +456,7 @@ namespace TSQL
         object Expr.Visitor<object>.VisitCastExpr(Expr.CastExpression expr) { VisitCast(expr); return null; }
         object Expr.Visitor<object>.VisitConvertExpr(Expr.ConvertExpression expr) { VisitConvert(expr); return null; }
         object Expr.Visitor<object>.VisitCollateExpr(Expr.Collate expr) { VisitCollate(expr); return null; }
+        object Expr.Visitor<object>.VisitIifExpr(Expr.Iif expr) { VisitIif(expr); return null; }
 
         object Predicate.Visitor<object>.VisitComparisonPredicate(Predicate.Comparison pred) { VisitComparison(pred); return null; }
         object Predicate.Visitor<object>.VisitLikePredicate(Predicate.Like pred) { VisitLike(pred); return null; }
