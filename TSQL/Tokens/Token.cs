@@ -152,24 +152,12 @@ namespace TSQL
             _leadingTriviaList = null;
         }
 
-        internal void AddLeadingTrivia(params Trivia[] trivia)
-        {
-            foreach (var t in trivia)
-                AddLeadingTrivia(t);
-        }
-
-        internal void AddLeadingTrivia(List<Trivia> trivia)
+        internal void AddLeadingTrivia(IReadOnlyList<Trivia> trivia)
         {
             for (int i = 0; i < trivia.Count; i++)
             {
                 AddLeadingTrivia(trivia[i]);
             }
-        }
-
-        internal void AddLeadingTrivia(IEnumerable<Trivia> trivia)
-        {
-            foreach (var t in trivia)
-                AddLeadingTrivia(t);
         }
 
         internal void AddLeadingTrivia(Trivia trivia)
@@ -194,24 +182,12 @@ namespace TSQL
             }
         }
 
-        internal void AddTrailingTrivia(params Trivia[] trivia)
-        {
-            foreach (var t in trivia)
-                AddTrailingTrivia(t);
-        }
-
         internal void AddTrailingTrivia(List<Trivia> trivia)
         {
             for (int i = 0; i < trivia.Count; i++)
             {
                 AddTrailingTrivia(trivia[i]);
             }
-        }
-
-        internal void AddTrailingTrivia(IEnumerable<Trivia> trivia)
-        {
-            foreach (var t in trivia)
-                AddTrailingTrivia(t);
         }
 
         internal void AddTrailingTrivia(Trivia trivia)
