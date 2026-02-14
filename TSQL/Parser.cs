@@ -38,6 +38,9 @@ namespace TSQL
                 | column_expression | ( "(" expression ")" )
                 | scalar_function | window_function
             case_expression -> "CASE" (expression WHEN_clause_simple+ | WHEN_clause_searched+) ("ELSE" expression)? "END"
+            openxml_expression -> "OPENXML" "(" expression_list ")" ("WITH" "(" (openxml_schema | table_name) ")")?
+            openxml_schema -> openxml_column_def ("," openxml_column_def)*
+            openxml_column_def -> IDENTIFIER data_type (STRING)?
             iif_expression -> "IIF" "(" search_condition "," expression "," expression ")"
             cast_expression -> ("CAST" | "TRY_CAST") "(" expression "AS" data_type ")"
             convert_expression -> ("CONVERT" | "TRY_CONVERT") "(" data_type "," expression ("," expression)? ")"
@@ -650,6 +653,16 @@ namespace TSQL
             if (Check(TokenType.OPENROWSET) || Check(TokenType.OPENQUERY) || Check(TokenType.OPENDATASOURCE))
             {
                 return ParseRowsetFunction();
+            }
+
+            // OPENXML with optional WITH clause
+            if (Check(TokenType.OPENXML))
+            {
+                Token openXmlToken = Advance();
+                Expr.OpenXmlExpression openXmlExpr = (Expr.OpenXmlExpression)FinishOpenXml(openXmlToken);
+                RowsetFunctionReference rowsetRef = new RowsetFunctionReference(openXmlExpr);
+                rowsetRef.Alias = Alias();
+                return rowsetRef;
             }
 
             return ParseNamedTableSource();
@@ -1745,14 +1758,73 @@ namespace TSQL
             ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(openXmlToken));
             Expr.FunctionCall functionCall = FinishCall(callee);
 
-            // TODO: Handle optional WITH clause
-            // if (Match(TokenType.WITH))
-            // {
-            //     Parse SchemaDeclaration or TableName
-            //     Return a new OpenXmlExpr that wraps the function call + WITH clause
-            // }
+            Expr.OpenXmlExpression openXml = new Expr.OpenXmlExpression(functionCall);
 
-            return functionCall;
+            if (!Check(TokenType.WITH))
+            {
+                return openXml;
+            }
+
+            Token withToken = Advance();
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after WITH");
+
+            // Disambiguate: schema declaration (identifier type_name ...) vs table name (identifier [.identifier]* ))
+            // Schema declaration starts with: identifier followed by a data type
+            // Table name is: identifier [. identifier]* )
+            // We try schema declaration first using backtracking
+            Expr.OpenXmlWithClause withClause;
+            int saved = _current;
+            try
+            {
+                SyntaxElementList<Expr.OpenXmlColumnDef> columns = new SyntaxElementList<Expr.OpenXmlColumnDef>();
+                columns.Add(ParseOpenXmlColumnDef());
+
+                while (Match(TokenType.COMMA, out Token comma))
+                {
+                    columns.Add(ParseOpenXmlColumnDef(), comma);
+                }
+
+                // If we get here without error, it's a schema declaration
+                Expr.OpenXmlSchemaDeclaration schema = new Expr.OpenXmlSchemaDeclaration(columns);
+                schema._withKeyword = withToken;
+                schema._leftParen = leftParen;
+                withClause = schema;
+            }
+            catch (ParseError)
+            {
+                // Fall back to table name
+                _current = saved;
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
+                ObjectIdentifier tableName = FunctionIdentifier(parts);
+
+                Expr.OpenXmlTableName table = new Expr.OpenXmlTableName(tableName);
+                table._withKeyword = withToken;
+                table._leftParen = leftParen;
+                withClause = table;
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after WITH clause");
+            withClause._rightParen = rightParen;
+
+            openXml.WithClause = withClause;
+            return openXml;
+        }
+
+        private Expr.OpenXmlColumnDef ParseOpenXmlColumnDef()
+        {
+            Token name = ConsumeIdentifierOrContextualKeyword("Expected column name");
+            DataType dataType = ParseDataType();
+
+            Expr.OpenXmlColumnDef colDef = new Expr.OpenXmlColumnDef(dataType);
+            colDef._name = name;
+
+            // Optional ColPattern (a string literal)
+            if (Check(TokenType.STRING))
+            {
+                colDef._colPatternToken = Advance();
+            }
+
+            return colDef;
         }
 
         private Expr.FunctionCall FinishCall(ObjectIdentifier callee)

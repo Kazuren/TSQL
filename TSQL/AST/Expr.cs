@@ -28,6 +28,7 @@ namespace TSQL
             T VisitCollateExpr(Collate expr);
             T VisitIifExpr(Iif expr);
             T VisitAtTimeZoneExpr(AtTimeZone expr);
+            T VisitOpenXmlExpr(OpenXmlExpression expr);
         }
 
 
@@ -616,6 +617,104 @@ namespace TSQL
                     yield return token;
             }
         }
+
+        #region OPENXML
+
+        public class OpenXmlColumnDef : SyntaxElement
+        {
+            public string Name { get => _name.Lexeme; }
+            public DataType DataType { get; }
+            public string ColPattern { get => _colPatternToken?.Lexeme; }
+
+            internal Token _name;
+            internal Token _colPatternToken;
+
+            public OpenXmlColumnDef(DataType dataType)
+            {
+                DataType = dataType;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _name;
+                foreach (Token token in DataType.DescendantTokens())
+                    yield return token;
+                if (_colPatternToken != null)
+                    yield return _colPatternToken;
+            }
+        }
+
+        public abstract class OpenXmlWithClause : SyntaxElement
+        {
+            internal Token _withKeyword;
+            internal Token _leftParen;
+            internal Token _rightParen;
+        }
+
+        public class OpenXmlSchemaDeclaration : OpenXmlWithClause
+        {
+            public SyntaxElementList<OpenXmlColumnDef> Columns { get; }
+
+            public OpenXmlSchemaDeclaration(SyntaxElementList<OpenXmlColumnDef> columns)
+            {
+                Columns = columns;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _withKeyword;
+                yield return _leftParen;
+                foreach (Token token in Columns.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
+            }
+        }
+
+        public class OpenXmlTableName : OpenXmlWithClause
+        {
+            public ObjectIdentifier TableName { get; }
+
+            public OpenXmlTableName(ObjectIdentifier tableName)
+            {
+                TableName = tableName;
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _withKeyword;
+                yield return _leftParen;
+                foreach (Token token in TableName.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
+            }
+        }
+
+        public class OpenXmlExpression : FunctionCall
+        {
+            public OpenXmlWithClause WithClause { get; set; }
+
+            internal OpenXmlExpression(FunctionCall source)
+                : base(source.Callee, source.Arguments)
+            {
+                _leftParen = source._leftParen;
+                _rightParen = source._rightParen;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitOpenXmlExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                foreach (Token token in base.DescendantTokens())
+                    yield return token;
+                if (WithClause != null)
+                {
+                    foreach (Token token in WithClause.DescendantTokens())
+                        yield return token;
+                }
+            }
+        }
+
+        #endregion
 
         public class Grouping : Expr
         {

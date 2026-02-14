@@ -2172,6 +2172,68 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region OPENXML WITH Tests
+
+        [Theory]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row')")]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row', 2)")]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row', 2) WITH (col1 varchar(50), col2 int)")]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row', 2) WITH (col1 varchar(50) './name', col2 int './id')")]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row') WITH (col1 nvarchar(100))")]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row') WITH (T)")]
+        [InlineData("SELECT * FROM OPENXML(@idoc, '/root/row') WITH (dbo.T)")]
+        public void Parse_OpenXml_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_OpenXml_WithoutWith_IsOpenXmlExpression()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT OPENXML(@idoc, '/root/row') FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.OpenXmlExpression openXml = Assert.IsType<Expr.OpenXmlExpression>(col.Expression);
+            Assert.Equal(2, openXml.Arguments.Count);
+            Assert.Null(openXml.WithClause);
+        }
+
+        [Fact]
+        public void Parse_OpenXml_WithSchema_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT OPENXML(@idoc, '/root/row', 2) WITH (col1 varchar(50), col2 int) FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.OpenXmlExpression openXml = Assert.IsType<Expr.OpenXmlExpression>(col.Expression);
+            Assert.Equal(3, openXml.Arguments.Count);
+            Expr.OpenXmlSchemaDeclaration schema = Assert.IsType<Expr.OpenXmlSchemaDeclaration>(openXml.WithClause);
+            Assert.Equal(2, schema.Columns.Count);
+            Assert.Equal("col1", schema.Columns[0].Name);
+            Assert.Equal("col2", schema.Columns[1].Name);
+        }
+
+        [Fact]
+        public void Parse_OpenXml_WithColPattern_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT OPENXML(@idoc, '/root/row') WITH (name varchar(50) './Name') FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.OpenXmlExpression openXml = Assert.IsType<Expr.OpenXmlExpression>(col.Expression);
+            Expr.OpenXmlSchemaDeclaration schema = Assert.IsType<Expr.OpenXmlSchemaDeclaration>(openXml.WithClause);
+            Assert.Single(schema.Columns);
+            Assert.Equal("name", schema.Columns[0].Name);
+            Assert.Equal("'./Name'", schema.Columns[0].ColPattern);
+        }
+
+        [Fact]
+        public void Parse_OpenXml_WithTableName_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT OPENXML(@idoc, '/root/row') WITH (dbo.T) FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.OpenXmlExpression openXml = Assert.IsType<Expr.OpenXmlExpression>(col.Expression);
+            Expr.OpenXmlTableName tableName = Assert.IsType<Expr.OpenXmlTableName>(openXml.WithClause);
+            Assert.Equal("T", tableName.TableName.ObjectName.Name);
+        }
+
+        #endregion
+
         #region WITHIN GROUP Tests
 
         [Theory]

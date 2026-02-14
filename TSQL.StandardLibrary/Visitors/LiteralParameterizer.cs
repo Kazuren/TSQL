@@ -174,6 +174,11 @@ namespace TSQL.StandardLibrary.Visitors
                 expr.TimeZone = TryReplace(expr.TimeZone);
             }
 
+            protected override void VisitOpenXml(Expr.OpenXmlExpression expr)
+            {
+                VisitFunctionCall(expr);
+            }
+
             #endregion
 
             #region Predicate Parents
