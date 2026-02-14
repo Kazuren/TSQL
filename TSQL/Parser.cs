@@ -1527,10 +1527,10 @@ namespace TSQL
                 return Grouping();
             }
 
-            // Handle COALESCE keyword - uses standard function call syntax with optional OVER
-            if (Match(TokenType.COALESCE, out Token coalesceToken))
+            // Handle COALESCE / NULLIF keywords - standard function call syntax
+            if (Match(TokenType.COALESCE, TokenType.NULLIF, out Token builtinFuncToken))
             {
-                ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(coalesceToken));
+                ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(builtinFuncToken));
                 return FinishCall(callee);
             }
 

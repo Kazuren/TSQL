@@ -2141,5 +2141,35 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region NULLIF Tests
+
+        [Theory]
+        [InlineData("SELECT NULLIF(a, b) FROM T")]
+        [InlineData("SELECT NULLIF(a + 1, 0) FROM T")]
+        [InlineData("SELECT NULLIF(x, '') AS result FROM T")]
+        public void Parse_Nullif(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Nullif_InWhereClause()
+        {
+            string source = "SELECT a FROM T WHERE NULLIF(a, 0) > 1";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Nullif_IsFunctionCall()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT NULLIF(a, b) FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
+            Assert.Equal("NULLIF", call.Callee.ObjectName.Name);
+            Assert.Equal(2, call.Arguments.Count);
+        }
+
+        #endregion
     }
 }
