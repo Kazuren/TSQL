@@ -61,25 +61,25 @@ namespace TSQL.Tests
             Assert.Equal("QualifiedWildcard", visitor.LastType);
         }
 
-        private class ExprTypeRecorder : Expr.Visitor<object>
+        private class ExprTypeRecorder : Expr.Visitor<object?>
         {
-            public string LastType { get; private set; }
-            public object VisitBinaryExpr(Expr.Binary expr) { LastType = "Binary"; return null; }
-            public object VisitLiteralExpr(Expr.Literal expr) { LastType = "Literal"; return null; }
-            public object VisitColumnIdentifierExpr(Expr.ColumnIdentifier expr) { LastType = "ColumnIdentifier"; return null; }
-            public object VisitObjectIdentifierExpr(Expr.ObjectIdentifier expr) { LastType = "ObjectIdentifier"; return null; }
-            public object VisitWildcardExpr(Expr.Wildcard expr) { LastType = "Wildcard"; return null; }
-            public object VisitQualifiedWildcardExpr(Expr.QualifiedWildcard expr) { LastType = "QualifiedWildcard"; return null; }
-            public object VisitUnaryExpr(Expr.Unary expr) { LastType = "Unary"; return null; }
-            public object VisitGroupingExpr(Expr.Grouping expr) { LastType = "Grouping"; return null; }
-            public object VisitSubqueryExpr(Expr.Subquery expr) { LastType = "Subquery"; return null; }
-            public object VisitFunctionCallExpr(Expr.FunctionCall expr) { LastType = "FunctionCall"; return null; }
-            public object VisitVariableExpr(Expr.Variable expr) { LastType = "Variable"; return null; }
-            public object VisitWindowFunctionExpr(Expr.WindowFunction expr) { LastType = "WindowFunction"; return null; }
-            public object VisitSimpleCaseExpr(Expr.SimpleCase expr) { LastType = "SimpleCase"; return null; }
-            public object VisitSearchedCaseExpr(Expr.SearchedCase expr) { LastType = "SearchedCase"; return null; }
-            public object VisitCastExpr(Expr.CastExpression expr) { LastType = "Cast"; return null; }
-            public object VisitConvertExpr(Expr.ConvertExpression expr) { LastType = "Convert"; return null; }
+            public string? LastType { get; private set; }
+            public object? VisitBinaryExpr(Expr.Binary expr) { LastType = "Binary"; return null; }
+            public object? VisitLiteralExpr(Expr.Literal expr) { LastType = "Literal"; return null; }
+            public object? VisitColumnIdentifierExpr(Expr.ColumnIdentifier expr) { LastType = "ColumnIdentifier"; return null; }
+            public object? VisitObjectIdentifierExpr(Expr.ObjectIdentifier expr) { LastType = "ObjectIdentifier"; return null; }
+            public object? VisitWildcardExpr(Expr.Wildcard expr) { LastType = "Wildcard"; return null; }
+            public object? VisitQualifiedWildcardExpr(Expr.QualifiedWildcard expr) { LastType = "QualifiedWildcard"; return null; }
+            public object? VisitUnaryExpr(Expr.Unary expr) { LastType = "Unary"; return null; }
+            public object? VisitGroupingExpr(Expr.Grouping expr) { LastType = "Grouping"; return null; }
+            public object? VisitSubqueryExpr(Expr.Subquery expr) { LastType = "Subquery"; return null; }
+            public object? VisitFunctionCallExpr(Expr.FunctionCall expr) { LastType = "FunctionCall"; return null; }
+            public object? VisitVariableExpr(Expr.Variable expr) { LastType = "Variable"; return null; }
+            public object? VisitWindowFunctionExpr(Expr.WindowFunction expr) { LastType = "WindowFunction"; return null; }
+            public object? VisitSimpleCaseExpr(Expr.SimpleCase expr) { LastType = "SimpleCase"; return null; }
+            public object? VisitSearchedCaseExpr(Expr.SearchedCase expr) { LastType = "SearchedCase"; return null; }
+            public object? VisitCastExpr(Expr.CastExpression expr) { LastType = "Cast"; return null; }
+            public object? VisitConvertExpr(Expr.ConvertExpression expr) { LastType = "Convert"; return null; }
         }
 
         #endregion
@@ -126,20 +126,20 @@ namespace TSQL.Tests
             Assert.Equal("SubqueryReference", visitor.LastType);
         }
 
-        private class TableSourceTypeRecorder : TableSource.Visitor<object>
+        private class TableSourceTypeRecorder : TableSource.Visitor<object?>
         {
-            public string LastType { get; private set; }
-            public object VisitTableReference(TableReference source) { LastType = "TableReference"; return null; }
-            public object VisitSubqueryReference(SubqueryReference source) { LastType = "SubqueryReference"; return null; }
-            public object VisitTableVariableReference(TableVariableReference source) { LastType = "TableVariableReference"; return null; }
-            public object VisitQualifiedJoin(QualifiedJoin source) { LastType = "QualifiedJoin"; return null; }
-            public object VisitCrossJoin(CrossJoin source) { LastType = "CrossJoin"; return null; }
-            public object VisitApplyJoin(ApplyJoin source) { LastType = "ApplyJoin"; return null; }
-            public object VisitParenthesizedTableSource(ParenthesizedTableSource source) { LastType = "ParenthesizedTableSource"; return null; }
-            public object VisitPivotTableSource(PivotTableSource source) { LastType = "PivotTableSource"; return null; }
-            public object VisitUnpivotTableSource(UnpivotTableSource source) { LastType = "UnpivotTableSource"; return null; }
-            public object VisitValuesTableSource(ValuesTableSource source) { LastType = "ValuesTableSource"; return null; }
-            public object VisitRowsetFunctionReference(RowsetFunctionReference source) { LastType = "RowsetFunctionReference"; return null; }
+            public string? LastType { get; private set; }
+            public object? VisitTableReference(TableReference source) { LastType = "TableReference"; return null; }
+            public object? VisitSubqueryReference(SubqueryReference source) { LastType = "SubqueryReference"; return null; }
+            public object? VisitTableVariableReference(TableVariableReference source) { LastType = "TableVariableReference"; return null; }
+            public object? VisitQualifiedJoin(QualifiedJoin source) { LastType = "QualifiedJoin"; return null; }
+            public object? VisitCrossJoin(CrossJoin source) { LastType = "CrossJoin"; return null; }
+            public object? VisitApplyJoin(ApplyJoin source) { LastType = "ApplyJoin"; return null; }
+            public object? VisitParenthesizedTableSource(ParenthesizedTableSource source) { LastType = "ParenthesizedTableSource"; return null; }
+            public object? VisitPivotTableSource(PivotTableSource source) { LastType = "PivotTableSource"; return null; }
+            public object? VisitUnpivotTableSource(UnpivotTableSource source) { LastType = "UnpivotTableSource"; return null; }
+            public object? VisitValuesTableSource(ValuesTableSource source) { LastType = "ValuesTableSource"; return null; }
+            public object? VisitRowsetFunctionReference(RowsetFunctionReference source) { LastType = "RowsetFunctionReference"; return null; }
         }
 
         #endregion
