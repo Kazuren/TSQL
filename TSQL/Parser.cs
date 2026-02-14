@@ -10,7 +10,6 @@ namespace TSQL
     // ## @variable.function_call
     //  - reason: @variable must be a CLR user-defined type, something that's rare and not worth implementing unless needed
 
-    // dollar sign ($) columns need no unique handling, column identifier already handles them just fine
     /*
     Legend:
     ? -> the group before it can appear zero or one time but not more.
@@ -20,177 +19,197 @@ namespace TSQL
     () -> grouping
 
     Grammar:
-        Statements:
-            Statement -> ("WITH" cte_list)? query_expression (option_clause)?
-            cte_list -> cte_definition ("," cte_definition)*
-            cte_definition -> IDENTIFIER ("(" IDENTIFIER ("," IDENTIFIER)* ")")? "AS" "(" query_expression ")"
-           
-        Expressions:
-            expression -> term
-            term -> factor ( ("-" | "+" | "&" | "^" | "|") factor )*
-            factor -> unary ( ( "/" | "*" | "%") unary )*
-            unary -> ("-" | "~") postfix | postfix
-            postfix -> scalar_subquery ("COLLATE" IDENTIFIER)? ("AT" "TIME" "ZONE" primary)*
-            scalar_subquery -> ( "(" query_expression ")" ) | primary
-            primary ->
-                "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
-                | case_expression | iif_expression | cast_expression | convert_expression
-                | column_expression | ( "(" expression ")" )
-                | scalar_function | window_function
-            case_expression -> "CASE" (expression WHEN_clause_simple+ | WHEN_clause_searched+) ("ELSE" expression)? "END"
-            openxml_expression -> "OPENXML" "(" expression_list ")" ("WITH" "(" (openxml_schema | table_name) ")")?
-            openxml_schema -> openxml_column_def ("," openxml_column_def)*
-            openxml_column_def -> IDENTIFIER data_type (STRING)?
-            iif_expression -> "IIF" "(" search_condition "," expression "," expression ")"
-            cast_expression -> ("CAST" | "TRY_CAST") "(" expression "AS" data_type ")"
-            convert_expression -> ("CONVERT" | "TRY_CONVERT") "(" data_type "," expression ("," expression)? ")"
-            data_type -> IDENTIFIER ("(" expression ("," expression)* ")")?
-        
 
-        Syntax nodes:
-            column_expression -> fully_qualified_identifier
-            fully_qualified_identifier -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
+    === Statements ===
 
-            scalar_function -> function_call
-            function_call -> fully_qualified_identifier "(" (expression_list)? ")" (within_group_clause)?
-            within_group_clause -> "WITHIN" "GROUP" "(" "ORDER" "BY" order_by_item ("," order_by_item)* ")"
-            expression_list -> expression ("," expression)*
+        Statement -> ("WITH" cte_list)? query_expression (option_clause)?
+        cte_list -> cte_definition ("," cte_definition)*
+        cte_definition -> IDENTIFIER ("(" IDENTIFIER ("," IDENTIFIER)* ")")? "AS" "(" query_expression ")"
 
-            query_expression -> union_except (order_by_clause (offset_fetch)?)? (for_clause)?
-            union_except -> intersect (("UNION" ("ALL")? | "EXCEPT") intersect)*
-            intersect -> select_core ("INTERSECT" select_core)*
-            select_core -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
-            option_clause -> "OPTION" "(" query_hint ("," query_hint)* ")"
-            for_clause -> "FOR" ("BROWSE" | for_xml | for_json)
-            for_xml -> "XML" ("RAW" ("(" STRING ")")? | "AUTO" | "EXPLICIT" | "PATH" ("(" STRING ")")?) ("," for_xml_directive)*
-            for_xml_directive -> "BINARY" "BASE64" | "TYPE" | "ROOT" ("(" STRING ")")? | "XMLDATA" | "XMLSCHEMA" ("(" STRING ")")? | "ELEMENTS" ("XSINIL" | "ABSENT")?
-            for_json -> "JSON" ("AUTO" | "PATH") ("," for_json_directive)*
-            for_json_directive -> "ROOT" ("(" STRING ")")? | "INCLUDE_NULL_VALUES" | "WITHOUT_ARRAY_WRAPPER"
-            parenthesized_expression -> ( "(" query_expression | expression ")" )
-            wildcard -> STAR
-            qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
-            select_item -> wildcard | qualified_wildcard | expression (("AS")? IDENTIFIER)?
-            select_list -> select_item ("," select_item)*
+    === Expressions ===
 
-            where_clause -> "WHERE search_condition
-            group_by_clause -> "GROUP" "BY" group_by_item ("," group_by_item)*
-            group_by_item -> expression | rollup | cube | grouping_sets | "()" | "(" expression ("," expression)+ ")"
-            rollup -> "ROLLUP" "(" group_by_expression ("," group_by_expression)* ")"
-            cube -> "CUBE" "(" group_by_expression ("," group_by_expression)* ")"
-            grouping_sets -> "GROUPING" "SETS" "(" grouping_set ("," grouping_set)* ")"
-            group_by_expression -> expression | "(" expression ("," expression)+ ")"
-            grouping_set -> "()" | group_by_item
-            having_clause -> "HAVING" search_condition
-            order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
-            order_by_item -> expression ("ASC" | "DESC")?
-            offset_fetch -> "OFFSET" expression ("ROW" | "ROWS") ("FETCH" ("FIRST" | "NEXT") expression ("ROW" | "ROWS") "ONLY")?
-            comparison_operator = ("=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "!>" | "!<" )
+        expression -> term
+        term -> factor ( ("-" | "+" | "&" | "^" | "|") factor )*
+        factor -> unary ( ( "/" | "*" | "%") unary )*
+        unary -> ("-" | "~") postfix | postfix
+        postfix -> scalar_subquery ("COLLATE" IDENTIFIER)? ("AT" "TIME" "ZONE" primary)*
+        scalar_subquery -> ( "(" query_expression ")" ) | primary
+        primary ->
+            "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
+            | case_expression | iif_expression | cast_expression | convert_expression
+            | column_expression | ( "(" expression ")" )
+            | scalar_function | window_function
 
-            ---------------- WHERE ---------------
-            comparison_predicate -> expression comparison_operator expression 
-            like_predicate -> expression ("NOT")? "LIKE" expression ("ESCAPE" STRING)?
-            between_predicate -> expression ("NOT")? "BETWEEN" expression "AND" expression
-            null_predicate -> expression IS ("NOT")? "NULL"
-            full_text_columns -> "*" | column_identifier | "(" column_identifier ("," column_identifier)* ")"
-            contains_predicate -> "CONTAINS" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
-            freetext_predicate -> "FREETEXT" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
-            in_predicate -> expression ("NOT")? IN "(" ( query_expression | ( expression ("," expression)* ) ) ")"
-            quantifier_predicate -> expression comparison_operator ("ALL" | "SOME" | "ANY" ) "(" query_expression ")"
-            exists_predicate -> "EXISTS" "(" query_expression ")"
+        case_expression -> "CASE" (expression WHEN_clause_simple+ | WHEN_clause_searched+) ("ELSE" expression)? "END"
+        iif_expression -> "IIF" "(" search_condition "," expression "," expression ")"
+        cast_expression -> ("CAST" | "TRY_CAST") "(" expression "AS" data_type ")"
+        convert_expression -> ("CONVERT" | "TRY_CONVERT") "(" data_type "," expression ("," expression)? ")"
+        data_type -> IDENTIFIER ("(" expression ("," expression)* ")")?
 
+        openxml_expression -> "OPENXML" "(" expression_list ")" ("WITH" "(" (openxml_schema | table_name) ")")?
+        openxml_schema -> openxml_column_def ("," openxml_column_def)*
+        openxml_column_def -> IDENTIFIER data_type (STRING)?
 
-            search_condition -> predicate
-            
-            predicate -> or_predicate
-            or_predicate ->  and_predicate ("OR" and_predicate)*
-            and_predicate -> unary_predicate ("AND" unary_predicate)*
-            unary_predicate -> ("NOT")? unary_predicate | primary_predicate
-            primary_predicate ->
-                comparison_predicate | like_comparison | between_predicate |
-                null_predicate | contains_predicate | freetext_predicate | in_predicate |
-                quantifier_predicate | exists_predicate | "(" predicate ")"
-            ---------------- WHERE ---------------
-    
-            ---------------- FROM ---------------
-            from_clause -> "FROM" table_source_list
-            table_source_list -> table_source_item ("," table_source_item)*
-            table_source_item -> table_source_primary (join_part)*
+    === Identifiers & Functions ===
 
-            table_source_primary ->
-                named_table_source
-                | subquery_table_source
-                | variable_table_source
-                | values_table_source
-                | rowset_function_source
-                | "(" table_source_item ")"
+        column_expression -> fully_qualified_identifier
+        fully_qualified_identifier -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".")? IDENTIFIER
 
-            named_table_source -> fully_qualified_identifier (for_system_time)? (("AS")? IDENTIFIER)? (tablesample_clause)? (with_hints)?
-            subquery_table_source -> "(" query_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
-            variable_table_source -> VARIABLE (("AS")? IDENTIFIER)?
-            values_table_source -> "(" "VALUES" values_row ("," values_row)* ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
-            values_row -> "(" expression ("," expression)* ")"
-            rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (("AS")? IDENTIFIER)?
+        scalar_function -> function_call
+        function_call -> fully_qualified_identifier "(" (expression_list)? ")" (within_group_clause)?
+        within_group_clause -> "WITHIN" "GROUP" "(" "ORDER" "BY" order_by_item ("," order_by_item)* ")"
+        expression_list -> expression ("," expression)*
 
-            join_part -> qualified_join | cross_join | apply_join | pivot_clause | unpivot_clause
-            qualified_join -> ( ("INNER" | "LEFT" ("OUTER")? | "RIGHT" ("OUTER")? | "FULL" ("OUTER")?) (join_hint)? )? "JOIN" table_source_primary "ON" search_condition
-            cross_join -> "CROSS" "JOIN" table_source_primary
-            apply_join -> ("CROSS" | "OUTER") "APPLY" table_source_primary
-            join_hint -> "LOOP" | "HASH" | "MERGE" | "REMOTE"
+    === Query Structure ===
 
-            pivot_clause -> "PIVOT" "(" function_call "FOR" fully_qualified_identifier "IN" "(" expression_list ")" ")" (("AS")? IDENTIFIER)?
-            unpivot_clause -> "UNPIVOT" "(" fully_qualified_identifier "FOR" fully_qualified_identifier "IN" "(" IDENTIFIER ("," IDENTIFIER)* ")" ")" (("AS")? IDENTIFIER)?
+        query_expression -> union_except (order_by_clause (offset_fetch)?)? (for_clause)?
+        union_except -> intersect (("UNION" ("ALL")? | "EXCEPT") intersect)*
+        intersect -> select_core ("INTERSECT" select_core)*
+        select_core -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
+        parenthesized_expression -> ( "(" query_expression | expression ")" )
 
-            for_system_time -> "FOR" "SYSTEM_TIME" system_time
-            system_time ->
-                "AS" "OF" date_time
-                | "FROM" date_time "TO" date_time
-                | "BETWEEN" date_time "AND" date_time
-                | "CONTAINED" "IN" "(" date_time "," date_time ")"
-                | "ALL"
-            date_time -> STRING | VARIABLE
+        wildcard -> STAR
+        qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
+        select_item -> wildcard | qualified_wildcard | expression (("AS")? IDENTIFIER)?
+        select_list -> select_item ("," select_item)*
 
-            tablesample_clause -> "TABLESAMPLE" ("SYSTEM")? "(" expression ("PERCENT" | "ROWS") ")" ( "REPEATABLE" "(" expression ")" )?
+    === Clauses ===
 
-            with_hints -> "WITH" "(" table_hint ("," table_hint)* ")"
-            table_hint -> "NOEXPAND"
-                | "INDEX" "(" index_value ("," index_value)* ")"
-                | "INDEX" "=" index_value
-                | "FORCESEEK" ( "(" index_value "(" IDENTIFIER ("," IDENTIFIER)* ")" ")" )?
-                | "FORCESCAN"
-                | "HOLDLOCK"
-                | "NOLOCK"
-                | "NOWAIT"
-                | "PAGLOCK"
-                | "READCOMMITTED"
-                | "READCOMMITTEDLOCK"
-                | "READPAST"
-                | "READUNCOMMITTED"
-                | "REPEATABLEREAD"
-                | "ROWLOCK"
-                | "SERIALIZABLE"
-                | "SNAPSHOT"
-                | "SPATIAL_WINDOW_MAX_CELLS" "=" WHOLE_NUMBER
-                | "TABLOCK"
-                | "TABLOCKX"
-                | "UPDLOCK"
-                | "XLOCK"
-            index_value -> WHOLE_NUMBER | IDENTIFIER
-            ---------------- FROM ---------------
+        where_clause -> "WHERE" search_condition
+        having_clause -> "HAVING" search_condition
 
-            ---------------- WINDOW FUNCTIONS ---------------
-            window_function -> function_call over_clause
-            over_clause -> "OVER" "(" (partition_by_clause)? (order_by_clause)? (frame_clause)? ")"
-            partition_by_clause -> "PARTITION" "BY" expression ("," expression)*
-            order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
-            order_by_item -> expression ("ASC" | "DESC")?
-            frame_clause -> ("ROWS" | "RANGE") frame_extent
-            frame_extent -> frame_bound | "BETWEEN" frame_bound "AND" frame_bound
-            frame_bound -> "UNBOUNDED" "PRECEDING" 
-                         | "UNBOUNDED" "FOLLOWING"
-                         | "CURRENT" "ROW"
-                         | WHOLE_NUMBER "PRECEDING"
-                         | WHOLE_NUMBER "FOLLOWING"
-            ---------------- WINDOW FUNCTIONS ---------------
+        group_by_clause -> "GROUP" "BY" group_by_item ("," group_by_item)*
+        group_by_item -> expression | rollup | cube | grouping_sets | "()" | "(" expression ("," expression)+ ")"
+        rollup -> "ROLLUP" "(" group_by_expression ("," group_by_expression)* ")"
+        cube -> "CUBE" "(" group_by_expression ("," group_by_expression)* ")"
+        grouping_sets -> "GROUPING" "SETS" "(" grouping_set ("," grouping_set)* ")"
+        group_by_expression -> expression | "(" expression ("," expression)+ ")"
+        grouping_set -> "()" | group_by_item
+
+        order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
+        order_by_item -> expression ("ASC" | "DESC")?
+        offset_fetch -> "OFFSET" expression ("ROW" | "ROWS") ("FETCH" ("FIRST" | "NEXT") expression ("ROW" | "ROWS") "ONLY")?
+
+        option_clause -> "OPTION" "(" query_hint ("," query_hint)* ")"
+
+        for_clause -> "FOR" ("BROWSE" | for_xml | for_json)
+        for_xml -> "XML" ("RAW" ("(" STRING ")")? | "AUTO" | "EXPLICIT" | "PATH" ("(" STRING ")")?) ("," for_xml_directive)*
+        for_xml_directive -> "BINARY" "BASE64" | "TYPE" | "ROOT" ("(" STRING ")")? | "XMLDATA" | "XMLSCHEMA" ("(" STRING ")")? | "ELEMENTS" ("XSINIL" | "ABSENT")?
+        for_json -> "JSON" ("AUTO" | "PATH") ("," for_json_directive)*
+        for_json_directive -> "ROOT" ("(" STRING ")")? | "INCLUDE_NULL_VALUES" | "WITHOUT_ARRAY_WRAPPER"
+
+    === Predicates ===
+
+        search_condition -> predicate
+
+        predicate -> or_predicate
+        or_predicate -> and_predicate ("OR" and_predicate)*
+        and_predicate -> unary_predicate ("AND" unary_predicate)*
+        unary_predicate -> ("NOT")? unary_predicate | primary_predicate
+        primary_predicate ->
+            comparison_predicate | like_comparison | between_predicate |
+            null_predicate | contains_predicate | freetext_predicate | in_predicate |
+            quantifier_predicate | exists_predicate | "(" predicate ")"
+
+        comparison_predicate -> expression comparison_operator expression
+        comparison_operator = ("=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "!>" | "!<" )
+        like_predicate -> expression ("NOT")? "LIKE" expression ("ESCAPE" STRING)?
+        between_predicate -> expression ("NOT")? "BETWEEN" expression "AND" expression
+        null_predicate -> expression IS ("NOT")? "NULL"
+        in_predicate -> expression ("NOT")? IN "(" ( query_expression | ( expression ("," expression)* ) ) ")"
+        quantifier_predicate -> expression comparison_operator ("ALL" | "SOME" | "ANY" ) "(" query_expression ")"
+        exists_predicate -> "EXISTS" "(" query_expression ")"
+
+        full_text_columns -> "*" | column_identifier | "(" column_identifier ("," column_identifier)* ")"
+        contains_predicate -> "CONTAINS" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
+        freetext_predicate -> "FREETEXT" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
+
+    === FROM / Table Sources ===
+
+        from_clause -> "FROM" table_source_list
+        table_source_list -> table_source_item ("," table_source_item)*
+        table_source_item -> table_source_primary (join_part)*
+
+        table_source_primary ->
+            named_table_source
+            | subquery_table_source
+            | variable_table_source
+            | values_table_source
+            | rowset_function_source
+            | "(" table_source_item ")"
+
+        named_table_source -> fully_qualified_identifier (for_system_time)? (("AS")? IDENTIFIER)? (tablesample_clause)? (with_hints)?
+        subquery_table_source -> "(" query_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
+        variable_table_source -> VARIABLE (("AS")? IDENTIFIER)?
+        values_table_source -> "(" "VALUES" values_row ("," values_row)* ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
+        values_row -> "(" expression ("," expression)* ")"
+        rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (("AS")? IDENTIFIER)?
+
+    --- Joins ---
+
+        join_part -> qualified_join | cross_join | apply_join | pivot_clause | unpivot_clause
+        qualified_join -> ( ("INNER" | "LEFT" ("OUTER")? | "RIGHT" ("OUTER")? | "FULL" ("OUTER")?) (join_hint)? )? "JOIN" table_source_primary "ON" search_condition
+        cross_join -> "CROSS" "JOIN" table_source_primary
+        apply_join -> ("CROSS" | "OUTER") "APPLY" table_source_primary
+        join_hint -> "LOOP" | "HASH" | "MERGE" | "REMOTE"
+
+        pivot_clause -> "PIVOT" "(" function_call "FOR" fully_qualified_identifier "IN" "(" expression_list ")" ")" (("AS")? IDENTIFIER)?
+        unpivot_clause -> "UNPIVOT" "(" fully_qualified_identifier "FOR" fully_qualified_identifier "IN" "(" IDENTIFIER ("," IDENTIFIER)* ")" ")" (("AS")? IDENTIFIER)?
+
+    --- Temporal ---
+
+        for_system_time -> "FOR" "SYSTEM_TIME" system_time
+        system_time ->
+            "AS" "OF" date_time
+            | "FROM" date_time "TO" date_time
+            | "BETWEEN" date_time "AND" date_time
+            | "CONTAINED" "IN" "(" date_time "," date_time ")"
+            | "ALL"
+        date_time -> STRING | VARIABLE
+
+    --- Table Hints ---
+
+        tablesample_clause -> "TABLESAMPLE" ("SYSTEM")? "(" expression ("PERCENT" | "ROWS") ")" ( "REPEATABLE" "(" expression ")" )?
+
+        with_hints -> "WITH" "(" table_hint ("," table_hint)* ")"
+        table_hint -> "NOEXPAND"
+            | "INDEX" "(" index_value ("," index_value)* ")"
+            | "INDEX" "=" index_value
+            | "FORCESEEK" ( "(" index_value "(" IDENTIFIER ("," IDENTIFIER)* ")" ")" )?
+            | "FORCESCAN"
+            | "HOLDLOCK"
+            | "NOLOCK"
+            | "NOWAIT"
+            | "PAGLOCK"
+            | "READCOMMITTED"
+            | "READCOMMITTEDLOCK"
+            | "READPAST"
+            | "READUNCOMMITTED"
+            | "REPEATABLEREAD"
+            | "ROWLOCK"
+            | "SERIALIZABLE"
+            | "SNAPSHOT"
+            | "SPATIAL_WINDOW_MAX_CELLS" "=" WHOLE_NUMBER
+            | "TABLOCK"
+            | "TABLOCKX"
+            | "UPDLOCK"
+            | "XLOCK"
+        index_value -> WHOLE_NUMBER | IDENTIFIER
+
+    === Window Functions ===
+
+        window_function -> function_call over_clause
+        over_clause -> "OVER" "(" (partition_by_clause)? (order_by_clause)? (frame_clause)? ")"
+        partition_by_clause -> "PARTITION" "BY" expression ("," expression)*
+        order_by_clause -> "ORDER" "BY" order_by_item ("," order_by_item)*
+        order_by_item -> expression ("ASC" | "DESC")?
+        frame_clause -> ("ROWS" | "RANGE") frame_extent
+        frame_extent -> frame_bound | "BETWEEN" frame_bound "AND" frame_bound
+        frame_bound -> "UNBOUNDED" "PRECEDING"
+                     | "UNBOUNDED" "FOLLOWING"
+                     | "CURRENT" "ROW"
+                     | WHOLE_NUMBER "PRECEDING"
+                     | WHOLE_NUMBER "FOLLOWING"
     */
 
     public class Parser
