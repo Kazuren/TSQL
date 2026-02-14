@@ -339,10 +339,10 @@ namespace TSQL.Benchmarks
     [BenchmarkCategory("Parser", "Identifiers")]
     public class IdentifierBenchmarks
     {
-        private const string SimpleColumn = "SELECT column FROM T";
-        private const string TableQualified = "SELECT table.column FROM T";
-        private const string SchemaQualified = "SELECT schema.table.column FROM T";
-        private const string FullyQualified = "SELECT database.schema.table.column FROM T";
+        private const string SimpleColumn = "SELECT col FROM T";
+        private const string TableQualified = "SELECT t.col FROM T";
+        private const string SchemaQualified = "SELECT s.t.col FROM T";
+        private const string FullyQualified = "SELECT d.s.t.col FROM T";
         private const string MixedIdentifiers = "SELECT a, t.b, s.t.c, d.s.t.e FROM T";
 
         [Benchmark(Description = "Simple column")]
@@ -440,6 +440,526 @@ namespace TSQL.Benchmarks
                 results[i] = parser.Parse();
             }
             return results;
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for WHERE clause predicate parsing
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "Predicates")]
+    public class PredicateBenchmarks
+    {
+        private const string SimpleComparison = "SELECT Id FROM T WHERE Active = 1";
+        private const string MultiplePredicate = "SELECT Id FROM T WHERE Active = 1 AND Age > 18 AND Name LIKE 'J%' AND Status <> 'deleted'";
+        private const string InList = "SELECT Id FROM T WHERE Status IN ('active', 'pending', 'review', 'approved', 'shipped')";
+        private const string BetweenPredicate = "SELECT Id FROM T WHERE CreatedDate BETWEEN '2024-01-01' AND '2024-12-31' AND Amount BETWEEN 100 AND 500";
+        private const string ExistsSubquery = "SELECT Id FROM T WHERE EXISTS (SELECT 1 FROM Orders o WHERE o.UserId = T.Id AND o.Total > 100)";
+        private const string ComplexBoolean = "SELECT Id FROM T WHERE (A = 1 OR B = 2) AND (C > 3 OR (D < 4 AND E = 5)) AND NOT F = 6";
+
+        [Benchmark(Description = "Simple comparison")]
+        public Stmt ParseSimpleComparison()
+        {
+            var scanner = new Scanner(SimpleComparison);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Multiple AND predicates with LIKE")]
+        public Stmt ParseMultiplePredicate()
+        {
+            var scanner = new Scanner(MultiplePredicate);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "IN list with 5 values")]
+        public Stmt ParseInList()
+        {
+            var scanner = new Scanner(InList);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "BETWEEN predicates")]
+        public Stmt ParseBetweenPredicate()
+        {
+            var scanner = new Scanner(BetweenPredicate);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "EXISTS subquery")]
+        public Stmt ParseExistsSubquery()
+        {
+            var scanner = new Scanner(ExistsSubquery);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Complex boolean with NOT")]
+        public Stmt ParseComplexBoolean()
+        {
+            var scanner = new Scanner(ComplexBoolean);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for JOIN parsing
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "Joins")]
+    public class JoinBenchmarks
+    {
+        private const string InnerJoin = "SELECT u.Id, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId";
+        private const string MultiJoin = "SELECT u.Id, o.Total, p.Name FROM Users u INNER JOIN Orders o ON u.Id = o.UserId LEFT JOIN Products p ON o.ProductId = p.Id LEFT JOIN Categories c ON p.CategoryId = c.Id";
+        private const string CrossApply = "SELECT d.Name, e.TopSalary FROM Departments d CROSS APPLY (SELECT TOP 1 Salary AS TopSalary FROM Employees WHERE DeptId = d.Id ORDER BY Salary DESC) e";
+        private const string JoinWithHints = "SELECT u.Id FROM Users u WITH (NOLOCK) INNER JOIN Orders o WITH (NOLOCK) ON u.Id = o.UserId";
+        private const string FullOuterJoin = "SELECT a.Id, b.Id FROM TableA a FULL OUTER JOIN TableB b ON a.JoinKey = b.JoinKey";
+
+        [Benchmark(Description = "INNER JOIN")]
+        public Stmt ParseInnerJoin()
+        {
+            var scanner = new Scanner(InnerJoin);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Multi JOIN chain (4 tables)")]
+        public Stmt ParseMultiJoin()
+        {
+            var scanner = new Scanner(MultiJoin);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "CROSS APPLY with subquery")]
+        public Stmt ParseCrossApply()
+        {
+            var scanner = new Scanner(CrossApply);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "JOIN with table hints")]
+        public Stmt ParseJoinWithHints()
+        {
+            var scanner = new Scanner(JoinWithHints);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "FULL OUTER JOIN")]
+        public Stmt ParseFullOuterJoin()
+        {
+            var scanner = new Scanner(FullOuterJoin);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for Common Table Expression parsing
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "CTEs")]
+    public class CTEBenchmarks
+    {
+        private const string SimpleCTE = "WITH cte AS (SELECT Id, Name FROM Users WHERE Active = 1) SELECT Id, Name FROM cte";
+        private const string MultipleCTEs = "WITH cte1 AS (SELECT Id FROM Users), cte2 AS (SELECT UserId, Total FROM Orders), cte3 AS (SELECT Id, Name FROM Products) SELECT c1.Id, c2.Total, c3.Name FROM cte1 c1 JOIN cte2 c2 ON c1.Id = c2.UserId JOIN cte3 c3 ON c3.Id = 1";
+        private const string CTEWithColumns = "WITH ranked(Id, Name, Rnk) AS (SELECT Id, Name, ROW_NUMBER() OVER (ORDER BY Id) FROM Users) SELECT Id, Name FROM ranked WHERE Rnk <= 10";
+
+        [Benchmark(Description = "Simple CTE")]
+        public Stmt ParseSimpleCTE()
+        {
+            var scanner = new Scanner(SimpleCTE);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Multiple CTEs (3)")]
+        public Stmt ParseMultipleCTEs()
+        {
+            var scanner = new Scanner(MultipleCTEs);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "CTE with column list")]
+        public Stmt ParseCTEWithColumns()
+        {
+            var scanner = new Scanner(CTEWithColumns);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for set operation parsing (UNION, INTERSECT, EXCEPT)
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "SetOperations")]
+    public class SetOperationBenchmarks
+    {
+        private const string UnionAll = "SELECT Id, Name FROM Users UNION ALL SELECT Id, Name FROM Customers";
+        private const string MultiUnion = "SELECT Id FROM TableA UNION SELECT Id FROM TableB UNION SELECT Id FROM TableC UNION ALL SELECT Id FROM TableD";
+        private const string UnionWithOrderBy = "SELECT Id, Name FROM Users UNION ALL SELECT Id, Name FROM Customers ORDER BY Name OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
+        private const string IntersectExcept = "SELECT Id FROM TableA INTERSECT SELECT Id FROM TableB EXCEPT SELECT Id FROM TableC";
+
+        [Benchmark(Description = "UNION ALL")]
+        public Stmt ParseUnionAll()
+        {
+            var scanner = new Scanner(UnionAll);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Multi UNION chain (4 selects)")]
+        public Stmt ParseMultiUnion()
+        {
+            var scanner = new Scanner(MultiUnion);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "UNION with ORDER BY and OFFSET")]
+        public Stmt ParseUnionWithOrderBy()
+        {
+            var scanner = new Scanner(UnionWithOrderBy);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "INTERSECT and EXCEPT")]
+        public Stmt ParseIntersectExcept()
+        {
+            var scanner = new Scanner(IntersectExcept);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for table hints and query hints
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "Hints")]
+    public class HintBenchmarks
+    {
+        private const string TableHints = "SELECT Id FROM Users WITH (NOLOCK, INDEX(IX_Users_Name)) WHERE Active = 1";
+        private const string QueryHintSimple = "SELECT Id FROM Users OPTION (RECOMPILE)";
+        private const string QueryHintComplex = "SELECT Id FROM Users u INNER JOIN Orders o ON u.Id = o.UserId OPTION (HASH JOIN, MAXDOP 4, OPTIMIZE FOR UNKNOWN)";
+        private const string QueryHintUseHint = "SELECT Id FROM Users OPTION (USE HINT ('FORCE_LEGACY_CARDINALITY_ESTIMATION', 'ENABLE_PARALLEL_PLAN_PREFERENCE'))";
+
+        [Benchmark(Description = "Table hints (NOLOCK, INDEX)")]
+        public Stmt ParseTableHints()
+        {
+            var scanner = new Scanner(TableHints);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Simple query hint (RECOMPILE)")]
+        public Stmt ParseQueryHintSimple()
+        {
+            var scanner = new Scanner(QueryHintSimple);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Complex query hints")]
+        public Stmt ParseQueryHintComplex()
+        {
+            var scanner = new Scanner(QueryHintComplex);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "USE HINT with strings")]
+        public Stmt ParseQueryHintUseHint()
+        {
+            var scanner = new Scanner(QueryHintUseHint);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for advanced clauses: GROUP BY extensions, OFFSET/FETCH, FOR XML/JSON, PIVOT
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "Clauses")]
+    public class ClauseBenchmarks
+    {
+        private const string GroupByRollup = "SELECT Region, City, SUM(Sales) FROM Data GROUP BY ROLLUP (Region, City)";
+        private const string GroupByCube = "SELECT Region, City, Year, SUM(Sales) FROM Data GROUP BY CUBE (Region, City, Year)";
+        private const string GroupingSets = "SELECT Region, City, Year, SUM(Sales) FROM Data GROUP BY GROUPING SETS ((Region, City), (Region, Year), (City), ())";
+        private const string OffsetFetch = "SELECT Id, Name FROM Users ORDER BY Name OFFSET 50 ROWS FETCH NEXT 25 ROWS ONLY";
+        private const string ForXmlPath = "SELECT Id, Name FROM Users FOR XML PATH('User'), ROOT('Users'), ELEMENTS, TYPE";
+        private const string ForJsonPath = "SELECT Id, Name FROM Users FOR JSON PATH, ROOT('users'), INCLUDE_NULL_VALUES";
+        private const string Pivot = "SELECT Year, [Q1], [Q2], [Q3], [Q4] FROM SalesData PIVOT (SUM(Amount) FOR Quarter IN ([Q1], [Q2], [Q3], [Q4])) AS pvt";
+
+        [Benchmark(Description = "GROUP BY ROLLUP")]
+        public Stmt ParseGroupByRollup()
+        {
+            var scanner = new Scanner(GroupByRollup);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "GROUP BY CUBE")]
+        public Stmt ParseGroupByCube()
+        {
+            var scanner = new Scanner(GroupByCube);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "GROUPING SETS")]
+        public Stmt ParseGroupingSets()
+        {
+            var scanner = new Scanner(GroupingSets);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "OFFSET/FETCH paging")]
+        public Stmt ParseOffsetFetch()
+        {
+            var scanner = new Scanner(OffsetFetch);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "FOR XML PATH with options")]
+        public Stmt ParseForXmlPath()
+        {
+            var scanner = new Scanner(ForXmlPath);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "FOR JSON PATH with options")]
+        public Stmt ParseForJsonPath()
+        {
+            var scanner = new Scanner(ForJsonPath);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "PIVOT")]
+        public Stmt ParsePivot()
+        {
+            var scanner = new Scanner(Pivot);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for expression types: CASE, CAST/CONVERT, IIF
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("Parser", "Expressions")]
+    public class ExpressionBenchmarks
+    {
+        private const string SearchedCase = "SELECT CASE WHEN Status = 1 THEN 'Active' WHEN Status = 2 THEN 'Inactive' WHEN Status = 3 THEN 'Suspended' ELSE 'Unknown' END FROM Users";
+        private const string SimpleCase = "SELECT CASE Status WHEN 1 THEN 'Active' WHEN 2 THEN 'Inactive' WHEN 3 THEN 'Suspended' ELSE 'Unknown' END FROM Users";
+        private const string NestedCase = "SELECT CASE WHEN A = 1 THEN CASE WHEN B = 2 THEN 'X' ELSE 'Y' END ELSE CASE WHEN C = 3 THEN 'Z' ELSE 'W' END END FROM T";
+        private const string CastConvert = "SELECT CAST(Id AS VARCHAR(10)), CONVERT(DECIMAL(18, 2), Amount), TRY_CAST(Value AS INT), TRY_CONVERT(DATE, DateStr, 101) FROM T";
+        private const string IifExpression = "SELECT IIF(Score >= 90, 'A', IIF(Score >= 80, 'B', IIF(Score >= 70, 'C', 'F'))) FROM Students";
+
+        [Benchmark(Description = "Searched CASE (3 WHEN)")]
+        public Stmt ParseSearchedCase()
+        {
+            var scanner = new Scanner(SearchedCase);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Simple CASE (3 WHEN)")]
+        public Stmt ParseSimpleCase()
+        {
+            var scanner = new Scanner(SimpleCase);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Nested CASE expressions")]
+        public Stmt ParseNestedCase()
+        {
+            var scanner = new Scanner(NestedCase);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "CAST/CONVERT/TRY variants")]
+        public Stmt ParseCastConvert()
+        {
+            var scanner = new Scanner(CastConvert);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Nested IIF expressions")]
+        public Stmt ParseIifExpression()
+        {
+            var scanner = new Scanner(IifExpression);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+    }
+
+    /// <summary>
+    /// Benchmarks for production-scale queries exercising many features simultaneously
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("RealWorld")]
+    public class RealWorldBenchmarks
+    {
+        private const string ReportQuery = @"
+            WITH MonthlySales AS (
+                SELECT
+                    s.RegionId,
+                    DATEPART(MONTH, s.SaleDate) AS SaleMonth,
+                    SUM(s.Amount) AS TotalAmount,
+                    COUNT(*) AS SaleCount
+                FROM Sales s
+                INNER JOIN Products p ON s.ProductId = p.Id
+                WHERE s.SaleDate BETWEEN '2024-01-01' AND '2024-12-31'
+                    AND p.Active = 1
+                    AND s.Status IN ('completed', 'shipped')
+                GROUP BY s.RegionId, DATEPART(MONTH, s.SaleDate)
+            )
+            SELECT
+                r.Name AS RegionName,
+                ms.SaleMonth,
+                ms.TotalAmount,
+                ms.SaleCount,
+                CASE
+                    WHEN ms.TotalAmount > 100000 THEN 'High'
+                    WHEN ms.TotalAmount > 50000 THEN 'Medium'
+                    ELSE 'Low'
+                END AS PerformanceTier,
+                ROW_NUMBER() OVER (PARTITION BY ms.SaleMonth ORDER BY ms.TotalAmount DESC) AS MonthlyRank,
+                SUM(ms.TotalAmount) OVER (PARTITION BY r.Name ORDER BY ms.SaleMonth ROWS UNBOUNDED PRECEDING) AS RunningTotal
+            FROM MonthlySales ms
+            INNER JOIN Regions r ON ms.RegionId = r.Id
+            WHERE ms.SaleCount > 10
+            GROUP BY r.Name, ms.SaleMonth, ms.TotalAmount, ms.SaleCount, ms.RegionId, r.Id
+            HAVING SUM(ms.TotalAmount) > 5000
+            ORDER BY ms.SaleMonth, ms.TotalAmount DESC
+            OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY";
+
+        private const string AnalyticsQuery = @"
+            WITH UserMetrics AS (
+                SELECT
+                    u.Id AS UserId,
+                    u.Name,
+                    COUNT(o.Id) AS OrderCount,
+                    SUM(o.Total) AS TotalSpent,
+                    AVG(o.Total) AS AvgOrder
+                FROM Users u
+                LEFT JOIN Orders o ON u.Id = o.UserId
+                WHERE u.CreatedDate >= '2023-01-01'
+                GROUP BY u.Id, u.Name
+            ),
+            RankedUsers AS (
+                SELECT
+                    UserId,
+                    Name,
+                    OrderCount,
+                    TotalSpent,
+                    AvgOrder,
+                    NTILE(10) OVER (ORDER BY TotalSpent DESC) AS SpendDecile,
+                    DENSE_RANK() OVER (ORDER BY OrderCount DESC) AS FrequencyRank
+                FROM UserMetrics
+                WHERE TotalSpent > 0
+            )
+            SELECT
+                ru.Name,
+                ru.OrderCount,
+                ru.TotalSpent,
+                ru.SpendDecile,
+                ru.FrequencyRank,
+                d.TopCategory,
+                d.TopCategorySpend
+            FROM RankedUsers ru
+            CROSS APPLY (
+                SELECT TOP 1
+                    c.Name AS TopCategory,
+                    SUM(oi.Amount) AS TopCategorySpend
+                FROM OrderItems oi
+                INNER JOIN Products p ON oi.ProductId = p.Id
+                INNER JOIN Categories c ON p.CategoryId = c.Id
+                WHERE oi.OrderId IN (SELECT Id FROM Orders WHERE UserId = ru.UserId)
+                GROUP BY c.Name
+                ORDER BY SUM(oi.Amount) DESC
+            ) d
+            WHERE ru.SpendDecile <= 3
+            ORDER BY ru.TotalSpent DESC
+            FOR JSON PATH, ROOT('topCustomers')";
+
+        [Benchmark(Description = "Report query (~1500 chars)")]
+        public Stmt ParseReportQuery()
+        {
+            var scanner = new Scanner(ReportQuery);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
+        [Benchmark(Description = "Analytics query (~1200 chars)")]
+        public Stmt ParseAnalyticsQuery()
+        {
+            var scanner = new Scanner(AnalyticsQuery);
+            var tokens = scanner.ScanTokens();
+            var parser = new Parser(tokens);
+            return parser.Parse();
         }
     }
 }
