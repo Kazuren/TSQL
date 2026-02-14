@@ -53,6 +53,9 @@ namespace TSQL
         APPLY, LOOP, HASH, REMOTE, SYSTEM, CONTAINED, REPEATABLE,
 
         // GROUP BY keywords (contextual - can also be used as identifiers)
-        ROLLUP, CUBE, GROUPING, SETS
+        ROLLUP, CUBE, GROUPING, SETS,
+
+        // TOP clause keywords (contextual - can also be used as identifiers)
+        TIES
     }
 }

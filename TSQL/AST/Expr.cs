@@ -384,6 +384,7 @@ namespace TSQL
         public class Literal : Expr
         {
             public object Value { get => _token.Literal; }
+            internal TokenType TokenType { get => _token.Type; }
 
             private readonly Token _token;
             public Literal(object value)

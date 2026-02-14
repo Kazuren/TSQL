@@ -199,6 +199,8 @@ namespace TSQL
     public class TopClause : SyntaxElement
     {
         public Expr Expression { get; }
+        public bool Percent { get; set; }
+        public bool WithTies { get; set; }
 
         public TopClause(Expr expr)
         {
@@ -208,6 +210,9 @@ namespace TSQL
         internal Token _topKeyword;
         internal Token _leftParen;
         internal Token _rightParen;
+        internal Token _percentKeyword;
+        internal Token _withKeyword;
+        internal Token _tiesKeyword;
 
         public override IEnumerable<Token> DescendantTokens()
         {
@@ -225,6 +230,17 @@ namespace TSQL
             if (_rightParen != null)
             {
                 yield return _rightParen;
+            }
+
+            if (_percentKeyword != null)
+            {
+                yield return _percentKeyword;
+            }
+
+            if (_withKeyword != null)
+            {
+                yield return _withKeyword;
+                yield return _tiesKeyword;
             }
         }
     }

@@ -2102,5 +2102,44 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region TOP Validation Tests
+
+        [Theory]
+        [InlineData("SELECT TOP 10 * FROM T")]
+        [InlineData("SELECT TOP (@n) * FROM T")]
+        [InlineData("SELECT TOP (10 + 5) * FROM T")]
+        [InlineData("SELECT TOP (CAST(@n AS INT)) * FROM T")]
+        [InlineData("SELECT TOP 10 a, b FROM T")]
+        [InlineData("SELECT TOP 10 PERCENT * FROM T")]
+        [InlineData("SELECT TOP (50) PERCENT * FROM T")]
+        [InlineData("SELECT TOP 10 PERCENT WITH TIES * FROM T")]
+        [InlineData("SELECT TOP (10) WITH TIES * FROM T")]
+        public void Parse_Top_ValidExpressions(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Theory]
+        [InlineData("SELECT TOP NULL * FROM T")]
+        [InlineData("SELECT TOP 'x' * FROM T")]
+        [InlineData("SELECT TOP 3.14 * FROM T")]
+        [InlineData("SELECT TOP @n * FROM T")]
+        public void Parse_Top_RejectsInvalidLiterals(string source)
+        {
+            Assert.Throws<Parser.ParseError>(() => ParseSelect(source));
+        }
+
+        [Theory]
+        [InlineData("SELECT a AS TIES FROM T")]
+        [InlineData("SELECT TIES = a FROM T")]
+        [InlineData("SELECT a FROM T AS TIES")]
+        [InlineData("SELECT TIES FROM T")]
+        public void Parse_Ties_WorksAsIdentifier(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
     }
 }

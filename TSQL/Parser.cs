@@ -19,10 +19,6 @@ namespace TSQL
     | -> one of the following (OR) e.g. a | b = a OR b
     () -> grouping
 
-    // TODO: think if we should make TOP NOT support NULL / DECIMAL / STRING
-    // maybe we can do that by parsing the Expression 
-    // and check the previous Token and if it was NULL / DECIMAL / STRING to throw an error
-
     Grammar:
         Statements:
             Statement -> ("WITH" cte_list)? select_expression
@@ -54,7 +50,7 @@ namespace TSQL
             function_call -> fully_qualified_identifier "(" (expression_list)? ")" 
             expression_list -> expression ("," expression)*
 
-            select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | parenthesized_expression) ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)? (option_clause)?
+            select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)? (option_clause)?
             option_clause -> "OPTION" "(" query_hint ("," query_hint)* ")"
             parenthesized_expression -> ( "(" select_expression | expression ")" ) 
             wildcard -> STAR
@@ -220,7 +216,8 @@ namespace TSQL
             TokenType.ROLLUP,
             TokenType.CUBE,
             TokenType.GROUPING,
-            TokenType.SETS
+            TokenType.SETS,
+            TokenType.TIES
         };
 
         public Parser(IEnumerable<Token> tokens)
@@ -290,9 +287,7 @@ namespace TSQL
 
             if (Match(TokenType.TOP, out Token topKeyword))
             {
-                Expr expr = Expression();
-                selectExpr.Top = new TopClause(expr);
-                selectExpr.Top._topKeyword = topKeyword;
+                selectExpr.Top = ParseTopClause(topKeyword);
             }
 
             selectExpr.Columns.Add(SelectItem());
@@ -339,6 +334,53 @@ namespace TSQL
             return selectExpr;
         }
 
+
+        /// <summary>
+        /// TOP WHOLE_NUMBER | TOP (expression) — bare TOP only accepts integer literals.
+        /// Rejects NULL, DECIMAL, and STRING literals.
+        /// </summary>
+        private TopClause ParseTopClause(Token topKeyword)
+        {
+            TopClause top;
+
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                // TOP (expression) — full expression inside parens
+                Token leftParen = Advance();
+                Expr expr = Expression();
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after TOP expression");
+                top = new TopClause(expr);
+                top._leftParen = leftParen;
+                top._rightParen = rightParen;
+            }
+            else if (Check(TokenType.WHOLE_NUMBER))
+            {
+                // TOP N — bare integer literal only
+                Expr expr = new Expr.Literal(Advance());
+                top = new TopClause(expr);
+            }
+            else
+            {
+                throw Error(Peek(), "Expected integer literal or parenthesized expression after TOP");
+            }
+
+            top._topKeyword = topKeyword;
+
+            if (Match(TokenType.PERCENT, out Token percentToken))
+            {
+                top.Percent = true;
+                top._percentKeyword = percentToken;
+            }
+
+            if (Check(TokenType.WITH) && CheckNext(TokenType.TIES))
+            {
+                top.WithTies = true;
+                top._withKeyword = Advance();
+                top._tiesKeyword = Advance();
+            }
+
+            return top;
+        }
 
         private SelectItem SelectItem()
         {
