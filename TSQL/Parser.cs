@@ -21,9 +21,9 @@ namespace TSQL
 
     Grammar:
         Statements:
-            Statement -> ("WITH" cte_list)? select_expression
+            Statement -> ("WITH" cte_list)? query_expression (option_clause)?
             cte_list -> cte_definition ("," cte_definition)*
-            cte_definition -> IDENTIFIER ("(" IDENTIFIER ("," IDENTIFIER)* ")")? "AS" "(" select_expression ")"
+            cte_definition -> IDENTIFIER ("(" IDENTIFIER ("," IDENTIFIER)* ")")? "AS" "(" query_expression ")"
            
         Expressions:
             expression -> term
@@ -31,7 +31,7 @@ namespace TSQL
             factor -> unary ( ( "/" | "*" | "%") unary )*
             unary -> ("-" | "~") postfix | postfix
             postfix -> scalar_subquery ("COLLATE" IDENTIFIER)? ("AT" "TIME" "ZONE" primary)*
-            scalar_subquery -> ( "(" select_expression ")" ) | primary
+            scalar_subquery -> ( "(" query_expression ")" ) | primary
             primary ->
                 "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
                 | case_expression | iif_expression | cast_expression | convert_expression
@@ -56,9 +56,12 @@ namespace TSQL
             within_group_clause -> "WITHIN" "GROUP" "(" "ORDER" "BY" order_by_item ("," order_by_item)* ")"
             expression_list -> expression ("," expression)*
 
-            select_expression -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)? (order_by_clause)? (option_clause)?
+            query_expression -> union_except (order_by_clause)?
+            union_except -> intersect (("UNION" ("ALL")? | "EXCEPT") intersect)*
+            intersect -> select_core ("INTERSECT" select_core)*
+            select_core -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
             option_clause -> "OPTION" "(" query_hint ("," query_hint)* ")"
-            parenthesized_expression -> ( "(" select_expression | expression ")" ) 
+            parenthesized_expression -> ( "(" query_expression | expression ")" )
             wildcard -> STAR
             qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
             select_item -> wildcard | qualified_wildcard | expression (("AS")? IDENTIFIER)?
@@ -85,9 +88,9 @@ namespace TSQL
             full_text_columns -> "*" | column_identifier | "(" column_identifier ("," column_identifier)* ")"
             contains_predicate -> "CONTAINS" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
             freetext_predicate -> "FREETEXT" "(" full_text_columns "," expression ("," "LANGUAGE" expression)? ")"
-            in_predicate -> expression ("NOT")? IN "(" ( select_expression | ( expression ("," expression)* ) ) ")"
-            quantifier_predicate -> expression comparison_operator ("ALL" | "SOME" | "ANY" ) "(" select_expression ")"
-            exists_predicate -> "EXISTS" "(" select_expression ")"
+            in_predicate -> expression ("NOT")? IN "(" ( query_expression | ( expression ("," expression)* ) ) ")"
+            quantifier_predicate -> expression comparison_operator ("ALL" | "SOME" | "ANY" ) "(" query_expression ")"
+            exists_predicate -> "EXISTS" "(" query_expression ")"
 
 
             search_condition -> predicate
@@ -116,7 +119,7 @@ namespace TSQL
                 | "(" table_source_item ")"
 
             named_table_source -> fully_qualified_identifier (for_system_time)? (("AS")? IDENTIFIER)? (tablesample_clause)? (with_hints)?
-            subquery_table_source -> "(" select_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
+            subquery_table_source -> "(" query_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
             variable_table_source -> VARIABLE (("AS")? IDENTIFIER)?
             values_table_source -> "(" "VALUES" values_row ("," values_row)* ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
             values_row -> "(" expression ("," expression)* ")"
@@ -263,7 +266,7 @@ namespace TSQL
         }
 
         /// <summary>
-        /// (WITH cte_list)? select_expression
+        /// (WITH cte_list)? query_expression (OPTION clause)?
         /// </summary>
         private Stmt.Select SelectStatement()
         {
@@ -273,21 +276,109 @@ namespace TSQL
                 cte = ParseCte();
             }
 
-            Stmt.Select selectStmt = new Stmt.Select(SelectExpression());
+            Stmt.Select selectStmt = new Stmt.Select(QueryExpression());
             selectStmt.CteStmt = cte;
+
+            // OPTION (query_hint [, ...n])
+            if (Check(TokenType.OPTION))
+            {
+                selectStmt.Option = ParseOptionClause();
+            }
+
             return selectStmt;
         }
 
         private Expr.Subquery Subquery()
         {
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
-            SelectExpression subquery = SelectExpression();
+            QueryExpression query = QueryExpression();
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
 
-            return new Expr.Subquery(subquery, leftParen, rightParen);
+            return new Expr.Subquery(query, leftParen, rightParen);
         }
 
-        private SelectExpression SelectExpression()
+        /// <summary>
+        /// query_expression -> union_except (ORDER BY ...)?
+        /// </summary>
+        private QueryExpression QueryExpression()
+        {
+            QueryExpression result = UnionExcept();
+
+            // ORDER BY applies to the entire query expression
+            if (Match(TokenType.ORDER, out Token orderToken))
+            {
+                result._orderKeyword = orderToken;
+                result._orderByKeyword = Consume(TokenType.BY, "Expected BY after ORDER");
+                result.OrderBy = ParseOrderByList();
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// union_except -> intersect ((UNION [ALL] | EXCEPT) intersect)*
+        /// </summary>
+        private QueryExpression UnionExcept()
+        {
+            QueryExpression left = Intersect();
+
+            while (Check(TokenType.UNION) || Check(TokenType.EXCEPT))
+            {
+                Token opToken = Advance();
+                SetOperationType opType;
+                Token allToken = null;
+
+                if (opToken.Type == TokenType.UNION)
+                {
+                    if (Match(TokenType.ALL, out allToken))
+                    {
+                        opType = SetOperationType.UnionAll;
+                    }
+                    else
+                    {
+                        opType = SetOperationType.Union;
+                    }
+                }
+                else
+                {
+                    opType = SetOperationType.Except;
+                }
+
+                QueryExpression right = Intersect();
+
+                SetOperation setOp = new SetOperation(left, right, opType);
+                setOp._operatorToken = opToken;
+                setOp._allToken = allToken;
+                left = setOp;
+            }
+
+            return left;
+        }
+
+        /// <summary>
+        /// intersect -> select_core (INTERSECT select_core)*
+        /// </summary>
+        private QueryExpression Intersect()
+        {
+            QueryExpression left = SelectCore();
+
+            while (Match(TokenType.INTERSECT, out Token opToken))
+            {
+                QueryExpression right = SelectCore();
+
+                SetOperation setOp = new SetOperation(left, right, SetOperationType.Intersect);
+                setOp._operatorToken = opToken;
+                left = setOp;
+            }
+
+            return left;
+        }
+
+        /// <summary>
+        /// SELECT ... FROM ... WHERE ... GROUP BY ... HAVING ...
+        /// Does not parse ORDER BY or OPTION — those are handled at the query expression level.
+        /// </summary>
+        private SelectExpression SelectCore()
         {
             SelectExpression selectExpr = new SelectExpression();
             selectExpr._selectKeyword = Consume(TokenType.SELECT, "Expected SELECT");
@@ -328,20 +419,6 @@ namespace TSQL
             {
                 selectExpr._havingKeyword = havingToken;
                 selectExpr.Having = SearchCondition();
-            }
-
-            // ORDER BY expr [ASC|DESC], ...
-            if (Match(TokenType.ORDER, out Token orderToken))
-            {
-                selectExpr._orderKeyword = orderToken;
-                selectExpr._orderByKeyword = Consume(TokenType.BY, "Expected BY after ORDER");
-                selectExpr.OrderBy = ParseOrderByList();
-            }
-
-            // OPTION (query_hint [, ...n])
-            if (Check(TokenType.OPTION))
-            {
-                selectExpr.Option = ParseOptionClause();
             }
 
             return selectExpr;
@@ -1494,7 +1571,7 @@ namespace TSQL
                 Predicate.In inPred;
                 if (Check(TokenType.SELECT))
                 {
-                    SelectExpression subSelect = SelectExpression();
+                    QueryExpression subSelect = QueryExpression();
                     Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after IN subquery");
                     Expr.Subquery sub = new Expr.Subquery(subSelect, leftParen, rightParen);
                     inPred = new Predicate.In(leftExpr, negated, sub);

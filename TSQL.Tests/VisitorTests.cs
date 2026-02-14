@@ -25,7 +25,7 @@ namespace TSQL.Tests
         public void ColumnIdentifier_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT a FROM T");
-            var col = (SelectColumn)stmt.SelectExpression.Columns[0];
+            var col = (SelectColumn)((SelectExpression)stmt.Query).Columns[0];
             var visitor = new ExprTypeRecorder();
             col.Expression.Accept(visitor);
             Assert.Equal("ColumnIdentifier", visitor.LastType);
@@ -35,7 +35,7 @@ namespace TSQL.Tests
         public void ObjectIdentifier_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT * FROM T");
-            var tableRef = (TableReference)stmt.SelectExpression.From.TableSources[0];
+            var tableRef = (TableReference)((SelectExpression)stmt.Query).From.TableSources[0];
             var visitor = new ExprTypeRecorder();
             tableRef.TableName.Accept(visitor);
             Assert.Equal("ObjectIdentifier", visitor.LastType);
@@ -45,7 +45,7 @@ namespace TSQL.Tests
         public void Wildcard_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT * FROM T");
-            var wildcard = (Expr.Wildcard)stmt.SelectExpression.Columns[0];
+            var wildcard = (Expr.Wildcard)((SelectExpression)stmt.Query).Columns[0];
             var visitor = new ExprTypeRecorder();
             wildcard.Accept(visitor);
             Assert.Equal("Wildcard", visitor.LastType);
@@ -55,7 +55,7 @@ namespace TSQL.Tests
         public void QualifiedWildcard_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT T.* FROM T");
-            var qualWildcard = (Expr.QualifiedWildcard)stmt.SelectExpression.Columns[0];
+            var qualWildcard = (Expr.QualifiedWildcard)((SelectExpression)stmt.Query).Columns[0];
             var visitor = new ExprTypeRecorder();
             qualWildcard.Accept(visitor);
             Assert.Equal("QualifiedWildcard", visitor.LastType);
@@ -94,7 +94,7 @@ namespace TSQL.Tests
         public void TableReference_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT * FROM T");
-            var tableSource = stmt.SelectExpression.From.TableSources[0];
+            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
             var visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("TableReference", visitor.LastType);
@@ -104,7 +104,7 @@ namespace TSQL.Tests
         public void QualifiedJoin_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT * FROM A INNER JOIN B ON A.id = B.id");
-            var tableSource = stmt.SelectExpression.From.TableSources[0];
+            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
             var visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("QualifiedJoin", visitor.LastType);
@@ -114,7 +114,7 @@ namespace TSQL.Tests
         public void CrossJoin_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT * FROM A CROSS JOIN B");
-            var tableSource = stmt.SelectExpression.From.TableSources[0];
+            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
             var visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("CrossJoin", visitor.LastType);
@@ -124,7 +124,7 @@ namespace TSQL.Tests
         public void SubqueryReference_Accept_DispatchesCorrectly()
         {
             var stmt = ParseSelect("SELECT * FROM (SELECT 1 AS x) AS sub");
-            var tableSource = stmt.SelectExpression.From.TableSources[0];
+            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
             var visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("SubqueryReference", visitor.LastType);
@@ -201,7 +201,7 @@ namespace TSQL.Tests
         public void Mutability_ReplaceLiteralWithVariable_UpdatesToSource()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
-            var where = (Predicate.Comparison)stmt.SelectExpression.Where;
+            var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
             Assert.IsType<Expr.Literal>(where.Right);
             where.Right = new Expr.Variable("@P0");
@@ -213,7 +213,7 @@ namespace TSQL.Tests
         public void Mutability_ReplaceStringLiteralWithVariable_UpdatesToSource()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
-            var where = (Predicate.Comparison)stmt.SelectExpression.Where;
+            var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
             Assert.IsType<Expr.Literal>(where.Right);
             Assert.Equal("hello", ((Expr.Literal)where.Right).Value);
@@ -227,7 +227,7 @@ namespace TSQL.Tests
         public void Mutability_NewLiteral_ProducesValidSource()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 1");
-            var where = (Predicate.Comparison)stmt.SelectExpression.Where;
+            var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
             where.Right = new Expr.Literal(99);
 

@@ -760,18 +760,18 @@ namespace TSQL
 
         public class Subquery : Expr
         {
-            private SelectExpression _selectExpression;
-            public SelectExpression SelectExpression
+            private QueryExpression _query;
+            public QueryExpression Query
             {
-                get => _selectExpression;
-                set => SetWithTrivia(ref _selectExpression, value);
+                get => _query;
+                set => SetWithTrivia(ref _query, value);
             }
             internal Token _leftParen;
             internal Token _rightParen;
 
-            public Subquery(SelectExpression selectExpression, Token leftParen, Token rightParen)
+            public Subquery(QueryExpression query, Token leftParen, Token rightParen)
             {
-                _selectExpression = selectExpression;
+                _query = query;
                 _leftParen = leftParen;
                 _rightParen = rightParen;
             }
@@ -785,7 +785,7 @@ namespace TSQL
             {
                 yield return _leftParen;
 
-                foreach (Token token in SelectExpression.DescendantTokens())
+                foreach (Token token in Query.DescendantTokens())
                 {
                     yield return token;
                 }
@@ -1318,7 +1318,30 @@ namespace TSQL
         }
     }
 
-    public class SelectExpression : SyntaxElement
+    public enum SetOperationType { Union, UnionAll, Intersect, Except }
+
+    public abstract class QueryExpression : SyntaxElement
+    {
+        public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
+
+        internal Token _orderKeyword;
+        internal Token _orderByKeyword;
+
+        protected IEnumerable<Token> OrderByTokens()
+        {
+            if (OrderBy != null && OrderBy.Count > 0)
+            {
+                yield return _orderKeyword;
+                yield return _orderByKeyword;
+                foreach (Token token in OrderBy.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+    }
+
+    public class SelectExpression : QueryExpression
     {
         public bool Distinct { get; set; }
         public TopClause Top { get; set; }
@@ -1337,16 +1360,13 @@ namespace TSQL
             get => _having;
             set => SetWithTrivia(ref _having, value);
         }
-        public SyntaxElementList<OrderByItem> OrderBy { get; set; } = new SyntaxElementList<OrderByItem>();
-        public OptionClause Option { get; set; }
 
         // Original tokens
         internal Token _selectKeyword;
         internal Token _distinctKeyword;
         internal Token _whereKeyword;
         internal Token _havingKeyword;
-        internal Token _orderKeyword;
-        internal Token _orderByKeyword;
+
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _selectKeyword;
@@ -1403,22 +1423,52 @@ namespace TSQL
                 }
             }
 
-            if (OrderBy != null && OrderBy.Count > 0)
+            foreach (Token token in OrderByTokens())
             {
-                yield return _orderKeyword;
-                yield return _orderByKeyword;
-                foreach (Token token in OrderBy.DescendantTokens())
-                {
-                    yield return token;
-                }
+                yield return token;
             }
+        }
+    }
 
-            if (Option != null)
+    public class SetOperation : QueryExpression
+    {
+        private QueryExpression _left;
+        public QueryExpression Left
+        {
+            get => _left;
+            set => SetWithTrivia(ref _left, value);
+        }
+        private QueryExpression _right;
+        public QueryExpression Right
+        {
+            get => _right;
+            set => SetWithTrivia(ref _right, value);
+        }
+        public SetOperationType OperationType { get; }
+
+        internal Token _operatorToken;
+        internal Token _allToken;
+
+        public SetOperation(QueryExpression left, QueryExpression right, SetOperationType operationType)
+        {
+            _left = left;
+            _right = right;
+            OperationType = operationType;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in Left.DescendantTokens())
+                yield return token;
+            yield return _operatorToken;
+            if (_allToken != null)
+                yield return _allToken;
+            foreach (Token token in Right.DescendantTokens())
+                yield return token;
+
+            foreach (Token token in OrderByTokens())
             {
-                foreach (Token token in Option.DescendantTokens())
-                {
-                    yield return token;
-                }
+                yield return token;
             }
         }
     }

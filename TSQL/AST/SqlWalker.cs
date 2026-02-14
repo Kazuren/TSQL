@@ -49,7 +49,7 @@ namespace TSQL
                     Walk(cte.Query);
                 }
             }
-            WalkSelectExpression(stmt.SelectExpression);
+            WalkQueryExpression(stmt.Query);
         }
 
         #endregion
@@ -84,7 +84,7 @@ namespace TSQL
 
         protected virtual void VisitSubquery(Expr.Subquery expr)
         {
-            WalkSelectExpression(expr.SelectExpression);
+            WalkQueryExpression(expr.Query);
         }
 
         protected virtual void VisitFunctionCall(Expr.FunctionCall expr)
@@ -366,6 +366,27 @@ namespace TSQL
 
         #region Helper Methods
 
+        protected void WalkQueryExpression(QueryExpression queryExpr)
+        {
+            if (queryExpr is SelectExpression selectExpr)
+            {
+                WalkSelectExpression(selectExpr);
+            }
+            else if (queryExpr is SetOperation setOp)
+            {
+                WalkQueryExpression(setOp.Left);
+                WalkQueryExpression(setOp.Right);
+            }
+
+            if (queryExpr.OrderBy != null)
+            {
+                foreach (OrderByItem item in queryExpr.OrderBy)
+                {
+                    Walk(item.Expression);
+                }
+            }
+        }
+
         protected void WalkSelectExpression(SelectExpression selectExpr)
         {
             if (selectExpr.Top != null)
@@ -410,14 +431,6 @@ namespace TSQL
             if (selectExpr.Having != null)
             {
                 Walk(selectExpr.Having);
-            }
-
-            if (selectExpr.OrderBy != null)
-            {
-                foreach (OrderByItem item in selectExpr.OrderBy)
-                {
-                    Walk(item.Expression);
-                }
             }
         }
 

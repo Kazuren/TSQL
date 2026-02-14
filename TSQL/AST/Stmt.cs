@@ -14,16 +14,17 @@ namespace TSQL
         public class Select : Stmt
         {
             public Cte CteStmt { get; set; }
-            private SelectExpression _selectExpression;
-            public SelectExpression SelectExpression
+            private QueryExpression _query;
+            public QueryExpression Query
             {
-                get => _selectExpression;
-                set => SetWithTrivia(ref _selectExpression, value);
+                get => _query;
+                set => SetWithTrivia(ref _query, value);
             }
+            public OptionClause Option { get; set; }
 
-            public Select(SelectExpression selectExpression)
+            public Select(QueryExpression query)
             {
-                _selectExpression = selectExpression;
+                _query = query;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -39,9 +40,15 @@ namespace TSQL
                         yield return token;
                 }
 
-                foreach (Token token in SelectExpression.DescendantTokens())
+                foreach (Token token in Query.DescendantTokens())
                 {
                     yield return token;
+                }
+
+                if (Option != null)
+                {
+                    foreach (Token token in Option.DescendantTokens())
+                        yield return token;
                 }
             }
         }

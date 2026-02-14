@@ -410,7 +410,7 @@ namespace TSQL.AST
                 yield return _leftParen;
                 if (Subquery != null)
                 {
-                    foreach (Token token in Subquery.SelectExpression.DescendantTokens())
+                    foreach (Token token in Subquery.Query.DescendantTokens())
                         yield return token;
                 }
                 else
@@ -463,7 +463,7 @@ namespace TSQL.AST
                 yield return Operator;
                 yield return QuantifierKeyword;
                 yield return _leftParen;
-                foreach (Token token in Subquery.SelectExpression.DescendantTokens())
+                foreach (Token token in Subquery.Query.DescendantTokens())
                     yield return token;
                 yield return _rightParen;
             }
