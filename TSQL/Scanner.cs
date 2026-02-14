@@ -305,8 +305,16 @@ namespace TSQL
                 type = TokenType.IDENTIFIER;
             }
 
-            // NULL keyword has a null literal value; all others use the lexeme string
-            object literal = type == TokenType.NULL ? null : slice.ToString();
+            // Only identifiers need the literal string; keywords (including NULL) get null
+            object literal;
+            if (type == TokenType.IDENTIFIER)
+            {
+                literal = slice.ToString();
+            }
+            else
+            {
+                literal = null;
+            }
             // Pass the slice directly - string allocation is deferred until Lexeme is accessed
             AddToken(type, literal, slice);
         }

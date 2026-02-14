@@ -158,6 +158,14 @@ namespace TSQL
                 AddLeadingTrivia(t);
         }
 
+        internal void AddLeadingTrivia(List<Trivia> trivia)
+        {
+            for (int i = 0; i < trivia.Count; i++)
+            {
+                AddLeadingTrivia(trivia[i]);
+            }
+        }
+
         internal void AddLeadingTrivia(IEnumerable<Trivia> trivia)
         {
             foreach (var t in trivia)
@@ -190,6 +198,14 @@ namespace TSQL
         {
             foreach (var t in trivia)
                 AddTrailingTrivia(t);
+        }
+
+        internal void AddTrailingTrivia(List<Trivia> trivia)
+        {
+            for (int i = 0; i < trivia.Count; i++)
+            {
+                AddTrailingTrivia(trivia[i]);
+            }
         }
 
         internal void AddTrailingTrivia(IEnumerable<Trivia> trivia)
