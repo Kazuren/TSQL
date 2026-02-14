@@ -85,7 +85,6 @@ Example workflow:
 
 ### Update CLAUDE.md After Each Session
 At the end of each development session, update this file with:
-- **New lessons learned** - gotchas, bugs encountered, solutions found
 - **Project structure changes** - new files, moved files, deleted files
 - **New patterns or conventions** - if new architectural decisions were made
 - **Updated commands** - if build/test/run commands changed
