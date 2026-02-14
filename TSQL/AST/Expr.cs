@@ -1362,9 +1362,136 @@ namespace TSQL
         }
     }
 
+    #region FOR Clause
+
+    public enum ForXmlMode { Raw, Auto, Explicit, Path }
+    public enum ForJsonMode { Auto, Path }
+
+    public enum ForDirectiveType
+    {
+        BinaryBase64, Type, Root, XmlData, XmlSchema,
+        Elements, ElementsXsiNil, ElementsAbsent,
+        IncludeNullValues, WithoutArrayWrapper
+    }
+
+    public abstract class ForClause : SyntaxElement
+    {
+        internal Token _forToken;
+    }
+
+    public class ForBrowseClause : ForClause
+    {
+        internal Token _browseToken;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _forToken;
+            yield return _browseToken;
+        }
+    }
+
+    public class ForXmlClause : ForClause
+    {
+        public ForXmlMode Mode { get; }
+        public SyntaxElementList<ForDirective> Directives { get; }
+
+        internal Token _xmlToken;
+        internal Token _modeToken;
+        internal Token _modeLeftParen;
+        internal Token _modeName;
+        internal Token _modeRightParen;
+        internal Token _firstDirectiveComma;
+
+        public ForXmlClause(ForXmlMode mode, SyntaxElementList<ForDirective> directives)
+        {
+            Mode = mode;
+            Directives = directives;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _forToken;
+            yield return _xmlToken;
+            yield return _modeToken;
+            if (_modeLeftParen != null)
+            {
+                yield return _modeLeftParen;
+                yield return _modeName;
+                yield return _modeRightParen;
+            }
+            if (Directives.Count > 0)
+            {
+                yield return _firstDirectiveComma;
+                foreach (Token token in Directives.DescendantTokens())
+                    yield return token;
+            }
+        }
+    }
+
+    public class ForJsonClause : ForClause
+    {
+        public ForJsonMode Mode { get; }
+        public SyntaxElementList<ForDirective> Directives { get; }
+
+        internal Token _jsonToken;
+        internal Token _modeToken;
+        internal Token _firstDirectiveComma;
+
+        public ForJsonClause(ForJsonMode mode, SyntaxElementList<ForDirective> directives)
+        {
+            Mode = mode;
+            Directives = directives;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _forToken;
+            yield return _jsonToken;
+            yield return _modeToken;
+            if (Directives.Count > 0)
+            {
+                yield return _firstDirectiveComma;
+                foreach (Token token in Directives.DescendantTokens())
+                    yield return token;
+            }
+        }
+    }
+
+    public class ForDirective : SyntaxElement
+    {
+        public ForDirectiveType DirectiveType { get; }
+
+        internal Token _token1;
+        internal Token _token2;
+        internal Token _leftParen;
+        internal Token _value;
+        internal Token _rightParen;
+
+        internal ForDirective(ForDirectiveType type)
+        {
+            DirectiveType = type;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _token1;
+            if (_token2 != null)
+                yield return _token2;
+            if (_leftParen != null)
+            {
+                yield return _leftParen;
+                yield return _value;
+                yield return _rightParen;
+            }
+        }
+    }
+
+    #endregion
+
     public abstract class QueryExpression : SyntaxElement
     {
         public OrderByClause OrderBy { get; set; }
+        public ForClause For { get; set; }
     }
 
     public class SelectExpression : QueryExpression
@@ -1454,6 +1581,12 @@ namespace TSQL
                 foreach (Token token in OrderBy.DescendantTokens())
                     yield return token;
             }
+
+            if (For != null)
+            {
+                foreach (Token token in For.DescendantTokens())
+                    yield return token;
+            }
         }
     }
 
@@ -1496,6 +1629,12 @@ namespace TSQL
             if (OrderBy != null)
             {
                 foreach (Token token in OrderBy.DescendantTokens())
+                    yield return token;
+            }
+
+            if (For != null)
+            {
+                foreach (Token token in For.DescendantTokens())
                     yield return token;
             }
         }

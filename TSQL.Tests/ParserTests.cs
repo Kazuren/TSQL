@@ -2817,5 +2817,147 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region FOR Clause Tests
+
+        // FOR XML round-trip tests
+        [Theory]
+        [InlineData("SELECT a FROM T FOR XML RAW")]
+        [InlineData("SELECT a FROM T FOR XML AUTO")]
+        [InlineData("SELECT a FROM T FOR XML EXPLICIT")]
+        [InlineData("SELECT a FROM T FOR XML PATH")]
+        [InlineData("SELECT a FROM T FOR XML RAW('Employee')")]
+        [InlineData("SELECT a FROM T FOR XML PATH('row')")]
+        [InlineData("SELECT a FROM T FOR XML RAW, ROOT")]
+        [InlineData("SELECT a FROM T FOR XML RAW, ROOT('data')")]
+        [InlineData("SELECT a FROM T FOR XML RAW, ELEMENTS")]
+        [InlineData("SELECT a FROM T FOR XML RAW, ELEMENTS XSINIL")]
+        [InlineData("SELECT a FROM T FOR XML RAW, ELEMENTS ABSENT")]
+        [InlineData("SELECT a FROM T FOR XML RAW, TYPE")]
+        [InlineData("SELECT a FROM T FOR XML RAW, BINARY BASE64")]
+        [InlineData("SELECT a FROM T FOR XML RAW, XMLDATA")]
+        [InlineData("SELECT a FROM T FOR XML AUTO, XMLSCHEMA")]
+        [InlineData("SELECT a FROM T FOR XML AUTO, XMLSCHEMA('http://example.com')")]
+        [InlineData("SELECT a FROM T FOR XML RAW('row'), ROOT('data'), ELEMENTS XSINIL, BINARY BASE64, TYPE")]
+        [InlineData("SELECT a FROM T FOR XML PATH('emp'), ROOT('employees'), ELEMENTS, TYPE")]
+        [InlineData("SELECT a FROM T FOR XML AUTO, TYPE, XMLSCHEMA, ELEMENTS XSINIL")]
+        [InlineData("SELECT a FROM T FOR XML EXPLICIT, XMLDATA")]
+        [InlineData("SELECT a FROM T FOR XML EXPLICIT, BINARY BASE64")]
+        public void Parse_ForXml(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // FOR JSON round-trip tests
+        [Theory]
+        [InlineData("SELECT a FROM T FOR JSON AUTO")]
+        [InlineData("SELECT a FROM T FOR JSON PATH")]
+        [InlineData("SELECT a FROM T FOR JSON PATH, ROOT")]
+        [InlineData("SELECT a FROM T FOR JSON PATH, ROOT('result')")]
+        [InlineData("SELECT a FROM T FOR JSON AUTO, INCLUDE_NULL_VALUES")]
+        [InlineData("SELECT a FROM T FOR JSON PATH, WITHOUT_ARRAY_WRAPPER")]
+        [InlineData("SELECT a FROM T FOR JSON PATH, ROOT('data'), INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER")]
+        public void Parse_ForJson(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // FOR BROWSE round-trip
+        [Fact]
+        public void Parse_ForBrowse()
+        {
+            string source = "SELECT a FROM T FOR BROWSE";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // FOR with ORDER BY
+        [Theory]
+        [InlineData("SELECT a FROM T ORDER BY a FOR XML RAW")]
+        [InlineData("SELECT a FROM T ORDER BY a FOR JSON PATH")]
+        public void Parse_ForWithOrderBy(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // FOR with OPTION
+        [Fact]
+        public void Parse_ForXml_WithOption()
+        {
+            string source = "SELECT a FROM T FOR XML RAW OPTION (RECOMPILE)";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // FOR with UNION
+        [Fact]
+        public void Parse_ForXml_WithUnion()
+        {
+            string source = "SELECT a FROM T1 UNION ALL SELECT b FROM T2 FOR XML RAW";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // FOR in subquery
+        [Fact]
+        public void Parse_ForXml_InSubquery()
+        {
+            string source = "SELECT (SELECT a FROM T FOR XML PATH(''), TYPE) AS XmlCol";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        // Structure tests
+        [Fact]
+        public void Parse_ForXml_Structure()
+        {
+            var stmt = ParseSelect("SELECT a FROM T FOR XML RAW('row'), ROOT('data'), ELEMENTS XSINIL, TYPE");
+            var forXml = Assert.IsType<ForXmlClause>(stmt.Query.For);
+
+            Assert.Equal(ForXmlMode.Raw, forXml.Mode);
+            Assert.Equal(3, forXml.Directives.Count);
+            Assert.Equal(ForDirectiveType.Root, forXml.Directives[0].DirectiveType);
+            Assert.Equal(ForDirectiveType.ElementsXsiNil, forXml.Directives[1].DirectiveType);
+            Assert.Equal(ForDirectiveType.Type, forXml.Directives[2].DirectiveType);
+        }
+
+        [Fact]
+        public void Parse_ForJson_Structure()
+        {
+            var stmt = ParseSelect("SELECT a FROM T FOR JSON PATH, ROOT('result'), INCLUDE_NULL_VALUES");
+            var forJson = Assert.IsType<ForJsonClause>(stmt.Query.For);
+
+            Assert.Equal(ForJsonMode.Path, forJson.Mode);
+            Assert.Equal(2, forJson.Directives.Count);
+            Assert.Equal(ForDirectiveType.Root, forJson.Directives[0].DirectiveType);
+            Assert.Equal(ForDirectiveType.IncludeNullValues, forJson.Directives[1].DirectiveType);
+        }
+
+        [Fact]
+        public void Parse_ForBrowse_Structure()
+        {
+            var stmt = ParseSelect("SELECT a FROM T FOR BROWSE");
+            Assert.IsType<ForBrowseClause>(stmt.Query.For);
+        }
+
+        [Fact]
+        public void Parse_NoForClause_IsNull()
+        {
+            var stmt = ParseSelect("SELECT a FROM T");
+            Assert.Null(stmt.Query.For);
+        }
+
+        // Contextual keyword as identifier tests
+        [Theory]
+        [InlineData("SELECT XML FROM T")]
+        [InlineData("SELECT JSON FROM T")]
+        [InlineData("SELECT RAW FROM T")]
+        [InlineData("SELECT AUTO FROM T")]
+        [InlineData("SELECT PATH FROM T")]
+        [InlineData("SELECT ROOT FROM T")]
+        [InlineData("SELECT ELEMENTS FROM T")]
+        [InlineData("SELECT TYPE FROM T")]
+        public void Parse_ForKeywords_AsIdentifiers(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
     }
 }

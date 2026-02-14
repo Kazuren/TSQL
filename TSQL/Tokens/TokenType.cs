@@ -68,6 +68,11 @@ namespace TSQL
         TIES,
 
         // OFFSET/FETCH keywords (contextual - can also be used as identifiers)
-        OFFSET, FIRST, NEXT, ONLY
+        OFFSET, FIRST, NEXT, ONLY,
+
+        // FOR clause keywords (contextual - can also be used as identifiers)
+        XML, JSON, RAW, AUTO, EXPLICIT, PATH, ROOT, ELEMENTS, TYPE,
+        BINARY, BASE64, XMLDATA, XMLSCHEMA, XSINIL, ABSENT,
+        INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
     }
 }

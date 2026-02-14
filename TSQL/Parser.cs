@@ -56,11 +56,16 @@ namespace TSQL
             within_group_clause -> "WITHIN" "GROUP" "(" "ORDER" "BY" order_by_item ("," order_by_item)* ")"
             expression_list -> expression ("," expression)*
 
-            query_expression -> union_except (order_by_clause (offset_fetch)?)?
+            query_expression -> union_except (order_by_clause (offset_fetch)?)? (for_clause)?
             union_except -> intersect (("UNION" ("ALL")? | "EXCEPT") intersect)*
             intersect -> select_core ("INTERSECT" select_core)*
             select_core -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
             option_clause -> "OPTION" "(" query_hint ("," query_hint)* ")"
+            for_clause -> "FOR" ("BROWSE" | for_xml | for_json)
+            for_xml -> "XML" ("RAW" ("(" STRING ")")? | "AUTO" | "EXPLICIT" | "PATH" ("(" STRING ")")?) ("," for_xml_directive)*
+            for_xml_directive -> "BINARY" "BASE64" | "TYPE" | "ROOT" ("(" STRING ")")? | "XMLDATA" | "XMLSCHEMA" ("(" STRING ")")? | "ELEMENTS" ("XSINIL" | "ABSENT")?
+            for_json -> "JSON" ("AUTO" | "PATH") ("," for_json_directive)*
+            for_json_directive -> "ROOT" ("(" STRING ")")? | "INCLUDE_NULL_VALUES" | "WITHOUT_ARRAY_WRAPPER"
             parenthesized_expression -> ( "(" query_expression | expression ")" )
             wildcard -> STAR
             qualified_wildcard -> (IDENTIFIER ".")? (IDENTIFIER ".")? (IDENTIFIER ".") STAR
@@ -238,7 +243,24 @@ namespace TSQL
             TokenType.OFFSET,
             TokenType.FIRST,
             TokenType.NEXT,
-            TokenType.ONLY
+            TokenType.ONLY,
+            TokenType.XML,
+            TokenType.JSON,
+            TokenType.RAW,
+            TokenType.AUTO,
+            TokenType.EXPLICIT,
+            TokenType.PATH,
+            TokenType.ROOT,
+            TokenType.ELEMENTS,
+            TokenType.TYPE,
+            TokenType.BINARY,
+            TokenType.BASE64,
+            TokenType.XMLDATA,
+            TokenType.XMLSCHEMA,
+            TokenType.XSINIL,
+            TokenType.ABSENT,
+            TokenType.INCLUDE_NULL_VALUES,
+            TokenType.WITHOUT_ARRAY_WRAPPER
         };
 
         public Parser(IEnumerable<Token> tokens)
@@ -303,7 +325,7 @@ namespace TSQL
         }
 
         /// <summary>
-        /// query_expression -> union_except (order_by_clause)?
+        /// query_expression -> union_except (order_by_clause)? (for_clause)?
         /// order_by_clause -> ORDER BY items (OFFSET ... (FETCH ...)?)?
         /// </summary>
         private QueryExpression QueryExpression()
@@ -337,6 +359,12 @@ namespace TSQL
                 }
 
                 result.OrderBy = orderBy;
+            }
+
+            // FOR XML / FOR JSON / FOR BROWSE
+            if (Check(TokenType.FOR) && !IsSystemTimeLookahead())
+            {
+                result.For = ParseForClause();
             }
 
             return result;
@@ -2631,6 +2659,253 @@ namespace TSQL
                 { "IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX", QueryHintType.IgnoreNonclusteredColumnstoreIndex },
                 { "DISABLE_OPTIMIZED_PLAN_FORCING", QueryHintType.DisableOptimizedPlanForcing },
             };
+
+        #region FOR Clause
+
+        /// <summary>
+        /// for_clause -> FOR BROWSE | FOR XML xml_mode ... | FOR JSON json_mode ...
+        /// </summary>
+        private ForClause ParseForClause()
+        {
+            Token forToken = Consume(TokenType.FOR, "Expected FOR");
+
+            if (Match(TokenType.BROWSE, out Token browseToken))
+            {
+                return new ForBrowseClause { _forToken = forToken, _browseToken = browseToken };
+            }
+            else if (Check(TokenType.XML))
+            {
+                return ParseForXml(forToken);
+            }
+            else if (Check(TokenType.JSON))
+            {
+                return ParseForJson(forToken);
+            }
+            else
+            {
+                throw Error(Peek(), "Expected BROWSE, XML, or JSON after FOR");
+            }
+        }
+
+        /// <summary>
+        /// FOR XML { RAW [('element')] | AUTO | EXPLICIT | PATH [('element')] } [, directive]*
+        /// </summary>
+        private ForXmlClause ParseForXml(Token forToken)
+        {
+            Token xmlToken = Advance(); // consume XML
+
+            // Parse mode
+            ForXmlMode mode;
+            Token modeToken;
+            Token modeLeftParen = null, modeName = null, modeRightParen = null;
+
+            if (Match(TokenType.RAW, out modeToken))
+            {
+                mode = ForXmlMode.Raw;
+            }
+            else if (Match(TokenType.AUTO, out modeToken))
+            {
+                mode = ForXmlMode.Auto;
+            }
+            else if (Match(TokenType.EXPLICIT, out modeToken))
+            {
+                mode = ForXmlMode.Explicit;
+            }
+            else if (Match(TokenType.PATH, out modeToken))
+            {
+                mode = ForXmlMode.Path;
+            }
+            else
+            {
+                throw Error(Peek(), "Expected RAW, AUTO, EXPLICIT, or PATH after FOR XML");
+            }
+
+            // Optional element name for RAW and PATH
+            if ((mode == ForXmlMode.Raw || mode == ForXmlMode.Path) && Check(TokenType.LEFT_PAREN))
+            {
+                modeLeftParen = Advance();
+                modeName = Consume(TokenType.STRING, "Expected element name string");
+                modeRightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after element name");
+            }
+
+            // Parse directives
+            SyntaxElementList<ForDirective> directives = new SyntaxElementList<ForDirective>();
+            Token firstComma = null;
+
+            if (Match(TokenType.COMMA, out firstComma))
+            {
+                directives.Add(ParseForXmlDirective());
+
+                while (Match(TokenType.COMMA, out Token comma))
+                {
+                    directives.Add(ParseForXmlDirective(), comma);
+                }
+            }
+
+            ForXmlClause clause = new ForXmlClause(mode, directives);
+            clause._forToken = forToken;
+            clause._xmlToken = xmlToken;
+            clause._modeToken = modeToken;
+            clause._modeLeftParen = modeLeftParen;
+            clause._modeName = modeName;
+            clause._modeRightParen = modeRightParen;
+            clause._firstDirectiveComma = firstComma;
+            return clause;
+        }
+
+        private ForDirective ParseForXmlDirective()
+        {
+            if (Match(TokenType.BINARY, out Token binaryToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.BinaryBase64);
+                d._token1 = binaryToken;
+                d._token2 = Consume(TokenType.BASE64, "Expected BASE64 after BINARY");
+                return d;
+            }
+            else if (Match(TokenType.TYPE, out Token typeToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.Type);
+                d._token1 = typeToken;
+                return d;
+            }
+            else if (Match(TokenType.ROOT, out Token rootToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.Root);
+                d._token1 = rootToken;
+                if (Check(TokenType.LEFT_PAREN))
+                {
+                    d._leftParen = Advance();
+                    d._value = Consume(TokenType.STRING, "Expected root name string");
+                    d._rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after root name");
+                }
+                return d;
+            }
+            else if (Match(TokenType.XMLDATA, out Token xmlDataToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.XmlData);
+                d._token1 = xmlDataToken;
+                return d;
+            }
+            else if (Match(TokenType.XMLSCHEMA, out Token xmlSchemaToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.XmlSchema);
+                d._token1 = xmlSchemaToken;
+                if (Check(TokenType.LEFT_PAREN))
+                {
+                    d._leftParen = Advance();
+                    d._value = Consume(TokenType.STRING, "Expected namespace URI string");
+                    d._rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after namespace URI");
+                }
+                return d;
+            }
+            else if (Match(TokenType.ELEMENTS, out Token elementsToken))
+            {
+                if (Match(TokenType.XSINIL, out Token xsinilToken))
+                {
+                    ForDirective d = new ForDirective(ForDirectiveType.ElementsXsiNil);
+                    d._token1 = elementsToken;
+                    d._token2 = xsinilToken;
+                    return d;
+                }
+                else if (Match(TokenType.ABSENT, out Token absentToken))
+                {
+                    ForDirective d = new ForDirective(ForDirectiveType.ElementsAbsent);
+                    d._token1 = elementsToken;
+                    d._token2 = absentToken;
+                    return d;
+                }
+                else
+                {
+                    ForDirective d = new ForDirective(ForDirectiveType.Elements);
+                    d._token1 = elementsToken;
+                    return d;
+                }
+            }
+            else
+            {
+                throw Error(Peek(), "Expected FOR XML directive (BINARY BASE64, TYPE, ROOT, XMLDATA, XMLSCHEMA, or ELEMENTS)");
+            }
+        }
+
+        /// <summary>
+        /// FOR JSON { AUTO | PATH } [, directive]*
+        /// </summary>
+        private ForJsonClause ParseForJson(Token forToken)
+        {
+            Token jsonToken = Advance(); // consume JSON
+
+            // Parse mode
+            ForJsonMode mode;
+            Token modeToken;
+
+            if (Match(TokenType.AUTO, out modeToken))
+            {
+                mode = ForJsonMode.Auto;
+            }
+            else if (Match(TokenType.PATH, out modeToken))
+            {
+                mode = ForJsonMode.Path;
+            }
+            else
+            {
+                throw Error(Peek(), "Expected AUTO or PATH after FOR JSON");
+            }
+
+            // Parse directives
+            SyntaxElementList<ForDirective> directives = new SyntaxElementList<ForDirective>();
+            Token firstComma = null;
+
+            if (Match(TokenType.COMMA, out firstComma))
+            {
+                directives.Add(ParseForJsonDirective());
+
+                while (Match(TokenType.COMMA, out Token comma))
+                {
+                    directives.Add(ParseForJsonDirective(), comma);
+                }
+            }
+
+            ForJsonClause clause = new ForJsonClause(mode, directives);
+            clause._forToken = forToken;
+            clause._jsonToken = jsonToken;
+            clause._modeToken = modeToken;
+            clause._firstDirectiveComma = firstComma;
+            return clause;
+        }
+
+        private ForDirective ParseForJsonDirective()
+        {
+            if (Match(TokenType.ROOT, out Token rootToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.Root);
+                d._token1 = rootToken;
+                if (Check(TokenType.LEFT_PAREN))
+                {
+                    d._leftParen = Advance();
+                    d._value = Consume(TokenType.STRING, "Expected root name string");
+                    d._rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after root name");
+                }
+                return d;
+            }
+            else if (Match(TokenType.INCLUDE_NULL_VALUES, out Token includeToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.IncludeNullValues);
+                d._token1 = includeToken;
+                return d;
+            }
+            else if (Match(TokenType.WITHOUT_ARRAY_WRAPPER, out Token withoutToken))
+            {
+                ForDirective d = new ForDirective(ForDirectiveType.WithoutArrayWrapper);
+                d._token1 = withoutToken;
+                return d;
+            }
+            else
+            {
+                throw Error(Peek(), "Expected FOR JSON directive (ROOT, INCLUDE_NULL_VALUES, or WITHOUT_ARRAY_WRAPPER)");
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// OPTION ( query_hint [, ...n] )
