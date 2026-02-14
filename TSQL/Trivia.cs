@@ -1,4 +1,4 @@
-﻿namespace TSQL
+namespace TSQL
 {
     public interface Trivia
     {
@@ -7,26 +7,71 @@
 
     public class Whitespace : Trivia
     {
-        public string Content { get; }
+        private readonly string _source;
+        private readonly int _start;
+        private readonly int _length;
+        private string _contentCache;
+
+        public Whitespace(string source, int start, int length)
+        {
+            _source = source;
+            _start = start;
+            _length = length;
+        }
+
         public Whitespace(string content)
         {
-            System.Diagnostics.Debug.Assert(!string.IsNullOrEmpty(content), "Content should not be null or empty.");
-            System.Diagnostics.Debug.Assert(string.IsNullOrWhiteSpace(content), "Content should only contain whitespace.");
-            Content = content;
+            _source = content;
+            _start = 0;
+            _length = content.Length;
+            _contentCache = content;
+        }
+
+        public string Content
+        {
+            get
+            {
+                if (_contentCache == null)
+                {
+                    _contentCache = _source.Substring(_start, _length);
+                }
+                return _contentCache;
+            }
         }
     }
+
     public class Comment : Trivia
     {
-        public string Content { get; }
+        private readonly string _source;
+        private readonly int _start;
+        private readonly int _length;
+        private string _contentCache;
+
+        public Comment(string source, int start, int length)
+        {
+            _source = source;
+            _start = start;
+            _length = length;
+        }
+
         public Comment(string content)
         {
-            System.Diagnostics.Debug.Assert(
-                (content.StartsWith("/*") && content.EndsWith("*/")) ||
-                (content.StartsWith("--") && !content.Contains("\n")),
-                "Content should be a comment"
-            );
+            _source = content;
+            _start = 0;
+            _length = content.Length;
+            _contentCache = content;
+        }
 
-            Content = content;
+        public string Content
+        {
+            get
+            {
+                if (_contentCache == null)
+                {
+                    _contentCache = _source.Substring(_start, _length);
+                }
+                return _contentCache;
+            }
         }
     }
 }

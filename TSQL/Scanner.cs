@@ -231,7 +231,7 @@ namespace TSQL
             // Consume the closing "*/" of the multi-line comment
             Consume(2);
 
-            AddTrivia(new Comment(_source.Substring(_start, _current - _start)));
+            AddTrivia(new Comment(_source, _start, _current - _start));
         }
 
         private void SingleLineComment()
@@ -241,7 +241,7 @@ namespace TSQL
                 Advance();
             }
 
-            AddTrivia(new Comment(_source.Substring(_start, _current - _start)));
+            AddTrivia(new Comment(_source, _start, _current - _start));
         }
 
         private void Whitespace()
@@ -259,7 +259,7 @@ namespace TSQL
                 c = Peek();
             }
 
-            AddTrivia(new Whitespace(_source.Substring(_start, _current - _start)));
+            AddTrivia(new Whitespace(_source, _start, _current - _start));
         }
 
         private void Number()
