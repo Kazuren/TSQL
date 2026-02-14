@@ -24,7 +24,7 @@ namespace TSQL.StandardLibrary.Visitors
     /// and produces a parameterized SQL string with a parameter dictionary.
     /// NULL literals are not parameterized since IS NULL semantics differ from = @param.
     /// </summary>
-    public static class LiteralParameterizer
+    internal static class LiteralParameterizer
     {
         /// <summary>
         /// Parameterizes all non-NULL literals in the statement.

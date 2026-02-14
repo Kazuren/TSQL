@@ -3,23 +3,28 @@ using TSQL.AST;
 
 namespace TSQL.StandardLibrary.Visitors
 {
-    /// <summary>
-    /// Collects all table references and qualified joins found in a SQL statement.
-    /// Useful for discovering which tables a query touches and what joins it uses.
-    /// </summary>
-    public class TableReferenceCollector : SqlWalker
+    public class TableReferences
+    {
+        public IReadOnlyList<TableReference> Tables { get; }
+        public IReadOnlyList<QualifiedJoin> Joins { get; }
+
+        internal TableReferences(IReadOnlyList<TableReference> tables, IReadOnlyList<QualifiedJoin> joins)
+        {
+            Tables = tables;
+            Joins = joins;
+        }
+    }
+
+    internal class TableReferenceCollector : SqlWalker
     {
         private readonly List<TableReference> _tables = new List<TableReference>();
         private readonly List<QualifiedJoin> _joins = new List<QualifiedJoin>();
 
-        public IReadOnlyList<TableReference> Tables => _tables;
-        public IReadOnlyList<QualifiedJoin> Joins => _joins;
-
-        public static TableReferenceCollector Collect(Stmt stmt)
+        internal static TableReferences Collect(Stmt stmt)
         {
             var collector = new TableReferenceCollector();
             collector.Walk(stmt);
-            return collector;
+            return new TableReferences(collector._tables, collector._joins);
         }
 
         protected override void VisitTableReference(TableReference source)

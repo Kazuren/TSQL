@@ -9,10 +9,7 @@ namespace TSQL.Tests
 
         private static Stmt.Select ParseSelect(string source)
         {
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(source);
             Assert.IsType<Stmt.Select>(stmt);
             return (Stmt.Select)stmt;
         }
@@ -242,7 +239,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesIntLiteral()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0", result.Sql);
             Assert.Single(result.Parameters);
@@ -253,7 +250,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesStringLiteral()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE name = @P0", result.Sql);
             Assert.Single(result.Parameters);
@@ -264,7 +261,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesMultipleLiterals()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42 AND y = 'hello'");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", result.Sql);
             Assert.Equal(2, result.Parameters.Count);
@@ -276,7 +273,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_SkipsNullLiteral()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x IS NULL");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE x IS NULL", result.Sql);
             Assert.Empty(result.Parameters);
@@ -286,7 +283,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_AvoidsConflictWithExistingVariables()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = @P0 AND y = 42");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", result.Sql);
             Assert.Single(result.Parameters);
@@ -297,7 +294,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesLiteralsInFunctionArgs()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE LEN('test') > 0");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE LEN(@P0) > @P1", result.Sql);
             Assert.Equal(2, result.Parameters.Count);
@@ -309,7 +306,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesLiteralsInBetween()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x BETWEEN 10 AND 20");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE x BETWEEN @P0 AND @P1", result.Sql);
             Assert.Equal(2, result.Parameters.Count);
@@ -321,7 +318,7 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesLiteralsInInList()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x IN (1, 2, 3)");
-            var result = LiteralParameterizer.Parameterize(stmt);
+            var result = stmt.Parameterize();
 
             Assert.Equal("SELECT * FROM T WHERE x IN (@P0, @P1, @P2)", result.Sql);
             Assert.Equal(3, result.Parameters.Count);
@@ -338,23 +335,23 @@ namespace TSQL.Tests
         public void TableReferenceCollector_FindsSingleTable()
         {
             var stmt = ParseSelect("SELECT * FROM Customers");
-            var collector = TableReferenceCollector.Collect(stmt);
+            var refs = stmt.CollectTableReferences();
 
-            Assert.Single(collector.Tables);
-            Assert.Equal("Customers", collector.Tables[0].TableName.ObjectName.Name);
-            Assert.Empty(collector.Joins);
+            Assert.Single(refs.Tables);
+            Assert.Equal("Customers", refs.Tables[0].TableName.ObjectName.Name);
+            Assert.Empty(refs.Joins);
         }
 
         [Fact]
         public void TableReferenceCollector_FindsMultipleTables_WithJoin()
         {
             var stmt = ParseSelect("SELECT * FROM Orders INNER JOIN Customers ON Orders.CustId = Customers.Id");
-            var collector = TableReferenceCollector.Collect(stmt);
+            var refs = stmt.CollectTableReferences();
 
-            Assert.Equal(2, collector.Tables.Count);
-            Assert.Single(collector.Joins);
+            Assert.Equal(2, refs.Tables.Count);
+            Assert.Single(refs.Joins);
 
-            var tableNames = collector.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
+            var tableNames = refs.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
             Assert.Contains("Customers", tableNames);
             Assert.Contains("Orders", tableNames);
         }
@@ -364,20 +361,20 @@ namespace TSQL.Tests
         {
             var stmt = ParseSelect(
                 "SELECT * FROM A INNER JOIN B ON A.id = B.id LEFT JOIN C ON B.id = C.id");
-            var collector = TableReferenceCollector.Collect(stmt);
+            var refs = stmt.CollectTableReferences();
 
-            Assert.Equal(3, collector.Tables.Count);
-            Assert.Equal(2, collector.Joins.Count);
+            Assert.Equal(3, refs.Tables.Count);
+            Assert.Equal(2, refs.Joins.Count);
         }
 
         [Fact]
         public void TableReferenceCollector_FindsTablesInSubquery()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
-            var collector = TableReferenceCollector.Collect(stmt);
+            var refs = stmt.CollectTableReferences();
 
-            Assert.Equal(2, collector.Tables.Count);
-            var tableNames = collector.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
+            Assert.Equal(2, refs.Tables.Count);
+            var tableNames = refs.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
             Assert.Contains("S", tableNames);
             Assert.Contains("T", tableNames);
         }
