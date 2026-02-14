@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TSQL
 {
-    public partial class Scanner
+    internal partial class Scanner
     {
         private readonly string _source;
         private readonly List<SourceToken> _tokens;

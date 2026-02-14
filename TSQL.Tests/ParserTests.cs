@@ -1484,7 +1484,7 @@ namespace TSQL.Tests
         public void Parse_PivotInValues_RejectsExpressions()
         {
             // PIVOT IN values cannot be arbitrary expressions like 1 + 2
-            Assert.Throws<Parser.ParseError>(() =>
+            Assert.Throws<ParseError>(() =>
                 ParseSelect("SELECT a FROM T PIVOT (SUM(Amount) FOR Month IN (1 + 2)) AS pvt"));
         }
 
@@ -2211,7 +2211,7 @@ namespace TSQL.Tests
         [InlineData("SELECT TOP @n * FROM T")]
         public void Parse_Top_RejectsInvalidLiterals(string source)
         {
-            Assert.Throws<Parser.ParseError>(() => ParseSelect(source));
+            Assert.Throws<ParseError>(() => ParseSelect(source));
         }
 
         [Theory]

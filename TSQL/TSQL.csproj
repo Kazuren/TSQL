@@ -9,6 +9,8 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="TSQL.Tests" />
+        <InternalsVisibleTo Include="TSQL.StandardLibrary" />
+        <InternalsVisibleTo Include="TSQL.Benchmarks" />
     </ItemGroup>
 </Project>
 

@@ -5,6 +5,14 @@ namespace TSQL
 {
     public abstract class Stmt : SyntaxElement
     {
+        public static Stmt Parse(string sql)
+        {
+            Scanner scanner = new Scanner(sql);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            return parser.Parse();
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
         public interface Visitor<T>
         {

@@ -212,16 +212,16 @@ namespace TSQL
                      | WHOLE_NUMBER "FOLLOWING"
     */
 
-    public class Parser
+    public class ParseError : Exception
     {
-        public class ParseError : Exception
+        public ParseError(string message) : base(message)
         {
-            public ParseError(string message) : base(message)
-            {
 
-            }
         }
+    }
 
+    internal class Parser
+    {
         private readonly List<Token> _tokens;
         private int _current = 0;
 
@@ -345,12 +345,6 @@ namespace TSQL
         public Stmt Parse()
         {
             Reset();
-            return ParseSelect();
-        }
-
-        public Stmt.Select ParseSelect()
-        {
-            Reset();
             Stmt.Select selectStmt = SelectStatement();
 
             if (!IsAtEnd())
@@ -359,6 +353,19 @@ namespace TSQL
             }
 
             return selectStmt;
+        }
+
+        public AST.Predicate ParseSearchCondition()
+        {
+            Reset();
+            AST.Predicate predicate = SearchCondition();
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected end of search condition.");
+            }
+
+            return predicate;
         }
 
         /// <summary>
