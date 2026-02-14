@@ -27,6 +27,7 @@ namespace TSQL
             T VisitConvertExpr(ConvertExpression expr);
             T VisitCollateExpr(Collate expr);
             T VisitIifExpr(Iif expr);
+            T VisitAtTimeZoneExpr(AtTimeZone expr);
         }
 
 
@@ -538,6 +539,45 @@ namespace TSQL
                 foreach (Token token in FalseValue.DescendantTokens())
                     yield return token;
                 yield return _rightParen;
+            }
+        }
+
+        public class AtTimeZone : Expr
+        {
+            private Expr _expression;
+            public Expr Expression
+            {
+                get => _expression;
+                set => SetWithTrivia(ref _expression, value);
+            }
+            private Expr _timeZone;
+            public Expr TimeZone
+            {
+                get => _timeZone;
+                set => SetWithTrivia(ref _timeZone, value);
+            }
+
+            internal Token _atKeyword;
+            internal Token _timeKeyword;
+            internal Token _zoneKeyword;
+
+            public AtTimeZone(Expr expression, Expr timeZone)
+            {
+                _expression = expression;
+                _timeZone = timeZone;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitAtTimeZoneExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                foreach (Token token in Expression.DescendantTokens())
+                    yield return token;
+                yield return _atKeyword;
+                yield return _timeKeyword;
+                yield return _zoneKeyword;
+                foreach (Token token in TimeZone.DescendantTokens())
+                    yield return token;
             }
         }
 

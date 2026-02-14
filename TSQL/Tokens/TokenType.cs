@@ -61,6 +61,9 @@ namespace TSQL
         // Built-in function keywords (contextual - can also be used as identifiers)
         IIF,
 
+        // AT TIME ZONE keywords (contextual - can also be used as identifiers)
+        AT, TIME, ZONE,
+
         // TOP clause keywords (contextual - can also be used as identifiers)
         TIES
     }

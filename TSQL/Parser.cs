@@ -30,7 +30,7 @@ namespace TSQL
             term -> factor ( ("-" | "+" | "&" | "^" | "|") factor )*
             factor -> unary ( ( "/" | "*" | "%") unary )*
             unary -> ("-" | "~") postfix | postfix
-            postfix -> scalar_subquery ("COLLATE" IDENTIFIER)?
+            postfix -> scalar_subquery ("COLLATE" IDENTIFIER)? ("AT" "TIME" "ZONE" primary)*
             scalar_subquery -> ( "(" select_expression ")" ) | primary
             primary ->
                 "NULL" | WHOLE_NUMBER | DECIMAL | STRING | VARIABLE
@@ -223,6 +223,9 @@ namespace TSQL
             TokenType.SETS,
             TokenType.LANGUAGE,
             TokenType.IIF,
+            TokenType.AT,
+            TokenType.TIME,
+            TokenType.ZONE,
             TokenType.TIES
         };
 
@@ -1570,6 +1573,20 @@ namespace TSQL
                 collate._collateKeyword = collateToken;
                 collate._collationName = collationName;
                 return collate;
+            }
+
+            while (Check(TokenType.AT) && CheckNext(TokenType.TIME))
+            {
+                Token atToken = Advance();
+                Token timeToken = Advance();
+                Token zoneToken = Consume(TokenType.ZONE, "Expected ZONE after AT TIME");
+                Expr timeZone = Primary();
+
+                Expr.AtTimeZone atTimeZone = new Expr.AtTimeZone(expr, timeZone);
+                atTimeZone._atKeyword = atToken;
+                atTimeZone._timeKeyword = timeToken;
+                atTimeZone._zoneKeyword = zoneToken;
+                expr = atTimeZone;
             }
 
             return expr;

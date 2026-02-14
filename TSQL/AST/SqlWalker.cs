@@ -169,6 +169,12 @@ namespace TSQL
             Walk(expr.FalseValue);
         }
 
+        protected virtual void VisitAtTimeZone(Expr.AtTimeZone expr)
+        {
+            Walk(expr.Expression);
+            Walk(expr.TimeZone);
+        }
+
         #endregion
 
         #region Predicate Visit Methods
@@ -457,6 +463,7 @@ namespace TSQL
         object Expr.Visitor<object>.VisitConvertExpr(Expr.ConvertExpression expr) { VisitConvert(expr); return null; }
         object Expr.Visitor<object>.VisitCollateExpr(Expr.Collate expr) { VisitCollate(expr); return null; }
         object Expr.Visitor<object>.VisitIifExpr(Expr.Iif expr) { VisitIif(expr); return null; }
+        object Expr.Visitor<object>.VisitAtTimeZoneExpr(Expr.AtTimeZone expr) { VisitAtTimeZone(expr); return null; }
 
         object Predicate.Visitor<object>.VisitComparisonPredicate(Predicate.Comparison pred) { VisitComparison(pred); return null; }
         object Predicate.Visitor<object>.VisitLikePredicate(Predicate.Like pred) { VisitLike(pred); return null; }

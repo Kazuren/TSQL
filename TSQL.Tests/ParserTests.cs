@@ -2172,6 +2172,67 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region AT TIME ZONE Tests
+
+        [Theory]
+        [InlineData("SELECT created AT TIME ZONE 'UTC' FROM T")]
+        [InlineData("SELECT created AT TIME ZONE 'Pacific Standard Time' FROM T")]
+        [InlineData("SELECT created AT TIME ZONE @tz FROM T")]
+        public void Parse_AtTimeZone_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_AtTimeZone_Chained()
+        {
+            string source = "SELECT created AT TIME ZONE 'UTC' AT TIME ZONE 'Pacific Standard Time' FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_AtTimeZone_HasCorrectStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT created AT TIME ZONE 'UTC' FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.AtTimeZone atz = Assert.IsType<Expr.AtTimeZone>(col.Expression);
+            Assert.IsType<Expr.ColumnIdentifier>(atz.Expression);
+            Assert.IsType<Expr.Literal>(atz.TimeZone);
+        }
+
+        [Fact]
+        public void Parse_AtTimeZone_ChainedStructure()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT created AT TIME ZONE 'UTC' AT TIME ZONE 'PST' FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(stmt.SelectExpression.Columns[0]);
+            Expr.AtTimeZone outer = Assert.IsType<Expr.AtTimeZone>(col.Expression);
+            Expr.AtTimeZone inner = Assert.IsType<Expr.AtTimeZone>(outer.Expression);
+            Assert.IsType<Expr.ColumnIdentifier>(inner.Expression);
+        }
+
+        [Fact]
+        public void Parse_At_WorksAsIdentifier()
+        {
+            string source = "SELECT AT FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Time_WorksAsIdentifier()
+        {
+            string source = "SELECT TIME FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_Zone_WorksAsIdentifier()
+        {
+            string source = "SELECT ZONE FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
         #region IIF Tests
 
         [Theory]

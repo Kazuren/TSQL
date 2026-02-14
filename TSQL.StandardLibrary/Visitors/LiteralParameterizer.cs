@@ -168,6 +168,12 @@ namespace TSQL.StandardLibrary.Visitors
                 expr.FalseValue = TryReplace(expr.FalseValue);
             }
 
+            protected override void VisitAtTimeZone(Expr.AtTimeZone expr)
+            {
+                expr.Expression = TryReplace(expr.Expression);
+                expr.TimeZone = TryReplace(expr.TimeZone);
+            }
+
             #endregion
 
             #region Predicate Parents
