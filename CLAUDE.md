@@ -18,6 +18,16 @@ dotnet test TSQL.Tests/TSQL.Tests.csproj --filter "ClassName=ParserTests"
 dotnet run --project TSQL.Benchmarks/TSQL.Benchmarks.csproj -c Release
 ```
 
+## Library Design Philosophy
+
+This is a **public library** consumed by external users. Every public API decision must prioritize the caller's experience:
+
+- **Minimize what users need to know.** Users should not need to understand scanner tokens, parser internals, or AST construction to accomplish common tasks. Provide high-level entry points that hide the pipeline.
+- **Never defer work to the caller that the library can do itself.** If the library can provide a reasonable default, compute a result, or handle an edge case internally, do it — don't force every consumer to write the same boilerplate.
+- **Public API surface is a commitment.** Think carefully before exposing types, methods, or constructors. Once published, they're hard to remove. Prefer fewer, well-designed entry points over many low-level ones. Internal implementation details should stay `internal`.
+- **Pit of success.** The easiest way to use the library should also be the correct way. If users can misuse an API, redesign it so they can't.
+- **Backward compatibility is not a concern yet.** The library is in active development and not in users' hands. Feel free to make breaking changes to the public API when it improves the design — rename types, change signatures, restructure namespaces. Get the API right first; stability comes later.
+
 ## Architecture
 
 This is a T-SQL parser library targeting .NET Standard 2.0 for broad compatibility.
