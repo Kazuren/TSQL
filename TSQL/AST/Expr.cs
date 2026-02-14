@@ -174,7 +174,6 @@ namespace TSQL
             internal Token _schemaToObjectDot;
             internal Token _objectToStarDot;
 
-            #region Constructors
             public QualifiedWildcard(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName, Token wildcardToken)
             {
                 DatabaseName = databaseName;
@@ -202,8 +201,6 @@ namespace TSQL
                 ObjectName = objectName;
                 WildcardToken = wildcardToken;
             }
-            #endregion
-
 
             public override T Accept<T>(Visitor<T> visitor)
             {
@@ -229,7 +226,6 @@ namespace TSQL
             internal Token _schemaToObjectDot;
             internal Token _objectToColumnDot;
 
-            #region Constructors
             public ColumnIdentifier(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName, ColumnName columnName)
             {
                 DatabaseName = databaseName;
@@ -262,7 +258,6 @@ namespace TSQL
             {
                 ColumnName = columnName;
             }
-            #endregion
 
             public override T Accept<T>(Visitor<T> visitor)
             {
