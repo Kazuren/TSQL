@@ -2752,6 +2752,35 @@ namespace TSQL
                 { TokenType.DISABLE_OPTIMIZED_PLAN_FORCING, QueryHintType.DisableOptimizedPlanForcing },
             };
 
+        private static readonly Dictionary<TokenType, (QueryHintType Type, TokenType Second)> TwoTokenQueryHints =
+            new Dictionary<TokenType, (QueryHintType, TokenType)>
+            {
+                { TokenType.LOOP, (QueryHintType.LoopJoin, TokenType.JOIN) },
+                { TokenType.ORDER, (QueryHintType.OrderGroup, TokenType.GROUP) },
+                { TokenType.EXPAND, (QueryHintType.ExpandViews, TokenType.VIEWS) },
+                { TokenType.KEEP, (QueryHintType.KeepPlan, TokenType.PLAN) },
+                { TokenType.KEEPFIXED, (QueryHintType.KeepfixedPlan, TokenType.PLAN) },
+                { TokenType.ROBUST, (QueryHintType.RobustPlan, TokenType.PLAN) },
+                { TokenType.CONCAT, (QueryHintType.ConcatUnion, TokenType.UNION) },
+            };
+
+        private static readonly Dictionary<TokenType, QueryHintType> ValueQueryHints =
+            new Dictionary<TokenType, QueryHintType>
+            {
+                { TokenType.FAST, QueryHintType.Fast },
+                { TokenType.MAXDOP, QueryHintType.Maxdop },
+                { TokenType.MAXRECURSION, QueryHintType.Maxrecursion },
+                { TokenType.QUERYTRACEON, QueryHintType.QueryTraceOn },
+            };
+
+        private static readonly Dictionary<TokenType, QueryHintType> EqualsValueQueryHints =
+            new Dictionary<TokenType, QueryHintType>
+            {
+                { TokenType.MAX_GRANT_PERCENT, QueryHintType.MaxGrantPercent },
+                { TokenType.MIN_GRANT_PERCENT, QueryHintType.MinGrantPercent },
+                { TokenType.LABEL, QueryHintType.Label },
+            };
+
         #region FOR Clause
 
         /// <summary>
@@ -3030,8 +3059,6 @@ namespace TSQL
         /// </summary>
         private QueryHint ParseQueryHint()
         {
-            // --- Keyword token types first ---
-
             // HASH GROUP / HASH UNION / HASH JOIN
             if (Check(TokenType.HASH))
             {
@@ -3061,18 +3088,6 @@ namespace TSQL
                 hint._hintToken = hintToken;
                 hint._hintToken2 = second;
                 return hint;
-            }
-
-            // LOOP JOIN
-            if (Check(TokenType.LOOP))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.LoopJoin, TokenType.JOIN);
-            }
-
-            // ORDER GROUP
-            if (Check(TokenType.ORDER))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.OrderGroup, TokenType.GROUP);
             }
 
             // USE HINT / USE PLAN
@@ -3123,21 +3138,6 @@ namespace TSQL
                 throw Error(Peek(), "Expected HINT after TABLE");
             }
 
-            // Simple single-token hints
-            if (SimpleQueryHints.TryGetValue(Peek().Type, out QueryHintType simpleType))
-            {
-                Token hintToken = Advance();
-                SimpleQueryHint hint = new SimpleQueryHint(simpleType);
-                hint._hintToken = hintToken;
-                return hint;
-            }
-
-            // EXPAND VIEWS
-            if (Check(TokenType.EXPAND))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.ExpandViews, TokenType.VIEWS);
-            }
-
             // FORCE ORDER / FORCE EXTERNALPUSHDOWN / FORCE SCALEOUTEXECUTION
             if (Check(TokenType.FORCE))
             {
@@ -3158,72 +3158,6 @@ namespace TSQL
             {
                 Token hintToken = Advance();
                 return ParseForceOrDisableHint(hintToken, false);
-            }
-
-            // KEEP PLAN
-            if (Check(TokenType.KEEP))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.KeepPlan, TokenType.PLAN);
-            }
-
-            // KEEPFIXED PLAN
-            if (Check(TokenType.KEEPFIXED))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.KeepfixedPlan, TokenType.PLAN);
-            }
-
-            // ROBUST PLAN
-            if (Check(TokenType.ROBUST))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.RobustPlan, TokenType.PLAN);
-            }
-
-            // CONCAT UNION
-            if (Check(TokenType.CONCAT))
-            {
-                return ParseTwoTokenQueryHint(QueryHintType.ConcatUnion, TokenType.UNION);
-            }
-
-            // FAST N
-            if (Check(TokenType.FAST))
-            {
-                return ParseValueHint(QueryHintType.Fast);
-            }
-
-            // MAXDOP N
-            if (Check(TokenType.MAXDOP))
-            {
-                return ParseValueHint(QueryHintType.Maxdop);
-            }
-
-            // MAXRECURSION N
-            if (Check(TokenType.MAXRECURSION))
-            {
-                return ParseValueHint(QueryHintType.Maxrecursion);
-            }
-
-            // QUERYTRACEON N
-            if (Check(TokenType.QUERYTRACEON))
-            {
-                return ParseValueHint(QueryHintType.QueryTraceOn);
-            }
-
-            // MAX_GRANT_PERCENT = N
-            if (Check(TokenType.MAX_GRANT_PERCENT))
-            {
-                return ParseEqualsValueHint(QueryHintType.MaxGrantPercent);
-            }
-
-            // MIN_GRANT_PERCENT = N
-            if (Check(TokenType.MIN_GRANT_PERCENT))
-            {
-                return ParseEqualsValueHint(QueryHintType.MinGrantPercent);
-            }
-
-            // LABEL = 'name'
-            if (Check(TokenType.LABEL))
-            {
-                return ParseEqualsValueHint(QueryHintType.Label);
             }
 
             // PARAMETERIZATION { SIMPLE | FORCED }
@@ -3253,6 +3187,33 @@ namespace TSQL
             if (Check(TokenType.OPTIMIZE))
             {
                 return ParseOptimizeHint();
+            }
+
+            // Data-driven: single-token hints (RECOMPILE, NO_PERFORMANCE_SPOOL, etc.)
+            if (SimpleQueryHints.TryGetValue(Peek().Type, out QueryHintType simpleType))
+            {
+                Token hintToken = Advance();
+                SimpleQueryHint hint = new SimpleQueryHint(simpleType);
+                hint._hintToken = hintToken;
+                return hint;
+            }
+
+            // Data-driven: two-token hints (LOOP JOIN, KEEP PLAN, EXPAND VIEWS, etc.)
+            if (TwoTokenQueryHints.TryGetValue(Peek().Type, out var twoToken))
+            {
+                return ParseTwoTokenQueryHint(twoToken.Type, twoToken.Second);
+            }
+
+            // Data-driven: keyword + value (FAST N, MAXDOP N, etc.)
+            if (ValueQueryHints.TryGetValue(Peek().Type, out QueryHintType valueType))
+            {
+                return ParseValueHint(valueType);
+            }
+
+            // Data-driven: keyword = value (MAX_GRANT_PERCENT = N, etc.)
+            if (EqualsValueQueryHints.TryGetValue(Peek().Type, out QueryHintType equalsType))
+            {
+                return ParseEqualsValueHint(equalsType);
             }
 
             throw Error(Peek(), "Expected query hint");

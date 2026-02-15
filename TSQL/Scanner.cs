@@ -111,7 +111,14 @@ namespace TSQL
                     }
                     break;
                 case '>':
-                    AddToken(Match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
+                    if (Match('='))
+                    {
+                        AddToken(TokenType.GREATER_EQUAL);
+                    }
+                    else
+                    {
+                        AddToken(TokenType.GREATER);
+                    }
                     break;
                 case '/':
                     if (Match('*'))
