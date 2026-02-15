@@ -80,15 +80,16 @@ namespace TSQL
 
     public class CteDefinition : SyntaxElement
     {
-        public Token Name { get; set; }
+        public string Name { get => _nameToken.Lexeme; }
         public CteColumnNames ColumnNames { get; set; }
         public Expr.Subquery Query { get; set; }
 
+        internal Token _nameToken;
         internal Token _asToken;
 
         public override IEnumerable<Token> DescendantTokens()
         {
-            yield return Name;
+            yield return _nameToken;
 
             if (ColumnNames != null)
             {
@@ -171,16 +172,17 @@ namespace TSQL
 
     public interface Alias : ISyntaxElement
     {
-        Token Name { get; }
+        string Name { get; }
     }
 
     internal class SuffixAlias : SyntaxElement, Alias
     {
-        public Token Name { get; }
+        public string Name { get => _nameToken.Lexeme; }
+        internal Token _nameToken;
         internal Token _asKeyword;
-        public SuffixAlias(Token name)
+        internal SuffixAlias(Token name)
         {
-            Name = name;
+            _nameToken = name;
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -190,23 +192,24 @@ namespace TSQL
                 yield return _asKeyword;
             }
 
-            yield return Name;
+            yield return _nameToken;
         }
     }
 
     internal class PrefixAlias : SyntaxElement, Alias
     {
-        public Token Name { get; }
+        public string Name { get => _nameToken.Lexeme; }
+        internal Token _nameToken;
         internal Token _equalsToken;
-        public PrefixAlias(Token name, Token equalsToken)
+        internal PrefixAlias(Token name, Token equalsToken)
         {
-            Name = name;
+            _nameToken = name;
             _equalsToken = equalsToken;
         }
 
         public override IEnumerable<Token> DescendantTokens()
         {
-            yield return Name;
+            yield return _nameToken;
             yield return _equalsToken;
         }
     }
@@ -272,7 +275,7 @@ namespace TSQL
 
 
         // ASC, DESC
-        public Token _orderToken;
+        internal Token _orderToken;
 
         public override IEnumerable<Token> DescendantTokens()
         {
@@ -1231,6 +1234,8 @@ namespace TSQL
 
     #region Query Hints
 
+    public enum ParameterizationMode { Simple, Forced }
+
     public enum QueryHintType
     {
         // Simple keyword hints (1-2 tokens)
@@ -1257,26 +1262,27 @@ namespace TSQL
     /// </summary>
     public class OptimizeForVariable : SyntaxElement
     {
-        public Token Variable { get; }
+        public string VariableName { get => _variableToken.Lexeme; }
         public Expr LiteralValue { get; }
 
+        internal Token _variableToken;
         internal Token _unknownToken;
         internal Token _equalsToken;
 
-        public OptimizeForVariable(Token variable, Expr literalValue)
+        internal OptimizeForVariable(Token variable, Expr literalValue)
         {
-            Variable = variable;
+            _variableToken = variable;
             LiteralValue = literalValue;
         }
 
-        public OptimizeForVariable(Token variable)
+        internal OptimizeForVariable(Token variable)
         {
-            Variable = variable;
+            _variableToken = variable;
         }
 
         public override IEnumerable<Token> DescendantTokens()
         {
-            yield return Variable;
+            yield return _variableToken;
             if (LiteralValue != null)
             {
                 yield return _equalsToken;
@@ -1295,7 +1301,8 @@ namespace TSQL
         public QueryHintType HintType { get; }
 
         public Expr Value { get; }
-        public Token ParameterizationMode { get; }
+        public ParameterizationMode? ParameterizationMode { get; }
+        internal Token _parameterizationModeToken;
         public SyntaxElementList<OptimizeForVariable> OptimizeForVariables { get; }
         public SyntaxElementList<Expr> UseHintNames { get; }
         public Expr.ObjectIdentifier TableHintObjectName { get; }
@@ -1323,10 +1330,11 @@ namespace TSQL
             Value = value;
         }
 
-        public QueryHint(QueryHintType hintType, Token parameterizationMode)
+        internal QueryHint(QueryHintType hintType, ParameterizationMode mode, Token parameterizationModeToken)
         {
             HintType = hintType;
-            ParameterizationMode = parameterizationMode;
+            ParameterizationMode = mode;
+            _parameterizationModeToken = parameterizationModeToken;
         }
 
         public QueryHint(QueryHintType hintType, SyntaxElementList<OptimizeForVariable> optimizeForVariables)
@@ -1408,7 +1416,7 @@ namespace TSQL
 
                 // PARAMETERIZATION { SIMPLE | FORCED }
                 case QueryHintType.Parameterization:
-                    yield return ParameterizationMode;
+                    yield return _parameterizationModeToken;
                     break;
 
                 // OPTIMIZE FOR ( @var ... )

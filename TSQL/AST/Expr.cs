@@ -10,7 +10,10 @@ namespace TSQL
         public interface Visitor<T>
         {
             T VisitBinaryExpr(Binary expr);
-            T VisitLiteralExpr(Literal expr);
+            T VisitStringLiteralExpr(StringLiteral expr);
+            T VisitIntLiteralExpr(IntLiteral expr);
+            T VisitDecimalLiteralExpr(DecimalLiteral expr);
+            T VisitNullLiteralExpr(NullLiteral expr);
             T VisitColumnIdentifierExpr(ColumnIdentifier expr);
             T VisitObjectIdentifierExpr(ObjectIdentifier expr);
             T VisitWildcardExpr(Wildcard expr);
@@ -31,6 +34,113 @@ namespace TSQL
             T VisitOpenXmlExpr(OpenXmlExpression expr);
         }
 
+        /// <summary>
+        /// Factory method that creates the appropriate literal subtype based on the value's runtime type.
+        /// </summary>
+        public static Expr Literal(object value)
+        {
+            if (value == null)
+            {
+                return new NullLiteral();
+            }
+            else if (value is string s)
+            {
+                return new StringLiteral(s);
+            }
+            else if (value is int i)
+            {
+                return new IntLiteral(i);
+            }
+            else if (value is double || value is decimal || value is float)
+            {
+                return new DecimalLiteral(System.Convert.ToDecimal(value));
+            }
+            else
+            {
+                throw new System.ArgumentException($"Expected literal to be null, string, int, double, float or decimal but got: {value.GetType().FullName}", nameof(value));
+            }
+        }
+
+        public enum ArithmeticOperator { Add, Subtract, Multiply, Divide, Modulo, BitwiseAnd, BitwiseOr, BitwiseXor }
+        public enum UnaryOperator { Negate, BitwiseNot }
+
+        internal static ArithmeticOperator TokenTypeToArithmeticOperator(TokenType type)
+        {
+            switch (type)
+            {
+                case TokenType.PLUS: return ArithmeticOperator.Add;
+                case TokenType.MINUS: return ArithmeticOperator.Subtract;
+                case TokenType.STAR: return ArithmeticOperator.Multiply;
+                case TokenType.SLASH: return ArithmeticOperator.Divide;
+                case TokenType.MODULO: return ArithmeticOperator.Modulo;
+                case TokenType.BITWISE_AND: return ArithmeticOperator.BitwiseAnd;
+                case TokenType.BITWISE_OR: return ArithmeticOperator.BitwiseOr;
+                case TokenType.BITWISE_XOR: return ArithmeticOperator.BitwiseXor;
+                default: throw new System.ArgumentException($"Unknown arithmetic operator token type: {type}");
+            }
+        }
+
+        internal static string ArithmeticOperatorToLexeme(ArithmeticOperator op)
+        {
+            switch (op)
+            {
+                case ArithmeticOperator.Add: return "+";
+                case ArithmeticOperator.Subtract: return "-";
+                case ArithmeticOperator.Multiply: return "*";
+                case ArithmeticOperator.Divide: return "/";
+                case ArithmeticOperator.Modulo: return "%";
+                case ArithmeticOperator.BitwiseAnd: return "&";
+                case ArithmeticOperator.BitwiseOr: return "|";
+                case ArithmeticOperator.BitwiseXor: return "^";
+                default: throw new System.ArgumentException($"Unknown arithmetic operator: {op}");
+            }
+        }
+
+        internal static TokenType ArithmeticOperatorToTokenType(ArithmeticOperator op)
+        {
+            switch (op)
+            {
+                case ArithmeticOperator.Add: return TokenType.PLUS;
+                case ArithmeticOperator.Subtract: return TokenType.MINUS;
+                case ArithmeticOperator.Multiply: return TokenType.STAR;
+                case ArithmeticOperator.Divide: return TokenType.SLASH;
+                case ArithmeticOperator.Modulo: return TokenType.MODULO;
+                case ArithmeticOperator.BitwiseAnd: return TokenType.BITWISE_AND;
+                case ArithmeticOperator.BitwiseOr: return TokenType.BITWISE_OR;
+                case ArithmeticOperator.BitwiseXor: return TokenType.BITWISE_XOR;
+                default: throw new System.ArgumentException($"Unknown arithmetic operator: {op}");
+            }
+        }
+
+        internal static UnaryOperator TokenTypeToUnaryOperator(TokenType type)
+        {
+            switch (type)
+            {
+                case TokenType.MINUS: return UnaryOperator.Negate;
+                case TokenType.BITWISE_NOT: return UnaryOperator.BitwiseNot;
+                default: throw new System.ArgumentException($"Unknown unary operator token type: {type}");
+            }
+        }
+
+        internal static string UnaryOperatorToLexeme(UnaryOperator op)
+        {
+            switch (op)
+            {
+                case UnaryOperator.Negate: return "-";
+                case UnaryOperator.BitwiseNot: return "~";
+                default: throw new System.ArgumentException($"Unknown unary operator: {op}");
+            }
+        }
+
+        internal static TokenType UnaryOperatorToTokenType(UnaryOperator op)
+        {
+            switch (op)
+            {
+                case UnaryOperator.Negate: return TokenType.MINUS;
+                case UnaryOperator.BitwiseNot: return TokenType.BITWISE_NOT;
+                default: throw new System.ArgumentException($"Unknown unary operator: {op}");
+            }
+        }
 
         public abstract class SqlIdentifier : Expr
         {
@@ -149,11 +259,11 @@ namespace TSQL
         }
         public class Wildcard : SqlIdentifier, SelectItem
         {
-            public Token WildcardToken { get; }
+            internal Token _wildcardToken;
 
-            public Wildcard(Token wildcardToken)
+            internal Wildcard(Token wildcardToken)
             {
-                WildcardToken = wildcardToken;
+                _wildcardToken = wildcardToken;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -163,7 +273,7 @@ namespace TSQL
 
             public override IEnumerable<Token> DescendantTokens()
             {
-                yield return WildcardToken;
+                yield return _wildcardToken;
             }
         }
 
@@ -172,38 +282,38 @@ namespace TSQL
             public DatabaseName DatabaseName { get; }
             public SchemaName SchemaName { get; }
             public ObjectName ObjectName { get; }
-            public Token WildcardToken { get; }
+            internal Token _wildcardToken;
 
             internal Token _databaseToSchemaDot;
             internal Token _schemaToObjectDot;
             internal Token _objectToStarDot;
 
-            public QualifiedWildcard(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName, Token wildcardToken)
+            internal QualifiedWildcard(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName, Token wildcardToken)
             {
                 DatabaseName = databaseName;
                 SchemaName = schemaName;
                 ObjectName = objectName;
-                WildcardToken = wildcardToken;
+                _wildcardToken = wildcardToken;
             }
 
-            public QualifiedWildcard(DatabaseName databaseName, ObjectName objectName, Token wildcardToken)
+            internal QualifiedWildcard(DatabaseName databaseName, ObjectName objectName, Token wildcardToken)
             {
                 DatabaseName = databaseName;
                 ObjectName = objectName;
-                WildcardToken = wildcardToken;
+                _wildcardToken = wildcardToken;
             }
 
-            public QualifiedWildcard(SchemaName schemaName, ObjectName objectName, Token wildcardToken)
+            internal QualifiedWildcard(SchemaName schemaName, ObjectName objectName, Token wildcardToken)
             {
                 SchemaName = schemaName;
                 ObjectName = objectName;
-                WildcardToken = wildcardToken;
+                _wildcardToken = wildcardToken;
             }
 
-            public QualifiedWildcard(ObjectName objectName, Token wildcardToken)
+            internal QualifiedWildcard(ObjectName objectName, Token wildcardToken)
             {
                 ObjectName = objectName;
-                WildcardToken = wildcardToken;
+                _wildcardToken = wildcardToken;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -215,7 +325,7 @@ namespace TSQL
             {
                 foreach (Token token in YieldQualifiedPrefix(DatabaseName, _databaseToSchemaDot, SchemaName, _schemaToObjectDot, ObjectName, _objectToStarDot))
                     yield return token;
-                yield return WildcardToken;
+                yield return _wildcardToken;
             }
         }
 
@@ -366,12 +476,33 @@ namespace TSQL
                 get => _left;
                 set => SetWithTrivia(ref _left, value);
             }
-            public Token Operator { get; set; }
+            private ArithmeticOperator _operator;
+            public ArithmeticOperator Operator
+            {
+                get => _operator;
+                set
+                {
+                    _operator = value;
+                    _operatorToken = new ConcreteToken(
+                        ArithmeticOperatorToTokenType(value),
+                        ArithmeticOperatorToLexeme(value),
+                        null);
+                    _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                }
+            }
             private Expr _right;
             public Expr Right
             {
                 get => _right;
                 set => SetWithTrivia(ref _right, value);
+            }
+
+            internal Token _operatorToken;
+
+            internal Binary(Token operatorToken)
+            {
+                _operatorToken = operatorToken;
+                _operator = TokenTypeToArithmeticOperator(operatorToken.Type);
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -385,7 +516,7 @@ namespace TSQL
                     yield return token;
                 }
 
-                yield return Operator;
+                yield return _operatorToken;
 
                 foreach (Token token in Right.DescendantTokens())
                 {
@@ -421,45 +552,101 @@ namespace TSQL
             }
         }
 
-        public class Literal : Expr
+        public class StringLiteral : Expr
         {
-            public object Value { get => _token.Literal; }
-            internal TokenType TokenType { get => _token.Type; }
+            public string Value { get; }
+            internal Token _token;
 
-            private readonly Token _token;
-            public Literal(object value)
+            public StringLiteral(string value)
             {
-                if (value == null)
-                {
-                    _token = new ConcreteToken(TokenType.NULL, "NULL", null);
-                }
-                else if (value is string s)
-                {
-                    _token = new ConcreteToken(TokenType.STRING, "'" + s.Replace("'", "''") + "'", value);
-                }
-                else if (value is int i)
-                {
-                    _token = new ConcreteToken(TokenType.WHOLE_NUMBER, i.ToString(), value);
-                }
-                else if (value is double || value is decimal || value is float)
-                {
-                    _token = new ConcreteToken(TokenType.DECIMAL, value.ToString(), value);
-                }
-                else
-                {
-                    throw new ArgumentException($"Expected literal to be null, string, int, double, float or decimal but got: {value.GetType().FullName}", nameof(value));
-                }
+                Value = value;
+                _token = new ConcreteToken(TokenType.STRING, "'" + value.Replace("'", "''") + "'", value);
                 _token.AddLeadingTrivia(new Whitespace(" "));
             }
-            internal Literal(Token token)
+
+            internal StringLiteral(Token token)
+            {
+                Value = (string)token.Literal;
+                _token = token;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitStringLiteralExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _token;
+            }
+        }
+
+        public class IntLiteral : Expr
+        {
+            public int Value { get; }
+            internal Token _token;
+
+            public IntLiteral(int value)
+            {
+                Value = value;
+                _token = new ConcreteToken(TokenType.WHOLE_NUMBER, value.ToString(), value);
+                _token.AddLeadingTrivia(new Whitespace(" "));
+            }
+
+            internal IntLiteral(Token token)
+            {
+                Value = (int)token.Literal;
+                _token = token;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitIntLiteralExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _token;
+            }
+        }
+
+        public class DecimalLiteral : Expr
+        {
+            public decimal Value { get; }
+            internal Token _token;
+
+            public DecimalLiteral(decimal value)
+            {
+                Value = value;
+                _token = new ConcreteToken(TokenType.DECIMAL, value.ToString(), value);
+                _token.AddLeadingTrivia(new Whitespace(" "));
+            }
+
+            internal DecimalLiteral(Token token)
+            {
+                Value = System.Convert.ToDecimal(token.Literal);
+                _token = token;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitDecimalLiteralExpr(this);
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _token;
+            }
+        }
+
+        public class NullLiteral : Expr
+        {
+            internal Token _token;
+
+            public NullLiteral()
+            {
+                _token = new ConcreteToken(TokenType.NULL, "NULL", null);
+                _token.AddLeadingTrivia(new Whitespace(" "));
+            }
+
+            internal NullLiteral(Token token)
             {
                 _token = token;
             }
 
-            public override T Accept<T>(Visitor<T> visitor)
-            {
-                return visitor.VisitLiteralExpr(this);
-            }
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitNullLiteralExpr(this);
+
             public override IEnumerable<Token> DescendantTokens()
             {
                 yield return _token;
@@ -468,8 +655,19 @@ namespace TSQL
 
         public class Unary : Expr
         {
-
-            public Token Operator { get; set; }
+            private UnaryOperator _operator;
+            public UnaryOperator Operator
+            {
+                get => _operator;
+                set
+                {
+                    _operator = value;
+                    _operatorToken = new ConcreteToken(
+                        UnaryOperatorToTokenType(value),
+                        UnaryOperatorToLexeme(value),
+                        null);
+                }
+            }
             private Expr _right;
             public Expr Right
             {
@@ -477,9 +675,12 @@ namespace TSQL
                 set => SetWithTrivia(ref _right, value);
             }
 
-            public Unary(Token @operator, Expr right)
+            internal Token _operatorToken;
+
+            internal Unary(Token operatorToken, Expr right)
             {
-                Operator = @operator;
+                _operatorToken = operatorToken;
+                _operator = TokenTypeToUnaryOperator(operatorToken.Type);
                 _right = right;
             }
 
@@ -489,7 +690,7 @@ namespace TSQL
             }
             public override IEnumerable<Token> DescendantTokens()
             {
-                yield return Operator;
+                yield return _operatorToken;
                 foreach (Token token in Right.DescendantTokens())
                 {
                     yield return token;
@@ -1288,26 +1489,27 @@ namespace TSQL
     /// </summary>
     public class DataType : SyntaxElement
     {
-        public Token TypeName { get; }
+        public string TypeName { get => _typeNameToken.Lexeme; }
         public SyntaxElementList<Expr> Parameters { get; }
 
+        internal Token _typeNameToken;
         internal Token _leftParen;
         internal Token _rightParen;
 
-        public DataType(Token typeName, SyntaxElementList<Expr> parameters)
+        internal DataType(Token typeName, SyntaxElementList<Expr> parameters)
         {
-            TypeName = typeName;
+            _typeNameToken = typeName;
             Parameters = parameters;
         }
 
-        public DataType(Token typeName)
+        internal DataType(Token typeName)
         {
-            TypeName = typeName;
+            _typeNameToken = typeName;
         }
 
         public override IEnumerable<Token> DescendantTokens()
         {
-            yield return TypeName;
+            yield return _typeNameToken;
             if (Parameters != null)
             {
                 yield return _leftParen;

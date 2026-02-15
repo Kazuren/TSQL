@@ -577,7 +577,7 @@ namespace TSQL
             else if (Check(TokenType.WHOLE_NUMBER))
             {
                 // TOP N — bare integer literal only
-                Expr expr = new Expr.Literal(Advance());
+                Expr expr = new Expr.IntLiteral(Advance());
                 top = new TopClause(expr);
             }
             else
@@ -1742,7 +1742,7 @@ namespace TSQL
             while (Match(TokenType.PLUS, TokenType.MINUS, TokenType.BITWISE_AND, TokenType.BITWISE_XOR, TokenType.BITWISE_OR, out Token op))
             {
                 Expr right = Factor();
-                expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
+                expr = new Expr.Binary(op) { Left = expr, Right = right };
             }
 
             return expr;
@@ -1755,7 +1755,7 @@ namespace TSQL
             while (Match(TokenType.STAR, TokenType.SLASH, TokenType.MODULO, out Token op))
             {
                 Expr right = Unary();
-                expr = new Expr.Binary() { Left = expr, Operator = op, Right = right };
+                expr = new Expr.Binary(op) { Left = expr, Right = right };
             }
 
             return expr;
@@ -1823,15 +1823,25 @@ namespace TSQL
                 return new Expr.Variable(variableToken);
             }
 
-            if (Match(TokenType.WHOLE_NUMBER, TokenType.DECIMAL, TokenType.STRING, out Token literalToken))
+            if (Match(TokenType.WHOLE_NUMBER, out Token wholeNumberToken))
             {
-                return new Expr.Literal(literalToken);
+                return new Expr.IntLiteral(wholeNumberToken);
+            }
+
+            if (Match(TokenType.DECIMAL, out Token decimalToken))
+            {
+                return new Expr.DecimalLiteral(decimalToken);
+            }
+
+            if (Match(TokenType.STRING, out Token stringToken))
+            {
+                return new Expr.StringLiteral(stringToken);
             }
 
             // NULL
             if (Match(TokenType.NULL, out Token nullToken))
             {
-                return new Expr.Literal(nullToken);
+                return new Expr.NullLiteral(nullToken);
             }
 
             // CASE WHEN ... THEN ... ELSE ... END
@@ -2221,7 +2231,7 @@ namespace TSQL
             }
             else if (Check(TokenType.WHOLE_NUMBER))
             {
-                Expr offset = new Expr.Literal(Advance());
+                Expr offset = new Expr.IntLiteral(Advance());
 
                 if (Match(TokenType.PRECEDING, out Token precedingToken))
                 {
@@ -2328,7 +2338,7 @@ namespace TSQL
         private CteDefinition ParseCteDefinition()
         {
             CteDefinition def = new CteDefinition();
-            def.Name = ConsumeIdentifierOrContextualKeyword("Expected CTE name");
+            def._nameToken = ConsumeIdentifierOrContextualKeyword("Expected CTE name");
 
             // Optional column list — if next is NOT AS, it must be (col1, col2)
             if (!Check(TokenType.AS))
@@ -3207,8 +3217,21 @@ namespace TSQL
             if (Check(TokenType.PARAMETERIZATION))
             {
                 Token hintToken = Advance();
-                Token modeToken = ConsumeIdentifierOrContextualKeyword("Expected SIMPLE or FORCED");
-                QueryHint hint = new QueryHint(QueryHintType.Parameterization, modeToken);
+                ParameterizationMode mode;
+                if (Check(TokenType.SIMPLE))
+                {
+                    mode = ParameterizationMode.Simple;
+                }
+                else if (Check(TokenType.FORCED))
+                {
+                    mode = ParameterizationMode.Forced;
+                }
+                else
+                {
+                    throw Error(Peek(), "Expected SIMPLE or FORCED");
+                }
+                Token modeToken = Advance();
+                QueryHint hint = new QueryHint(QueryHintType.Parameterization, mode, modeToken);
                 hint._hintToken = hintToken;
                 return hint;
             }

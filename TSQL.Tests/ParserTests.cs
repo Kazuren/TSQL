@@ -71,7 +71,7 @@ namespace TSQL.Tests
             Assert.IsType<SelectColumn>(item);
             SelectColumn column = (SelectColumn)item;
             Assert.NotNull(column.Alias);
-            Assert.Equal("bAlias", column.Alias.Name.Lexeme);
+            Assert.Equal("bAlias", column.Alias.Name);
         }
 
         [Fact]
@@ -204,7 +204,7 @@ namespace TSQL.Tests
             // Assert
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
-            Assert.Equal("alias", item.Alias.Name.Lexeme);
+            Assert.Equal("alias", item.Alias.Name);
         }
 
         [Fact]
@@ -216,7 +216,7 @@ namespace TSQL.Tests
             // Assert
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
-            Assert.Equal("alias", item.Alias.Name.Lexeme);
+            Assert.Equal("alias", item.Alias.Name);
         }
 
         [Fact]
@@ -229,7 +229,7 @@ namespace TSQL.Tests
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
             Assert.IsType<PrefixAlias>(item.Alias);
-            Assert.Equal("alias", item.Alias.Name.Lexeme);
+            Assert.Equal("alias", item.Alias.Name);
         }
 
         #endregion
@@ -247,7 +247,7 @@ namespace TSQL.Tests
             var binary = Assert.IsType<Expr.Binary>(item.Expression);
 
             Assert.IsType<Expr.ColumnIdentifier>(binary.Left);
-            Assert.Equal("+", binary.Operator.Lexeme);
+            Assert.Equal(Expr.ArithmeticOperator.Add, binary.Operator);
             Assert.IsType<Expr.ColumnIdentifier>(binary.Right);
         }
 
@@ -262,11 +262,11 @@ namespace TSQL.Tests
             var binary = Assert.IsType<Expr.Binary>(item.Expression);
 
             // a + (b * c) - multiplication should be on the right
-            Assert.Equal("+", binary.Operator.Lexeme);
+            Assert.Equal(Expr.ArithmeticOperator.Add, binary.Operator);
             Assert.IsType<Expr.ColumnIdentifier>(binary.Left);
 
             var rightBinary = Assert.IsType<Expr.Binary>(binary.Right);
-            Assert.Equal("*", rightBinary.Operator.Lexeme);
+            Assert.Equal(Expr.ArithmeticOperator.Multiply, rightBinary.Operator);
         }
 
         [Fact]
@@ -278,7 +278,7 @@ namespace TSQL.Tests
             // Assert
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             var unary = Assert.IsType<Expr.Unary>(item.Expression);
-            Assert.Equal("-", unary.Operator.Lexeme);
+            Assert.Equal(Expr.UnaryOperator.Negate, unary.Operator);
             Assert.IsType<Expr.ColumnIdentifier>(unary.Right);
         }
 
@@ -293,11 +293,11 @@ namespace TSQL.Tests
             var binary = Assert.IsType<Expr.Binary>(item.Expression);
 
             // (a + b) * c - grouped addition should be on the left
-            Assert.Equal("*", binary.Operator.Lexeme);
+            Assert.Equal(Expr.ArithmeticOperator.Multiply, binary.Operator);
 
             var grouping = Assert.IsType<Expr.Grouping>(binary.Left);
             var innerBinary = Assert.IsType<Expr.Binary>(grouping.Expression);
-            Assert.Equal("+", innerBinary.Operator.Lexeme);
+            Assert.Equal(Expr.ArithmeticOperator.Add, innerBinary.Operator);
         }
 
         [Fact]
@@ -308,7 +308,7 @@ namespace TSQL.Tests
 
             // Assert
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var literal = Assert.IsType<Expr.Literal>(item.Expression);
+            var literal = Assert.IsType<Expr.IntLiteral>(item.Expression);
             Assert.Equal(42, literal.Value);
         }
 
@@ -320,8 +320,8 @@ namespace TSQL.Tests
 
             // Assert
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var literal = Assert.IsType<Expr.Literal>(item.Expression);
-            Assert.Contains("hello", (string)literal.Value);
+            var literal = Assert.IsType<Expr.StringLiteral>(item.Expression);
+            Assert.Contains("hello", literal.Value);
         }
 
         #endregion
@@ -381,7 +381,7 @@ namespace TSQL.Tests
             Assert.NotNull(SelectExpressionOf(select).From);
             var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.Alias);
-            Assert.Equal("t", tableRef.Alias.Name.Lexeme);
+            Assert.Equal("t", tableRef.Alias.Name);
         }
 
         [Fact]
@@ -439,7 +439,7 @@ namespace TSQL.Tests
             var subRef = Assert.IsType<SubqueryReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(subRef.Subquery);
             Assert.NotNull(subRef.Alias);
-            Assert.Equal("sub", subRef.Alias.Name.Lexeme);
+            Assert.Equal("sub", subRef.Alias.Name);
         }
 
         [Fact]
@@ -459,7 +459,7 @@ namespace TSQL.Tests
             var varRef = Assert.IsType<TableVariableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("@TempTable", varRef.VariableName);
             Assert.NotNull(varRef.Alias);
-            Assert.Equal("t", varRef.Alias.Name.Lexeme);
+            Assert.Equal("t", varRef.Alias.Name);
         }
 
         [Fact]
@@ -469,7 +469,7 @@ namespace TSQL.Tests
 
             var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.Alias);
-            Assert.Equal("t", tableRef.Alias.Name.Lexeme);
+            Assert.Equal("t", tableRef.Alias.Name);
         }
 
         [Fact]
@@ -589,7 +589,7 @@ namespace TSQL.Tests
 
             var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             var left = Assert.IsType<TableReference>(join.Left);
-            Assert.Equal("LOOP", left.Alias.Name.Lexeme);
+            Assert.Equal("LOOP", left.Alias.Name);
             Assert.Null(join.JoinHint);
             Assert.Equal(JoinType.Inner, join.JoinType);
         }
@@ -864,7 +864,7 @@ namespace TSQL.Tests
             var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("NTILE", windowFunc.Function.Callee.ObjectName.Name);
             Assert.Single(windowFunc.Function.Arguments);
-            var arg = Assert.IsType<Expr.Literal>(windowFunc.Function.Arguments[0]);
+            var arg = Assert.IsType<Expr.IntLiteral>(windowFunc.Function.Arguments[0]);
             Assert.Equal(4, arg.Value);
         }
 
@@ -928,7 +928,7 @@ namespace TSQL.Tests
             Assert.NotNull(windowFunc.Over.Frame);
             Assert.Equal(WindowFrameType.Rows, windowFunc.Over.Frame.FrameType);
             Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
-            var offset = Assert.IsType<Expr.Literal>(windowFunc.Over.Frame.Start.Offset);
+            var offset = Assert.IsType<Expr.IntLiteral>(windowFunc.Over.Frame.Start.Offset);
             Assert.Equal(3, offset.Value);
         }
 
@@ -943,7 +943,7 @@ namespace TSQL.Tests
             var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.NotNull(windowFunc.Over.Frame);
             Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
-            var offset = Assert.IsType<Expr.Literal>(windowFunc.Over.Frame.Start.Offset);
+            var offset = Assert.IsType<Expr.IntLiteral>(windowFunc.Over.Frame.Start.Offset);
             Assert.Equal(2, offset.Value);
             Assert.Equal(WindowFrameBoundType.CurrentRow, windowFunc.Over.Frame.End.BoundType);
         }
@@ -986,7 +986,7 @@ namespace TSQL.Tests
             // Assert
             var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
-            Assert.Equal("ROWS", item.Alias.Name.Lexeme);
+            Assert.Equal("ROWS", item.Alias.Name);
         }
 
         [Fact]
@@ -1087,8 +1087,8 @@ namespace TSQL.Tests
             Assert.NotNull(SelectExpressionOf(select).Where);
             var comparison = Assert.IsType<AST.Predicate.Comparison>(SelectExpressionOf(select).Where);
             Assert.IsType<Expr.ColumnIdentifier>(comparison.Left);
-            Assert.Equal("=", comparison.Operator.Lexeme);
-            Assert.IsType<Expr.Literal>(comparison.Right);
+            Assert.Equal(AST.ComparisonOperator.Equal, comparison.Operator);
+            Assert.IsType<Expr.IntLiteral>(comparison.Right);
         }
 
         [Fact]
@@ -1141,7 +1141,7 @@ namespace TSQL.Tests
             var likePred = Assert.IsType<AST.Predicate.Like>(SelectExpressionOf(select).Where);
             Assert.False(likePred.Negated);
             Assert.IsType<Expr.ColumnIdentifier>(likePred.Left);
-            Assert.IsType<Expr.Literal>(likePred.Pattern);
+            Assert.IsType<Expr.StringLiteral>(likePred.Pattern);
         }
 
         [Fact]
@@ -1218,7 +1218,7 @@ namespace TSQL.Tests
             Assert.Equal(2, values.Rows[0].Values.Count);
             Assert.Equal(2, values.Rows[1].Values.Count);
             Assert.NotNull(values.Alias);
-            Assert.Equal("t", values.Alias.Name.Lexeme);
+            Assert.Equal("t", values.Alias.Name);
             Assert.NotNull(values.ColumnAliases);
             Assert.Equal(2, values.ColumnAliases.ColumnNames.Count);
             Assert.Equal("id", values.ColumnAliases.ColumnNames[0].Name);
@@ -1245,7 +1245,7 @@ namespace TSQL.Tests
 
             SubqueryReference subRef = Assert.IsType<SubqueryReference>(from.TableSources[0]);
             Assert.NotNull(subRef.Alias);
-            Assert.Equal("t", subRef.Alias.Name.Lexeme);
+            Assert.Equal("t", subRef.Alias.Name);
             Assert.NotNull(subRef.ColumnAliases);
             Assert.Equal(2, subRef.ColumnAliases.ColumnNames.Count);
             Assert.Equal("col1", subRef.ColumnAliases.ColumnNames[0].Name);
@@ -1275,7 +1275,7 @@ namespace TSQL.Tests
             Assert.Equal("Month", pivot.PivotColumn.ObjectName.Name);
             Assert.Equal(3, pivot.ValueList.Count);
             Assert.NotNull(pivot.Alias);
-            Assert.Equal("pvt", pivot.Alias.Name.Lexeme);
+            Assert.Equal("pvt", pivot.Alias.Name);
         }
 
         [Theory]
@@ -1303,7 +1303,7 @@ namespace TSQL.Tests
             Assert.Equal("Q1", unpivot.ColumnList[0].Name);
             Assert.Equal("Q4", unpivot.ColumnList[3].Name);
             Assert.NotNull(unpivot.Alias);
-            Assert.Equal("unpvt", unpivot.Alias.Name.Lexeme);
+            Assert.Equal("unpvt", unpivot.Alias.Name);
         }
 
         [Theory]
@@ -1327,7 +1327,7 @@ namespace TSQL.Tests
             Assert.Equal("OPENQUERY", rowset.FunctionCall.Callee.ObjectName.Name);
             Assert.Equal(2, rowset.FunctionCall.Arguments.Count);
             Assert.NotNull(rowset.Alias);
-            Assert.Equal("oq", rowset.Alias.Name.Lexeme);
+            Assert.Equal("oq", rowset.Alias.Name);
         }
 
         [Theory]
@@ -1435,7 +1435,7 @@ namespace TSQL.Tests
             Assert.Equal("T1", t1.TableName.ObjectName.Name);
 
             SubqueryReference sub = Assert.IsType<SubqueryReference>(apply.Right);
-            Assert.Equal("sub", sub.Alias.Name.Lexeme);
+            Assert.Equal("sub", sub.Alias.Name);
         }
 
         #endregion
@@ -1702,7 +1702,7 @@ namespace TSQL.Tests
 
             Assert.NotNull(orderBy);
             Assert.Equal(1, orderBy.Items.Count);
-            Assert.IsType<Expr.Literal>(orderBy.OffsetCount);
+            Assert.IsType<Expr.IntLiteral>(orderBy.OffsetCount);
             Assert.Null(orderBy.FetchCount);
         }
 
@@ -1713,8 +1713,8 @@ namespace TSQL.Tests
             var orderBy = stmt.Query.OrderBy;
 
             Assert.NotNull(orderBy);
-            Assert.IsType<Expr.Literal>(orderBy.OffsetCount);
-            Assert.IsType<Expr.Literal>(orderBy.FetchCount);
+            Assert.IsType<Expr.IntLiteral>(orderBy.OffsetCount);
+            Assert.IsType<Expr.IntLiteral>(orderBy.FetchCount);
         }
 
         [Fact]
@@ -1737,8 +1737,8 @@ namespace TSQL.Tests
             var stmt = ParseSelect(source);
             var setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.NotNull(setOp.OrderBy);
-            Assert.IsType<Expr.Literal>(setOp.OrderBy.OffsetCount);
-            Assert.IsType<Expr.Literal>(setOp.OrderBy.FetchCount);
+            Assert.IsType<Expr.IntLiteral>(setOp.OrderBy.OffsetCount);
+            Assert.IsType<Expr.IntLiteral>(setOp.OrderBy.FetchCount);
         }
 
         [Fact]
@@ -1775,7 +1775,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("WITH cte AS (SELECT a FROM T) SELECT a FROM cte");
             Assert.NotNull(stmt.CteStmt);
             Assert.Equal(1, stmt.CteStmt.Ctes.Count);
-            Assert.Equal("cte", stmt.CteStmt.Ctes[0].Name.Lexeme);
+            Assert.Equal("cte", stmt.CteStmt.Ctes[0].Name);
             Assert.Null(stmt.CteStmt.Ctes[0].ColumnNames);
         }
 
@@ -1793,8 +1793,8 @@ namespace TSQL.Tests
         {
             var stmt = ParseSelect("WITH c1 AS (SELECT a FROM T), c2 AS (SELECT b FROM U) SELECT a, b FROM c1, c2");
             Assert.Equal(2, stmt.CteStmt.Ctes.Count);
-            Assert.Equal("c1", stmt.CteStmt.Ctes[0].Name.Lexeme);
-            Assert.Equal("c2", stmt.CteStmt.Ctes[1].Name.Lexeme);
+            Assert.Equal("c1", stmt.CteStmt.Ctes[0].Name);
+            Assert.Equal("c2", stmt.CteStmt.Ctes[1].Name);
         }
 
         [Fact]
@@ -1834,8 +1834,7 @@ namespace TSQL.Tests
         {
             Stmt.Select stmt = ParseSelect("SELECT NULL");
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
-            Expr.Literal lit = Assert.IsType<Expr.Literal>(col.Expression);
-            Assert.Null(lit.Value);
+            Assert.IsType<Expr.NullLiteral>(col.Expression);
         }
 
         #endregion
@@ -1858,7 +1857,7 @@ namespace TSQL.Tests
             Stmt.Select stmt = ParseSelect("SELECT 10 % 3");
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.Binary bin = Assert.IsType<Expr.Binary>(col.Expression);
-            Assert.Equal(TokenType.MODULO, bin.Operator.Type);
+            Assert.Equal(Expr.ArithmeticOperator.Modulo, bin.Operator);
         }
 
         #endregion
@@ -1936,7 +1935,7 @@ namespace TSQL.Tests
             Expr.CastExpression cast = Assert.IsType<Expr.CastExpression>(col.Expression);
 
             Assert.IsType<Expr.ColumnIdentifier>(cast.Expression);
-            Assert.Equal("VARCHAR", cast.DataType.TypeName.Lexeme);
+            Assert.Equal("VARCHAR", cast.DataType.TypeName);
             Assert.Single(cast.DataType.Parameters);
             Assert.Equal(TokenType.CAST, cast._castKeyword.Type);
         }
@@ -1973,7 +1972,7 @@ namespace TSQL.Tests
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.ConvertExpression conv = Assert.IsType<Expr.ConvertExpression>(col.Expression);
 
-            Assert.Equal("VARCHAR", conv.DataType.TypeName.Lexeme);
+            Assert.Equal("VARCHAR", conv.DataType.TypeName);
             Assert.Single(conv.DataType.Parameters);
             Assert.IsType<Expr.ColumnIdentifier>(conv.Expression);
             Assert.NotNull(conv.Style);
@@ -2181,7 +2180,7 @@ namespace TSQL.Tests
         {
             Stmt.Select stmt = ParseSelect("SELECT N'hello'");
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
-            Expr.Literal lit = Assert.IsType<Expr.Literal>(col.Expression);
+            Expr.StringLiteral lit = Assert.IsType<Expr.StringLiteral>(col.Expression);
             Assert.Equal("hello", lit.Value);
         }
 
@@ -2376,7 +2375,7 @@ namespace TSQL.Tests
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.AtTimeZone atz = Assert.IsType<Expr.AtTimeZone>(col.Expression);
             Assert.IsType<Expr.ColumnIdentifier>(atz.Expression);
-            Assert.IsType<Expr.Literal>(atz.TimeZone);
+            Assert.IsType<Expr.StringLiteral>(atz.TimeZone);
         }
 
         [Fact]
@@ -2431,8 +2430,8 @@ namespace TSQL.Tests
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.Iif iif = Assert.IsType<Expr.Iif>(col.Expression);
             Assert.IsType<AST.Predicate.Comparison>(iif.Condition);
-            Assert.IsType<Expr.Literal>(iif.TrueValue);
-            Assert.IsType<Expr.Literal>(iif.FalseValue);
+            Assert.IsType<Expr.StringLiteral>(iif.TrueValue);
+            Assert.IsType<Expr.StringLiteral>(iif.FalseValue);
         }
 
         [Fact]

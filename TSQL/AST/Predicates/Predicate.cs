@@ -2,9 +2,71 @@
 
 namespace TSQL.AST
 {
+    public enum ComparisonOperator { Equal, NotEqual, LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual, NotLessThan, NotGreaterThan }
+    public enum QuantifierType { All, Any, Some }
+
     public abstract class Predicate : SyntaxElement
     {
         public abstract T Accept<T>(Visitor<T> visitor);
+
+        internal static ComparisonOperator TokenTypeToComparisonOperator(TokenType type)
+        {
+            switch (type)
+            {
+                case TokenType.EQUAL: return ComparisonOperator.Equal;
+                case TokenType.NOT_EQUAL: return ComparisonOperator.NotEqual;
+                case TokenType.LESS: return ComparisonOperator.LessThan;
+                case TokenType.LESS_EQUAL: return ComparisonOperator.LessThanOrEqual;
+                case TokenType.GREATER: return ComparisonOperator.GreaterThan;
+                case TokenType.GREATER_EQUAL: return ComparisonOperator.GreaterThanOrEqual;
+                case TokenType.NOT_LESS: return ComparisonOperator.NotLessThan;
+                case TokenType.NOT_GREATER: return ComparisonOperator.NotGreaterThan;
+                default: throw new System.ArgumentException($"Unknown comparison operator token type: {type}");
+            }
+        }
+
+        internal static string ComparisonOperatorToLexeme(ComparisonOperator op)
+        {
+            switch (op)
+            {
+                case ComparisonOperator.Equal: return "=";
+                case ComparisonOperator.NotEqual: return "<>";
+                case ComparisonOperator.LessThan: return "<";
+                case ComparisonOperator.LessThanOrEqual: return "<=";
+                case ComparisonOperator.GreaterThan: return ">";
+                case ComparisonOperator.GreaterThanOrEqual: return ">=";
+                case ComparisonOperator.NotLessThan: return "!<";
+                case ComparisonOperator.NotGreaterThan: return "!>";
+                default: throw new System.ArgumentException($"Unknown comparison operator: {op}");
+            }
+        }
+
+        internal static TokenType ComparisonOperatorToTokenType(ComparisonOperator op)
+        {
+            switch (op)
+            {
+                case ComparisonOperator.Equal: return TokenType.EQUAL;
+                case ComparisonOperator.NotEqual: return TokenType.NOT_EQUAL;
+                case ComparisonOperator.LessThan: return TokenType.LESS;
+                case ComparisonOperator.LessThanOrEqual: return TokenType.LESS_EQUAL;
+                case ComparisonOperator.GreaterThan: return TokenType.GREATER;
+                case ComparisonOperator.GreaterThanOrEqual: return TokenType.GREATER_EQUAL;
+                case ComparisonOperator.NotLessThan: return TokenType.NOT_LESS;
+                case ComparisonOperator.NotGreaterThan: return TokenType.NOT_GREATER;
+                default: throw new System.ArgumentException($"Unknown comparison operator: {op}");
+            }
+        }
+
+        internal static QuantifierType TokenTypeToQuantifierType(TokenType type)
+        {
+            switch (type)
+            {
+                case TokenType.ALL: return QuantifierType.All;
+                case TokenType.ANY: return QuantifierType.Any;
+                case TokenType.SOME: return QuantifierType.Some;
+                default: throw new System.ArgumentException($"Unknown quantifier token type: {type}");
+            }
+        }
 
         public interface Visitor<T>
         {
@@ -33,7 +95,20 @@ namespace TSQL.AST
                 get => _left;
                 set => SetWithTrivia(ref _left, value);
             }
-            public Token Operator { get; set; }
+            private ComparisonOperator _operator;
+            public ComparisonOperator Operator
+            {
+                get => _operator;
+                set
+                {
+                    _operator = value;
+                    _operatorToken = new ConcreteToken(
+                        ComparisonOperatorToTokenType(value),
+                        ComparisonOperatorToLexeme(value),
+                        null);
+                    _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                }
+            }
             private Expr _right;
             public Expr Right
             {
@@ -41,10 +116,13 @@ namespace TSQL.AST
                 set => SetWithTrivia(ref _right, value);
             }
 
-            public Comparison(Expr left, Token @operator, Expr right)
+            internal Token _operatorToken;
+
+            internal Comparison(Expr left, Token operatorToken, Expr right)
             {
                 _left = left;
-                Operator = @operator;
+                _operatorToken = operatorToken;
+                _operator = TokenTypeToComparisonOperator(operatorToken.Type);
                 _right = right;
             }
 
@@ -54,7 +132,7 @@ namespace TSQL.AST
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
-                yield return Operator;
+                yield return _operatorToken;
                 foreach (Token token in Right.DescendantTokens())
                     yield return token;
             }
@@ -434,8 +512,8 @@ namespace TSQL.AST
                 get => _left;
                 set => SetWithTrivia(ref _left, value);
             }
-            public Token Operator { get; set; }
-            public Token QuantifierKeyword { get; set; }
+            public ComparisonOperator Operator { get; set; }
+            public QuantifierType QuantifierKind { get; set; }
             private Expr.Subquery _subquery;
             public Expr.Subquery Subquery
             {
@@ -443,14 +521,18 @@ namespace TSQL.AST
                 set => SetWithTrivia(ref _subquery, value);
             }
 
+            internal Token _operatorToken;
+            internal Token _quantifierToken;
             internal Token _leftParen;
             internal Token _rightParen;
 
-            public Quantifier(Expr left, Token @operator, Token quantifierKeyword, Expr.Subquery subquery)
+            internal Quantifier(Expr left, Token operatorToken, Token quantifierToken, Expr.Subquery subquery)
             {
                 _left = left;
-                Operator = @operator;
-                QuantifierKeyword = quantifierKeyword;
+                _operatorToken = operatorToken;
+                Operator = TokenTypeToComparisonOperator(operatorToken.Type);
+                _quantifierToken = quantifierToken;
+                QuantifierKind = TokenTypeToQuantifierType(quantifierToken.Type);
                 _subquery = subquery;
             }
 
@@ -460,8 +542,8 @@ namespace TSQL.AST
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
-                yield return Operator;
-                yield return QuantifierKeyword;
+                yield return _operatorToken;
+                yield return _quantifierToken;
                 yield return _leftParen;
                 foreach (Token token in Subquery.Query.DescendantTokens())
                     yield return token;

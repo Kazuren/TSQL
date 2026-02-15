@@ -62,7 +62,10 @@ namespace TSQL.Tests
         {
             public string? LastType { get; private set; }
             public object? VisitBinaryExpr(Expr.Binary expr) { LastType = "Binary"; return null; }
-            public object? VisitLiteralExpr(Expr.Literal expr) { LastType = "Literal"; return null; }
+            public object? VisitStringLiteralExpr(Expr.StringLiteral expr) { LastType = "StringLiteral"; return null; }
+            public object? VisitIntLiteralExpr(Expr.IntLiteral expr) { LastType = "IntLiteral"; return null; }
+            public object? VisitDecimalLiteralExpr(Expr.DecimalLiteral expr) { LastType = "DecimalLiteral"; return null; }
+            public object? VisitNullLiteralExpr(Expr.NullLiteral expr) { LastType = "NullLiteral"; return null; }
             public object? VisitColumnIdentifierExpr(Expr.ColumnIdentifier expr) { LastType = "ColumnIdentifier"; return null; }
             public object? VisitObjectIdentifierExpr(Expr.ObjectIdentifier expr) { LastType = "ObjectIdentifier"; return null; }
             public object? VisitWildcardExpr(Expr.Wildcard expr) { LastType = "Wildcard"; return null; }
@@ -183,7 +186,10 @@ namespace TSQL.Tests
             public int ComparisonCount { get; private set; }
 
             protected override void VisitColumnIdentifier(Expr.ColumnIdentifier expr) { ColumnIdentifierCount++; }
-            protected override void VisitLiteral(Expr.Literal expr) { LiteralCount++; }
+            protected override void VisitStringLiteral(Expr.StringLiteral expr) { LiteralCount++; }
+            protected override void VisitIntLiteral(Expr.IntLiteral expr) { LiteralCount++; }
+            protected override void VisitDecimalLiteral(Expr.DecimalLiteral expr) { LiteralCount++; }
+            protected override void VisitNullLiteral(Expr.NullLiteral expr) { LiteralCount++; }
             protected override void VisitFunctionCall(Expr.FunctionCall expr) { FunctionCallCount++; base.VisitFunctionCall(expr); }
             protected override void VisitTableReference(TableReference source) { TableReferenceCount++; }
             protected override void VisitQualifiedJoin(QualifiedJoin source) { QualifiedJoinCount++; base.VisitQualifiedJoin(source); }
@@ -200,7 +206,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
             var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
-            Assert.IsType<Expr.Literal>(where.Right);
+            Assert.IsType<Expr.IntLiteral>(where.Right);
             where.Right = new Expr.Variable("@P0");
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0", stmt.ToSource());
@@ -212,8 +218,8 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
             var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
-            Assert.IsType<Expr.Literal>(where.Right);
-            Assert.Equal("hello", ((Expr.Literal)where.Right).Value);
+            Assert.IsType<Expr.StringLiteral>(where.Right);
+            Assert.Equal("hello", ((Expr.StringLiteral)where.Right).Value);
 
             where.Right = new Expr.Variable("@P0");
 
@@ -226,7 +232,7 @@ namespace TSQL.Tests
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 1");
             var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
-            where.Right = new Expr.Literal(99);
+            where.Right = new Expr.IntLiteral(99);
 
             Assert.Equal("SELECT * FROM T WHERE x = 99", stmt.ToSource());
         }

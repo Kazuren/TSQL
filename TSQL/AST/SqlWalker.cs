@@ -62,7 +62,13 @@ namespace TSQL
             Walk(expr.Right);
         }
 
-        protected virtual void VisitLiteral(Expr.Literal expr) { }
+        protected virtual void VisitStringLiteral(Expr.StringLiteral expr) { }
+
+        protected virtual void VisitIntLiteral(Expr.IntLiteral expr) { }
+
+        protected virtual void VisitDecimalLiteral(Expr.DecimalLiteral expr) { }
+
+        protected virtual void VisitNullLiteral(Expr.NullLiteral expr) { }
 
         protected virtual void VisitColumnIdentifier(Expr.ColumnIdentifier expr) { }
 
@@ -481,7 +487,10 @@ namespace TSQL
         object Stmt.Visitor<object>.VisitSelectStmt(Stmt.Select stmt) { VisitSelect(stmt); return null; }
 
         object Expr.Visitor<object>.VisitBinaryExpr(Expr.Binary expr) { VisitBinary(expr); return null; }
-        object Expr.Visitor<object>.VisitLiteralExpr(Expr.Literal expr) { VisitLiteral(expr); return null; }
+        object Expr.Visitor<object>.VisitStringLiteralExpr(Expr.StringLiteral expr) { VisitStringLiteral(expr); return null; }
+        object Expr.Visitor<object>.VisitIntLiteralExpr(Expr.IntLiteral expr) { VisitIntLiteral(expr); return null; }
+        object Expr.Visitor<object>.VisitDecimalLiteralExpr(Expr.DecimalLiteral expr) { VisitDecimalLiteral(expr); return null; }
+        object Expr.Visitor<object>.VisitNullLiteralExpr(Expr.NullLiteral expr) { VisitNullLiteral(expr); return null; }
         object Expr.Visitor<object>.VisitColumnIdentifierExpr(Expr.ColumnIdentifier expr) { VisitColumnIdentifier(expr); return null; }
         object Expr.Visitor<object>.VisitObjectIdentifierExpr(Expr.ObjectIdentifier expr) { VisitObjectIdentifier(expr); return null; }
         object Expr.Visitor<object>.VisitWildcardExpr(Expr.Wildcard expr) { VisitWildcard(expr); return null; }

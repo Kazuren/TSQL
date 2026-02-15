@@ -70,23 +70,35 @@ namespace TSQL.StandardLibrary.Visitors
 
             private Expr TryReplace(Expr expr)
             {
-                if (expr is Expr.Literal literal && literal.Value != null)
+                object value;
+                if (expr is Expr.StringLiteral stringLit)
                 {
-                    string paramName;
-                    do
-                    {
-                        paramName = "@P" + _paramIndex;
-                        _paramIndex++;
-                    } while (_existingNames.Contains(paramName.ToUpperInvariant()));
-
-                    Parameters[paramName] = literal.Value;
-                    return new Expr.Variable(paramName);
+                    value = stringLit.Value;
+                }
+                else if (expr is Expr.IntLiteral intLit)
+                {
+                    value = intLit.Value;
+                }
+                else if (expr is Expr.DecimalLiteral decLit)
+                {
+                    value = decLit.Value;
                 }
                 else
                 {
+                    // NullLiteral and all non-literal exprs: walk into children, don't parameterize
                     Walk(expr);
                     return expr;
                 }
+
+                string paramName;
+                do
+                {
+                    paramName = "@P" + _paramIndex;
+                    _paramIndex++;
+                } while (_existingNames.Contains(paramName.ToUpperInvariant()));
+
+                Parameters[paramName] = value;
+                return new Expr.Variable(paramName);
             }
 
             #region Expr Parents

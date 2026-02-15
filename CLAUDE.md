@@ -62,6 +62,7 @@ Tokens carry leading/trailing trivia (whitespace, comments) enabling exact sourc
 
 - `StringSlice` - Lightweight struct for deferred string allocation during lexing
 - Keywords matched by length to minimize comparisons
+- **Never compare `Token.Lexeme` (string) when `Token.Type` (enum) can be used instead.** Lexeme comparison is a string operation; TokenType comparison is an integer comparison. If a keyword doesn't have a `TokenType` entry yet, add it to the `TokenType` enum as a contextual keyword so the scanner produces the right token type. Resolve contextual meaning in the parser, not in AST node constructors.
 
 ## Project Structure
 
