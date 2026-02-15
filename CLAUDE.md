@@ -40,8 +40,11 @@ This is a T-SQL parser library targeting .NET Standard 2.0 for broad compatibili
 ### AST Structure
 
 - `SyntaxElement` - Base class for all AST nodes
-- `Expr` (`AST/Expr.cs`) - Expression nodes: literals, column identifiers, binary/unary operations, function calls, window functions, subqueries
-- `Stmt` (`AST/Stmt.cs`) - Statement nodes: SELECT with CTEs
+- `Expr` (`AST/Expr.cs`) - Expression nodes: literals, column identifiers, binary/unary operations, function calls, window functions, subqueries, CASE, CAST/CONVERT, OPENXML
+- `Stmt` (`AST/Stmt.cs`) - Statement nodes: SELECT with CTEs, SelectItem/SelectColumn, Alias, TopClause
+- `QueryExpression` (`AST/QueryExpression.cs`) - Query structure: SelectExpression, SetOperation, ORDER BY, GROUP BY, FOR clause, DataType, window frame support, SQL name hierarchy
+- `TableSource` (`AST/TableSource.cs`) - FROM clause ecosystem: table sources (joins, subqueries, PIVOT/UNPIVOT, VALUES), table hints, temporal/sampling clauses
+- `QueryHint` (`AST/QueryHint.cs`) - OPTION clause and all query hint types
 - `Predicate` (`AST/Predicates/Predicate.cs`) - WHERE clause predicates: comparison, LIKE, BETWEEN, IN, EXISTS, etc.
 - `SyntaxElementList<T>` - Generic list that preserves separator tokens for round-trip fidelity
 
