@@ -21,9 +21,31 @@ namespace TSQL
         private List<Token> _separators;
 
         /// <summary>
+        /// Adds an item to the list, automatically inserting a comma separator if the list is non-empty.
+        /// </summary>
+        public void Add(T item)
+        {
+            if (_items == null)
+            {
+                _items = new List<T>();
+            }
+
+            if (_items.Count > 0)
+            {
+                if (_separators == null)
+                {
+                    _separators = new List<Token>();
+                }
+                _separators.Add(new ConcreteToken(TokenType.COMMA, ",", null));
+            }
+
+            _items.Add(item);
+        }
+
+        /// <summary>
         /// Add an item with its trailing separator token (if any).
         /// </summary>
-        internal void Add(T item, Token separator = null)
+        internal void Add(T item, Token separator)
         {
             if (_items == null)
             {

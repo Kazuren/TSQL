@@ -197,11 +197,23 @@ namespace TSQL
         string Name { get; }
     }
 
-    internal class SuffixAlias : SyntaxElement, Alias
+    public class SuffixAlias : SyntaxElement, Alias
     {
         public string Name { get => _nameToken.Lexeme; }
         internal Token _nameToken;
         internal Token _asKeyword;
+
+        public SuffixAlias(string name, bool useAs = true)
+        {
+            _nameToken = new ConcreteToken(TokenType.IDENTIFIER, name, null);
+            _nameToken.AddLeadingTrivia(new Whitespace(" "));
+            if (useAs)
+            {
+                _asKeyword = new ConcreteToken(TokenType.AS, "AS", null);
+                _asKeyword.AddLeadingTrivia(new Whitespace(" "));
+            }
+        }
+
         internal SuffixAlias(Token name)
         {
             _nameToken = name;
@@ -218,11 +230,19 @@ namespace TSQL
         }
     }
 
-    internal class PrefixAlias : SyntaxElement, Alias
+    public class PrefixAlias : SyntaxElement, Alias
     {
         public string Name { get => _nameToken.Lexeme; }
         internal Token _nameToken;
         internal Token _equalsToken;
+
+        public PrefixAlias(string name)
+        {
+            _nameToken = new ConcreteToken(TokenType.IDENTIFIER, name, null);
+            _equalsToken = new ConcreteToken(TokenType.EQUAL, "=", null);
+            _equalsToken.AddLeadingTrivia(new Whitespace(" "));
+        }
+
         internal PrefixAlias(Token name, Token equalsToken)
         {
             _nameToken = name;
@@ -335,6 +355,13 @@ namespace TSQL
         public SyntaxElementList<TableSource> TableSources { get; set; } = new SyntaxElementList<TableSource>();
 
         internal Token _fromToken;
+
+        public FromClause()
+        {
+            _fromToken = new ConcreteToken(TokenType.FROM, "FROM", null);
+            _fromToken.AddLeadingTrivia(new Whitespace(" "));
+        }
+
         internal FromClause(Token fromToken)
         {
             _fromToken = fromToken;
@@ -874,6 +901,15 @@ namespace TSQL
         internal Token _groupKeyword;
         internal Token _byKeyword;
 
+        public GroupByClause(SyntaxElementList<GroupByItem> items)
+        {
+            _groupKeyword = new ConcreteToken(TokenType.GROUP, "GROUP", null);
+            _groupKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _byKeyword = new ConcreteToken(TokenType.BY, "BY", null);
+            _byKeyword.AddLeadingTrivia(new Whitespace(" "));
+            Items = items;
+        }
+
         internal GroupByClause(Token groupKeyword, Token byKeyword, SyntaxElementList<GroupByItem> items)
         {
             _groupKeyword = groupKeyword;
@@ -896,7 +932,7 @@ namespace TSQL
     {
         public Expr Expression { get; }
 
-        internal GroupByExpression(Expr expression)
+        public GroupByExpression(Expr expression)
         {
             Expression = expression;
         }
@@ -912,6 +948,12 @@ namespace TSQL
     {
         internal Token _leftParen;
         internal Token _rightParen;
+
+        public GroupByGrandTotal()
+        {
+            _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+            _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+        }
 
         internal GroupByGrandTotal(Token leftParen, Token rightParen)
         {
@@ -932,6 +974,13 @@ namespace TSQL
 
         internal Token _leftParen;
         internal Token _rightParen;
+
+        public GroupByComposite(SyntaxElementList<Expr> expressions)
+        {
+            _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+            Expressions = expressions;
+            _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+        }
 
         internal GroupByComposite(Token leftParen, SyntaxElementList<Expr> expressions, Token rightParen)
         {
@@ -956,6 +1005,15 @@ namespace TSQL
         internal Token _rollupKeyword;
         internal Token _leftParen;
         internal Token _rightParen;
+
+        public GroupByRollup(SyntaxElementList<GroupByItem> items)
+        {
+            _rollupKeyword = new ConcreteToken(TokenType.ROLLUP, "ROLLUP", null);
+            _rollupKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+            Items = items;
+            _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+        }
 
         internal GroupByRollup(Token rollupKeyword, Token leftParen, SyntaxElementList<GroupByItem> items, Token rightParen)
         {
@@ -983,6 +1041,15 @@ namespace TSQL
         internal Token _leftParen;
         internal Token _rightParen;
 
+        public GroupByCube(SyntaxElementList<GroupByItem> items)
+        {
+            _cubeKeyword = new ConcreteToken(TokenType.CUBE, "CUBE", null);
+            _cubeKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+            Items = items;
+            _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+        }
+
         internal GroupByCube(Token cubeKeyword, Token leftParen, SyntaxElementList<GroupByItem> items, Token rightParen)
         {
             _cubeKeyword = cubeKeyword;
@@ -1009,6 +1076,17 @@ namespace TSQL
         internal Token _setsKeyword;
         internal Token _leftParen;
         internal Token _rightParen;
+
+        public GroupByGroupingSets(SyntaxElementList<GroupByItem> items)
+        {
+            _groupingKeyword = new ConcreteToken(TokenType.GROUPING, "GROUPING", null);
+            _groupingKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _setsKeyword = new ConcreteToken(TokenType.SETS, "SETS", null);
+            _setsKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+            Items = items;
+            _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+        }
 
         internal GroupByGroupingSets(Token groupingKeyword, Token setsKeyword, Token leftParen, SyntaxElementList<GroupByItem> items, Token rightParen)
         {

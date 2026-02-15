@@ -2958,5 +2958,92 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Programmatic AST Construction Tests
+
+        [Fact]
+        public void Construct_SelectStarFromTable_ProducesValidSql()
+        {
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new Expr.Wildcard());
+
+            var from = new FromClause();
+            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("Users"))));
+            selectExpr.From = from;
+
+            var stmt = new Stmt.Select(selectExpr);
+            Assert.Equal("SELECT * FROM Users", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Construct_SelectMultipleColumns_ProducesValidSql()
+        {
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new SelectColumn(
+                new Expr.ColumnIdentifier(new ColumnName("a")), null));
+            selectExpr.Columns.Add(new SelectColumn(
+                new Expr.ColumnIdentifier(new ColumnName("b")), null));
+
+            var from = new FromClause();
+            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
+            selectExpr.From = from;
+
+            var stmt = new Stmt.Select(selectExpr);
+            Assert.Equal("SELECT a, b FROM T", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Construct_SelectWithAlias_ProducesValidSql()
+        {
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new SelectColumn(
+                new Expr.ColumnIdentifier(new ColumnName("a")),
+                new SuffixAlias("alias")));
+
+            var from = new FromClause();
+            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
+            selectExpr.From = from;
+
+            var stmt = new Stmt.Select(selectExpr);
+            Assert.Equal("SELECT a AS alias FROM T", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Construct_BinaryExpression_ProducesValidSql()
+        {
+            var binary = new Expr.Binary(
+                new Expr.ColumnIdentifier(new ColumnName("a")),
+                Expr.ArithmeticOperator.Add,
+                new Expr.ColumnIdentifier(new ColumnName("b")));
+
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new SelectColumn(binary, null));
+
+            var stmt = new Stmt.Select(selectExpr);
+            Assert.Equal("SELECT a + b", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Construct_ComparisonPredicate_ProducesValidSql()
+        {
+            var comparison = new AST.Predicate.Comparison(
+                new Expr.ColumnIdentifier(new ColumnName("x")),
+                AST.ComparisonOperator.GreaterThan,
+                new Expr.IntLiteral(10));
+
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new SelectColumn(
+                new Expr.ColumnIdentifier(new ColumnName("a")), null));
+
+            var from = new FromClause();
+            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
+            selectExpr.From = from;
+            selectExpr.AddWhere(comparison);
+
+            var stmt = new Stmt.Select(selectExpr);
+            Assert.Equal("SELECT a FROM T WHERE x > 10", stmt.ToSource());
+        }
+
+        #endregion
     }
 }

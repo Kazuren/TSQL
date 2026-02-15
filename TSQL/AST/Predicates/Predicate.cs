@@ -118,6 +118,18 @@ namespace TSQL.AST
 
             internal Token _operatorToken;
 
+            public Comparison(Expr left, ComparisonOperator op, Expr right)
+            {
+                _left = left;
+                _operator = op;
+                _operatorToken = new ConcreteToken(
+                    ComparisonOperatorToTokenType(op),
+                    ComparisonOperatorToLexeme(op),
+                    null);
+                _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                _right = right;
+            }
+
             internal Comparison(Expr left, Token operatorToken, Expr right)
             {
                 _left = left;

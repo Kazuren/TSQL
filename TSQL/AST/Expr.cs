@@ -261,6 +261,12 @@ namespace TSQL
         {
             internal Token _wildcardToken;
 
+            public Wildcard()
+            {
+                _wildcardToken = new ConcreteToken(TokenType.STAR, "*", null);
+                _wildcardToken.AddLeadingTrivia(new Whitespace(" "));
+            }
+
             internal Wildcard(Token wildcardToken)
             {
                 _wildcardToken = wildcardToken;
@@ -499,6 +505,18 @@ namespace TSQL
 
             internal Token _operatorToken;
 
+            public Binary(Expr left, ArithmeticOperator op, Expr right)
+            {
+                _left = left;
+                _operator = op;
+                _operatorToken = new ConcreteToken(
+                    ArithmeticOperatorToTokenType(op),
+                    ArithmeticOperatorToLexeme(op),
+                    null);
+                _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                _right = right;
+            }
+
             internal Binary(Token operatorToken)
             {
                 _operatorToken = operatorToken;
@@ -676,6 +694,16 @@ namespace TSQL
             }
 
             internal Token _operatorToken;
+
+            public Unary(UnaryOperator op, Expr right)
+            {
+                _operator = op;
+                _operatorToken = new ConcreteToken(
+                    UnaryOperatorToTokenType(op),
+                    UnaryOperatorToLexeme(op),
+                    null);
+                _right = right;
+            }
 
             internal Unary(Token operatorToken, Expr right)
             {
@@ -1789,6 +1817,10 @@ namespace TSQL
 
         public override IEnumerable<Token> DescendantTokens()
         {
+            if (_selectKeyword == null)
+            {
+                _selectKeyword = new ConcreteToken(TokenType.SELECT, "SELECT", null);
+            }
             yield return _selectKeyword;
 
             if (_distinctKeyword != null)
@@ -1912,7 +1944,12 @@ namespace TSQL
         public string Name { get; }
         private readonly Token _token;
 
-        protected SqlName(string name) { Name = name; }
+        protected SqlName(string name)
+        {
+            Name = name;
+            _token = new ConcreteToken(TokenType.IDENTIFIER, name, null);
+            _token.AddLeadingTrivia(new Whitespace(" "));
+        }
 
         internal SqlName(Token token)
         {
