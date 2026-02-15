@@ -386,5 +386,192 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region ColumnReferenceCollector
+
+        [Fact]
+        public void ColumnReferenceCollector_FindsSingleUnqualifiedColumn()
+        {
+            var stmt = ParseSelect("SELECT a FROM T");
+            var refs = stmt.CollectColumnReferences();
+
+            Assert.Single(refs);
+            Assert.Equal("a", refs[0].ColumnName.Name);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_FindsMultipleQualifiedColumns()
+        {
+            var stmt = ParseSelect("SELECT T.a, T.b FROM T");
+            var refs = stmt.CollectColumnReferences();
+
+            Assert.Equal(2, refs.Count);
+            Assert.All(refs, r => Assert.NotNull(r.ObjectName));
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_FindsColumnsInAllClauses()
+        {
+            var stmt = ParseSelect(
+                "SELECT a FROM A INNER JOIN B ON A.id = B.id WHERE x = 1 ORDER BY a");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.All);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("a", names);
+            Assert.Contains("id", names);
+            Assert.Contains("x", names);
+            Assert.True(refs.Count >= 5, "Should find columns in SELECT, ON, WHERE, and ORDER BY");
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_FindsColumnsInsideSubqueries()
+        {
+            var stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
+            var refs = stmt.CollectColumnReferences(
+                scope: ColumnReferenceScope.All,
+                clauses: ColumnReferenceClause.All);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("x", names);
+            Assert.Contains("id", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_WildcardProducesNoColumnRefs()
+        {
+            var stmt = ParseSelect("SELECT * FROM T");
+            var refs = stmt.CollectColumnReferences();
+
+            Assert.Empty(refs);
+        }
+
+        #endregion
+
+        #region ColumnReferenceCollector Scope Tests
+
+        [Fact]
+        public void ColumnReferenceCollector_DefaultScope_ExcludesSubqueries()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.All);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("a", names);
+            Assert.Contains("x", names);
+            Assert.DoesNotContain("id", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_SubqueriesOnly_CollectsOnlySubqueryColumns()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
+            var refs = stmt.CollectColumnReferences(
+                scope: ColumnReferenceScope.Subqueries,
+                clauses: ColumnReferenceClause.All);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("id", names);
+            Assert.DoesNotContain("a", names);
+            Assert.DoesNotContain("x", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_CtesOnly_CollectsOnlyCteColumns()
+        {
+            var stmt = ParseSelect("WITH cte AS (SELECT id FROM S) SELECT a FROM cte");
+            var refs = stmt.CollectColumnReferences(
+                scope: ColumnReferenceScope.Ctes,
+                clauses: ColumnReferenceClause.All);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("id", names);
+            Assert.DoesNotContain("a", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_ScopeNone_ReturnsEmpty()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            var refs = stmt.CollectColumnReferences(
+                scope: ColumnReferenceScope.None,
+                clauses: ColumnReferenceClause.All);
+
+            Assert.Empty(refs);
+        }
+
+        #endregion
+
+        #region ColumnReferenceCollector Clause Tests
+
+        [Fact]
+        public void ColumnReferenceCollector_SelectClauseOnly()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.Select);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("a", names);
+            Assert.DoesNotContain("x", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_WhereClauseOnly()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.Where);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("x", names);
+            Assert.DoesNotContain("a", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_FromClauseOnly_IncludesJoinConditions()
+        {
+            var stmt = ParseSelect("SELECT a FROM A INNER JOIN B ON A.id = B.id");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.From);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Equal(2, refs.Count);
+            Assert.All(names, n => Assert.Equal("id", n));
+            Assert.DoesNotContain("a", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_OrderByClauseOnly()
+        {
+            var stmt = ParseSelect("SELECT a FROM T ORDER BY b");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.OrderBy);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Single(refs);
+            Assert.Contains("b", names);
+            Assert.DoesNotContain("a", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_CombinedClauses()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1 ORDER BY b");
+            var refs = stmt.CollectColumnReferences(
+                clauses: ColumnReferenceClause.Select | ColumnReferenceClause.Where);
+
+            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            Assert.Contains("a", names);
+            Assert.Contains("x", names);
+            Assert.DoesNotContain("b", names);
+        }
+
+        [Fact]
+        public void ColumnReferenceCollector_ClauseNone_ReturnsEmpty()
+        {
+            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.None);
+
+            Assert.Empty(refs);
+        }
+
+        #endregion
     }
 }
+

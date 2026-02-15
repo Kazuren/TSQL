@@ -28,5 +28,19 @@ namespace TSQL.StandardLibrary.Visitors
         {
             return TableReferenceCollector.Collect(stmt);
         }
+
+        /// <summary>
+        /// Collects column references found in this statement.
+        /// Use <paramref name="scope"/> to control which query levels are traversed
+        /// and <paramref name="clauses"/> to control which SQL clauses are collected from.
+        /// Both must be satisfied for a column to be included. Wildcards are excluded.
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<Expr.ColumnIdentifier> CollectColumnReferences(
+            this Stmt stmt,
+            ColumnReferenceScope scope = ColumnReferenceScope.OutermostQuery,
+            ColumnReferenceClause clauses = ColumnReferenceClause.Select)
+        {
+            return ColumnReferenceCollector.Collect(stmt, scope, clauses);
+        }
     }
 }
