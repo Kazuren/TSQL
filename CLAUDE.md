@@ -45,7 +45,7 @@ This is a T-SQL parser library targeting .NET Standard 2.0 for broad compatibili
 - `QueryExpression` (`AST/QueryExpression.cs`) - Query structure: SelectExpression, SetOperation, ORDER BY, GROUP BY, FOR clause, DataType, window frame support, SQL name hierarchy
 - `TableSource` (`AST/TableSource.cs`) - FROM clause ecosystem: table sources (joins, subqueries, PIVOT/UNPIVOT, VALUES), table hints, temporal/sampling clauses
 - `QueryHint` (`AST/QueryHint.cs`) - OPTION clause and all query hint types
-- `Predicate` (`AST/Predicates/Predicate.cs`) - WHERE clause predicates: comparison, LIKE, BETWEEN, IN, EXISTS, etc.
+- `Predicate` (`AST/Predicate.cs`) - WHERE clause predicates: comparison, LIKE, BETWEEN, IN, EXISTS, etc.
 - `SyntaxElementList<T>` - Generic list that preserves separator tokens for round-trip fidelity
 
 ### Visitor Pattern
