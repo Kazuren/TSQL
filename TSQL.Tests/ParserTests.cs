@@ -983,13 +983,13 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_RowNumberWithoutOver_ThrowsParseError()
         {
-            Assert.ThrowsAny<Exception>(() => Stmt.Parse("SELECT ROW_NUMBER() FROM T"));
+            Assert.ThrowsAny<ParseError>(() => Stmt.Parse("SELECT ROW_NUMBER() FROM T"));
         }
 
         [Fact]
         public void Parse_FrameWithoutOrderBy_ThrowsParseError()
         {
-            Assert.ThrowsAny<Exception>(() => Stmt.Parse("SELECT SUM(x) OVER (ROWS UNBOUNDED PRECEDING) FROM T"));
+            Assert.ThrowsAny<ParseError>(() => Stmt.Parse("SELECT SUM(x) OVER (ROWS UNBOUNDED PRECEDING) FROM T"));
         }
 
         // === Round-Trip Tests ===
