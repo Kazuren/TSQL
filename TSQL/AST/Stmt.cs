@@ -13,6 +13,14 @@ namespace TSQL
             return parser.Parse();
         }
 
+        public static Select ParseSelect(string sql)
+        {
+            Scanner scanner = new Scanner(sql);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            return parser.ParseSelect();
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
         public interface Visitor<T>
         {

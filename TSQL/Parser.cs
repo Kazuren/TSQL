@@ -355,6 +355,19 @@ namespace TSQL
             return selectStmt;
         }
 
+        public Stmt.Select ParseSelect()
+        {
+            Reset();
+            Stmt.Select selectStmt = SelectStatement();
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected valid token.");
+            }
+
+            return selectStmt;
+        }
+
         public AST.Predicate ParseSearchCondition()
         {
             Reset();
