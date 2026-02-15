@@ -80,7 +80,11 @@ namespace TSQL
 
     public class CteDefinition : SyntaxElement
     {
-        public string Name { get => _nameToken.Lexeme; }
+        public string Name
+        {
+            get => _nameToken.Lexeme;
+            set { _nameToken = new ConcreteToken(TokenType.IDENTIFIER, value, null); }
+        }
         public CteColumnNames ColumnNames { get; set; }
         public Expr.Subquery Query { get; set; }
 
@@ -129,13 +133,31 @@ namespace TSQL
 
     public class SelectColumn : SyntaxElement, SelectItem
     {
-        public Expr Expression { get; }
-        public Alias Alias { get; }
+        private Expr _expression;
+        public Expr Expression
+        {
+            get => _expression;
+            set => SetWithTrivia(ref _expression, value);
+        }
+
+        private Alias _alias;
+        public Alias Alias
+        {
+            get => _alias;
+            set
+            {
+                if (_alias is SyntaxElement oldSe && value is SyntaxElement newSe)
+                {
+                    TransferLeadingTrivia(oldSe, newSe);
+                }
+                _alias = value;
+            }
+        }
 
         public SelectColumn(Expr expression, Alias alias)
         {
-            Expression = expression;
-            Alias = alias;
+            _expression = expression;
+            _alias = alias;
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -216,13 +238,18 @@ namespace TSQL
 
     public class TopClause : SyntaxElement
     {
-        public Expr Expression { get; }
+        private Expr _expression;
+        public Expr Expression
+        {
+            get => _expression;
+            set => SetWithTrivia(ref _expression, value);
+        }
         public bool Percent { get; set; }
         public bool WithTies { get; set; }
 
         public TopClause(Expr expr)
         {
-            Expression = expr;
+            _expression = expr;
         }
 
         internal Token _topKeyword;
@@ -393,12 +420,17 @@ namespace TSQL
 
     public class SubqueryReference : TableSource
     {
-        public Expr.Subquery Subquery { get; }
+        private Expr.Subquery _subquery;
+        public Expr.Subquery Subquery
+        {
+            get => _subquery;
+            set => SetWithTrivia(ref _subquery, value);
+        }
         public DerivedColumnAliases ColumnAliases { get; set; }
 
         public SubqueryReference(Expr.Subquery subquery)
         {
-            Subquery = subquery;
+            _subquery = subquery;
         }
 
         public override T Accept<T>(Visitor<T> visitor)
@@ -421,7 +453,11 @@ namespace TSQL
 
     public class TableVariableReference : TableSource
     {
-        public string VariableName => _variableToken.Lexeme;
+        public string VariableName
+        {
+            get => _variableToken.Lexeme;
+            set { _variableToken = new ConcreteToken(TokenType.VARIABLE, value, null); }
+        }
 
         internal Token _variableToken;
 
@@ -630,9 +666,26 @@ namespace TSQL
             get => _source;
             set => SetWithTrivia(ref _source, value);
         }
-        public Expr.FunctionCall AggregateFunction { get; }
-        public Expr.ObjectIdentifier PivotColumn { get; }
-        public SyntaxElementList<ColumnName> ValueList { get; }
+        private Expr.FunctionCall _aggregateFunction;
+        public Expr.FunctionCall AggregateFunction
+        {
+            get => _aggregateFunction;
+            set => SetWithTrivia(ref _aggregateFunction, value);
+        }
+
+        private Expr.ObjectIdentifier _pivotColumn;
+        public Expr.ObjectIdentifier PivotColumn
+        {
+            get => _pivotColumn;
+            set => SetWithTrivia(ref _pivotColumn, value);
+        }
+
+        private SyntaxElementList<ColumnName> _valueList;
+        public SyntaxElementList<ColumnName> ValueList
+        {
+            get => _valueList;
+            set => SetWithTrivia(ref _valueList, value);
+        }
 
         internal Token _pivotToken;
         internal Token _leftParen;
@@ -645,9 +698,9 @@ namespace TSQL
         public PivotTableSource(TableSource source, Expr.FunctionCall aggregateFunction, Expr.ObjectIdentifier pivotColumn, SyntaxElementList<ColumnName> valueList)
         {
             _source = source;
-            AggregateFunction = aggregateFunction;
-            PivotColumn = pivotColumn;
-            ValueList = valueList;
+            _aggregateFunction = aggregateFunction;
+            _pivotColumn = pivotColumn;
+            _valueList = valueList;
         }
 
         public override T Accept<T>(Visitor<T> visitor)
@@ -686,9 +739,26 @@ namespace TSQL
             get => _source;
             set => SetWithTrivia(ref _source, value);
         }
-        public Expr.ObjectIdentifier ValueColumn { get; }
-        public Expr.ObjectIdentifier PivotColumn { get; }
-        public SyntaxElementList<ColumnName> ColumnList { get; }
+        private Expr.ObjectIdentifier _valueColumn;
+        public Expr.ObjectIdentifier ValueColumn
+        {
+            get => _valueColumn;
+            set => SetWithTrivia(ref _valueColumn, value);
+        }
+
+        private Expr.ObjectIdentifier _pivotColumn;
+        public Expr.ObjectIdentifier PivotColumn
+        {
+            get => _pivotColumn;
+            set => SetWithTrivia(ref _pivotColumn, value);
+        }
+
+        private SyntaxElementList<ColumnName> _columnList;
+        public SyntaxElementList<ColumnName> ColumnList
+        {
+            get => _columnList;
+            set => SetWithTrivia(ref _columnList, value);
+        }
 
         internal Token _unpivotToken;
         internal Token _leftParen;
@@ -701,9 +771,9 @@ namespace TSQL
         public UnpivotTableSource(TableSource source, Expr.ObjectIdentifier valueColumn, Expr.ObjectIdentifier pivotColumn, SyntaxElementList<ColumnName> columnList)
         {
             _source = source;
-            ValueColumn = valueColumn;
-            PivotColumn = pivotColumn;
-            ColumnList = columnList;
+            _valueColumn = valueColumn;
+            _pivotColumn = pivotColumn;
+            _columnList = columnList;
         }
 
         public override T Accept<T>(Visitor<T> visitor)

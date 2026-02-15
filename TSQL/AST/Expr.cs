@@ -1489,7 +1489,11 @@ namespace TSQL
     /// </summary>
     public class DataType : SyntaxElement
     {
-        public string TypeName { get => _typeNameToken.Lexeme; }
+        public string TypeName
+        {
+            get => _typeNameToken.Lexeme;
+            set { _typeNameToken = new ConcreteToken(_typeNameToken.Type, value, null); }
+        }
         public SyntaxElementList<Expr> Parameters { get; }
 
         internal Token _typeNameToken;
