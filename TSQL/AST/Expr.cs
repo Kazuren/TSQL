@@ -64,83 +64,48 @@ namespace TSQL
         public enum ArithmeticOperator { Add, Subtract, Multiply, Divide, Modulo, BitwiseAnd, BitwiseOr, BitwiseXor }
         public enum UnaryOperator { Negate, BitwiseNot }
 
-        internal static ArithmeticOperator TokenTypeToArithmeticOperator(TokenType type)
-        {
-            switch (type)
+        private static readonly Dictionary<ArithmeticOperator, (TokenType Type, string Lexeme)> ArithmeticOpToToken =
+            new Dictionary<ArithmeticOperator, (TokenType, string)>
             {
-                case TokenType.PLUS: return ArithmeticOperator.Add;
-                case TokenType.MINUS: return ArithmeticOperator.Subtract;
-                case TokenType.STAR: return ArithmeticOperator.Multiply;
-                case TokenType.SLASH: return ArithmeticOperator.Divide;
-                case TokenType.MODULO: return ArithmeticOperator.Modulo;
-                case TokenType.BITWISE_AND: return ArithmeticOperator.BitwiseAnd;
-                case TokenType.BITWISE_OR: return ArithmeticOperator.BitwiseOr;
-                case TokenType.BITWISE_XOR: return ArithmeticOperator.BitwiseXor;
-                default: throw new System.ArgumentException($"Unknown arithmetic operator token type: {type}");
+                { ArithmeticOperator.Add, (TokenType.PLUS, "+") },
+                { ArithmeticOperator.Subtract, (TokenType.MINUS, "-") },
+                { ArithmeticOperator.Multiply, (TokenType.STAR, "*") },
+                { ArithmeticOperator.Divide, (TokenType.SLASH, "/") },
+                { ArithmeticOperator.Modulo, (TokenType.MODULO, "%") },
+                { ArithmeticOperator.BitwiseAnd, (TokenType.BITWISE_AND, "&") },
+                { ArithmeticOperator.BitwiseOr, (TokenType.BITWISE_OR, "|") },
+                { ArithmeticOperator.BitwiseXor, (TokenType.BITWISE_XOR, "^") },
+            };
+
+        private static readonly Dictionary<TokenType, ArithmeticOperator> TokenToArithmeticOp = BuildReverse(ArithmeticOpToToken);
+
+        private static readonly Dictionary<UnaryOperator, (TokenType Type, string Lexeme)> UnaryOpToToken =
+            new Dictionary<UnaryOperator, (TokenType, string)>
+            {
+                { UnaryOperator.Negate, (TokenType.MINUS, "-") },
+                { UnaryOperator.BitwiseNot, (TokenType.BITWISE_NOT, "~") },
+            };
+
+        private static readonly Dictionary<TokenType, UnaryOperator> TokenToUnaryOp = BuildReverse(UnaryOpToToken);
+
+        private static Dictionary<TokenType, TEnum> BuildReverse<TEnum>(Dictionary<TEnum, (TokenType Type, string Lexeme)> forward)
+            where TEnum : struct
+        {
+            var reverse = new Dictionary<TokenType, TEnum>();
+            foreach (var kvp in forward)
+            {
+                reverse[kvp.Value.Type] = kvp.Key;
             }
+            return reverse;
         }
 
-        internal static string ArithmeticOperatorToLexeme(ArithmeticOperator op)
-        {
-            switch (op)
-            {
-                case ArithmeticOperator.Add: return "+";
-                case ArithmeticOperator.Subtract: return "-";
-                case ArithmeticOperator.Multiply: return "*";
-                case ArithmeticOperator.Divide: return "/";
-                case ArithmeticOperator.Modulo: return "%";
-                case ArithmeticOperator.BitwiseAnd: return "&";
-                case ArithmeticOperator.BitwiseOr: return "|";
-                case ArithmeticOperator.BitwiseXor: return "^";
-                default: throw new System.ArgumentException($"Unknown arithmetic operator: {op}");
-            }
-        }
+        internal static ArithmeticOperator TokenTypeToArithmeticOperator(TokenType type) => TokenToArithmeticOp[type];
+        internal static string ArithmeticOperatorToLexeme(ArithmeticOperator op) => ArithmeticOpToToken[op].Lexeme;
+        internal static TokenType ArithmeticOperatorToTokenType(ArithmeticOperator op) => ArithmeticOpToToken[op].Type;
 
-        internal static TokenType ArithmeticOperatorToTokenType(ArithmeticOperator op)
-        {
-            switch (op)
-            {
-                case ArithmeticOperator.Add: return TokenType.PLUS;
-                case ArithmeticOperator.Subtract: return TokenType.MINUS;
-                case ArithmeticOperator.Multiply: return TokenType.STAR;
-                case ArithmeticOperator.Divide: return TokenType.SLASH;
-                case ArithmeticOperator.Modulo: return TokenType.MODULO;
-                case ArithmeticOperator.BitwiseAnd: return TokenType.BITWISE_AND;
-                case ArithmeticOperator.BitwiseOr: return TokenType.BITWISE_OR;
-                case ArithmeticOperator.BitwiseXor: return TokenType.BITWISE_XOR;
-                default: throw new System.ArgumentException($"Unknown arithmetic operator: {op}");
-            }
-        }
-
-        internal static UnaryOperator TokenTypeToUnaryOperator(TokenType type)
-        {
-            switch (type)
-            {
-                case TokenType.MINUS: return UnaryOperator.Negate;
-                case TokenType.BITWISE_NOT: return UnaryOperator.BitwiseNot;
-                default: throw new System.ArgumentException($"Unknown unary operator token type: {type}");
-            }
-        }
-
-        internal static string UnaryOperatorToLexeme(UnaryOperator op)
-        {
-            switch (op)
-            {
-                case UnaryOperator.Negate: return "-";
-                case UnaryOperator.BitwiseNot: return "~";
-                default: throw new System.ArgumentException($"Unknown unary operator: {op}");
-            }
-        }
-
-        internal static TokenType UnaryOperatorToTokenType(UnaryOperator op)
-        {
-            switch (op)
-            {
-                case UnaryOperator.Negate: return TokenType.MINUS;
-                case UnaryOperator.BitwiseNot: return TokenType.BITWISE_NOT;
-                default: throw new System.ArgumentException($"Unknown unary operator: {op}");
-            }
-        }
+        internal static UnaryOperator TokenTypeToUnaryOperator(TokenType type) => TokenToUnaryOp[type];
+        internal static string UnaryOperatorToLexeme(UnaryOperator op) => UnaryOpToToken[op].Lexeme;
+        internal static TokenType UnaryOperatorToTokenType(UnaryOperator op) => UnaryOpToToken[op].Type;
 
         public abstract class SqlIdentifier : Expr
         {
@@ -1732,7 +1697,7 @@ namespace TSQL
     {
         public bool Distinct { get; set; }
         public TopClause Top { get; set; }
-        public SyntaxElementList<SelectItem> Columns { get; set; } = new SyntaxElementList<SelectItem>();
+        public SyntaxElementList<SelectItem> Columns { get; set; }
         public FromClause From { get; set; }
         private AST.Predicate _where;
         public AST.Predicate Where
@@ -1750,6 +1715,12 @@ namespace TSQL
 
         // Original tokens
         internal Token _selectKeyword;
+
+        public SelectExpression()
+        {
+            _selectKeyword = new ConcreteToken(TokenType.SELECT, "SELECT", null);
+            Columns = new SyntaxElementList<SelectItem>();
+        }
         internal Token _distinctKeyword;
         internal Token _whereKeyword;
         internal Token _havingKeyword;
@@ -1817,10 +1788,6 @@ namespace TSQL
 
         public override IEnumerable<Token> DescendantTokens()
         {
-            if (_selectKeyword == null)
-            {
-                _selectKeyword = new ConcreteToken(TokenType.SELECT, "SELECT", null);
-            }
             yield return _selectKeyword;
 
             if (_distinctKeyword != null)

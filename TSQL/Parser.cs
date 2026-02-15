@@ -1418,7 +1418,7 @@ namespace TSQL
             {
                 // Contextual keywords can be used as aliases without AS
                 SuffixAlias alias = new SuffixAlias(Advance());
-                alias._asKeyword = ConcreteToken.Empty;
+                alias._asKeyword = null;
                 return alias;
             }
 
@@ -3029,7 +3029,7 @@ namespace TSQL
                 else if (Check(TokenType.UNION)) { second = Advance(); type = QueryHintType.HashUnion; }
                 else if (Check(TokenType.JOIN)) { second = Advance(); type = QueryHintType.HashJoin; }
                 else throw Error(Peek(), "Expected GROUP, UNION, or JOIN after HASH");
-                QueryHint hint = new QueryHint(type);
+                SimpleQueryHint hint = new SimpleQueryHint(type);
                 hint._hintToken = hintToken;
                 hint._hintToken2 = second;
                 return hint;
@@ -3044,7 +3044,7 @@ namespace TSQL
                 if (Check(TokenType.UNION)) { second = Advance(); type = QueryHintType.MergeUnion; }
                 else if (Check(TokenType.JOIN)) { second = Advance(); type = QueryHintType.MergeJoin; }
                 else throw Error(Peek(), "Expected UNION or JOIN after MERGE");
-                QueryHint hint = new QueryHint(type);
+                SimpleQueryHint hint = new SimpleQueryHint(type);
                 hint._hintToken = hintToken;
                 hint._hintToken2 = second;
                 return hint;
@@ -3089,7 +3089,7 @@ namespace TSQL
                     Token asToken = Consume(TokenType.AS, "Expected AS after TIMESTAMP");
                     Token ofToken = Consume(TokenType.OF, "Expected OF after AS");
                     Expr value = Expression();
-                    QueryHint hint = new QueryHint(QueryHintType.ForTimestamp, value);
+                    ForTimestampQueryHint hint = new ForTimestampQueryHint(value);
                     hint._hintToken = forToken;
                     hint._timestampToken = timestampToken;
                     hint._asToken = asToken;
@@ -3114,7 +3114,7 @@ namespace TSQL
             if (SimpleQueryHints.TryGetValue(Peek().Type, out QueryHintType simpleType))
             {
                 Token hintToken = Advance();
-                QueryHint hint = new QueryHint(simpleType);
+                SimpleQueryHint hint = new SimpleQueryHint(simpleType);
                 hint._hintToken = hintToken;
                 return hint;
             }
@@ -3132,7 +3132,7 @@ namespace TSQL
                 if (Check(TokenType.ORDER))
                 {
                     Token second = Advance();
-                    QueryHint hint = new QueryHint(QueryHintType.ForceOrder);
+                    SimpleQueryHint hint = new SimpleQueryHint(QueryHintType.ForceOrder);
                     hint._hintToken = hintToken;
                     hint._hintToken2 = second;
                     return hint;
@@ -3231,7 +3231,7 @@ namespace TSQL
                     throw Error(Peek(), "Expected SIMPLE or FORCED");
                 }
                 Token modeToken = Advance();
-                QueryHint hint = new QueryHint(QueryHintType.Parameterization, mode, modeToken);
+                ParameterizationQueryHint hint = new ParameterizationQueryHint(mode, modeToken);
                 hint._hintToken = hintToken;
                 return hint;
             }
@@ -3248,11 +3248,11 @@ namespace TSQL
         /// <summary>
         /// Helper: two-token query hint (e.g., EXPAND VIEWS, KEEP PLAN, LOOP JOIN)
         /// </summary>
-        private QueryHint ParseTwoTokenQueryHint(QueryHintType type, TokenType expectedSecond)
+        private SimpleQueryHint ParseTwoTokenQueryHint(QueryHintType type, TokenType expectedSecond)
         {
             Token hintToken = Advance();
             Token second = Consume(expectedSecond, "Expected " + expectedSecond);
-            QueryHint hint = new QueryHint(type);
+            SimpleQueryHint hint = new SimpleQueryHint(type);
             hint._hintToken = hintToken;
             hint._hintToken2 = second;
             return hint;
@@ -3261,11 +3261,11 @@ namespace TSQL
         /// <summary>
         /// Helper: FAST N, MAXDOP N, MAXRECURSION N, QUERYTRACEON N
         /// </summary>
-        private QueryHint ParseValueHint(QueryHintType type)
+        private ValueQueryHint ParseValueHint(QueryHintType type)
         {
             Token hintToken = Advance();
             Expr value = Expression();
-            QueryHint hint = new QueryHint(type, value);
+            ValueQueryHint hint = new ValueQueryHint(type, value);
             hint._hintToken = hintToken;
             return hint;
         }
@@ -3273,12 +3273,12 @@ namespace TSQL
         /// <summary>
         /// Helper: MAX_GRANT_PERCENT = N, MIN_GRANT_PERCENT = N, LABEL = 'name'
         /// </summary>
-        private QueryHint ParseEqualsValueHint(QueryHintType type)
+        private ValueQueryHint ParseEqualsValueHint(QueryHintType type)
         {
             Token hintToken = Advance();
             Token equalsToken = Consume(TokenType.EQUAL, "Expected '='");
             Expr value = Expression();
-            QueryHint hint = new QueryHint(type, value);
+            ValueQueryHint hint = new ValueQueryHint(type, value);
             hint._hintToken = hintToken;
             hint._equalsToken = equalsToken;
             return hint;
@@ -3288,7 +3288,7 @@ namespace TSQL
         /// FORCE EXTERNALPUSHDOWN / FORCE SCALEOUTEXECUTION
         /// DISABLE EXTERNALPUSHDOWN / DISABLE SCALEOUTEXECUTION
         /// </summary>
-        private QueryHint ParseForceOrDisableHint(Token hintToken, bool isForce)
+        private SimpleQueryHint ParseForceOrDisableHint(Token hintToken, bool isForce)
         {
             QueryHintType type;
             Token second;
@@ -3306,7 +3306,7 @@ namespace TSQL
             {
                 throw Error(Peek(), "Expected EXTERNALPUSHDOWN or SCALEOUTEXECUTION");
             }
-            QueryHint hint = new QueryHint(type);
+            SimpleQueryHint hint = new SimpleQueryHint(type);
             hint._hintToken = hintToken;
             hint._hintToken2 = second;
             return hint;
@@ -3323,9 +3323,9 @@ namespace TSQL
             if (Check(TokenType.UNKNOWN))
             {
                 Token unknownToken = Advance();
-                QueryHint hint = new QueryHint(QueryHintType.OptimizeForUnknown);
+                OptimizeForUnknownQueryHint hint = new OptimizeForUnknownQueryHint();
                 hint._hintToken = optimizeToken;
-                hint._hintToken2 = forToken;
+                hint._forToken = forToken;
                 hint._unknownToken = unknownToken;
                 return hint;
             }
@@ -3341,9 +3341,9 @@ namespace TSQL
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
 
-            QueryHint ofHint = new QueryHint(QueryHintType.OptimizeFor, vars);
+            OptimizeForQueryHint ofHint = new OptimizeForQueryHint(vars);
             ofHint._hintToken = optimizeToken;
-            ofHint._hintToken2 = forToken;
+            ofHint._forToken = forToken;
             ofHint._leftParen = leftParen;
             ofHint._rightParen = rightParen;
             return ofHint;
@@ -3374,7 +3374,7 @@ namespace TSQL
         /// <summary>
         /// USE HINT ( 'hint_name' [, ...n] )
         /// </summary>
-        private QueryHint ParseUseHint(Token useToken)
+        private UseHintQueryHint ParseUseHint(Token useToken)
         {
             Token hintToken2 = Advance(); // HINT
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after USE HINT");
@@ -3389,7 +3389,7 @@ namespace TSQL
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
 
-            QueryHint hint = new QueryHint(QueryHintType.UseHint, names);
+            UseHintQueryHint hint = new UseHintQueryHint(names);
             hint._hintToken = useToken;
             hint._hintToken2 = hintToken2;
             hint._leftParen = leftParen;
@@ -3400,7 +3400,7 @@ namespace TSQL
         /// <summary>
         /// TABLE HINT ( exposed_object_name [, table_hint [, ...n]] )
         /// </summary>
-        private QueryHint ParseTableHintQueryHint(Token tableToken)
+        private TableHintQueryHint ParseTableHintQueryHint(Token tableToken)
         {
             Token hintToken2 = Advance(); // HINT
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after TABLE HINT");
@@ -3423,7 +3423,7 @@ namespace TSQL
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
 
-            QueryHint hint = new QueryHint(QueryHintType.QueryTableHint, objectName, tableHints);
+            TableHintQueryHint hint = new TableHintQueryHint(objectName, tableHints);
             hint._hintToken = tableToken;
             hint._hintToken2 = hintToken2;
             hint._leftParen = leftParen;
@@ -3435,11 +3435,11 @@ namespace TSQL
         /// <summary>
         /// USE PLAN N'xml_plan'
         /// </summary>
-        private QueryHint MakeUsePlanHint(Token useToken, Token planToken, Expr value)
+        private UsePlanQueryHint MakeUsePlanHint(Token useToken, Token planToken, Expr value)
         {
-            QueryHint hint = new QueryHint(QueryHintType.UsePlan, value);
+            UsePlanQueryHint hint = new UsePlanQueryHint(value);
             hint._hintToken = useToken;
-            hint._hintToken2 = planToken;
+            hint._planToken = planToken;
             return hint;
         }
 
@@ -3455,14 +3455,6 @@ namespace TSQL
             if (IsAtEnd()) return false;
             TokenType type = Peek().Type;
             return type == TokenType.IDENTIFIER || ContextualKeywords.Contains(type);
-        }
-
-        /// <summary>
-        /// Checks if the given token is an identifier or a contextual keyword.
-        /// </summary>
-        private bool IsIdentifierOrContextualKeyword(Token token)
-        {
-            return token.Type == TokenType.IDENTIFIER || ContextualKeywords.Contains(token.Type);
         }
 
         /// <summary>
@@ -3497,16 +3489,6 @@ namespace TSQL
         {
             if (Check(type1)) { return Advance(); }
             if (Check(type2)) { return Advance(); }
-
-            throw Error(Peek(), message);
-        }
-
-        private Token Consume(TokenType[] types, string message)
-        {
-            foreach (TokenType type in types)
-            {
-                if (Check(type)) { return Advance(); }
-            }
 
             throw Error(Peek(), message);
         }

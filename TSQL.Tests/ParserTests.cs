@@ -5,10 +5,7 @@ namespace TSQL.Tests
         #region Helper Methods
         private static Stmt.Select ParseSelect(string source)
         {
-            Scanner scanner = new Scanner(source);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(source);
             Assert.IsType<Stmt.Select>(stmt);
             return (Stmt.Select)stmt;
         }
@@ -23,32 +20,6 @@ namespace TSQL.Tests
             return ParseSelect(source).ToSource();
         }
         #endregion
-
-        [Fact]
-        public void TestParser()
-        {
-            // Arrange
-            Scanner scanner = new Scanner("  /*te st*/ SELECT a, b AS bAlias FROM T");
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act
-            Stmt stmt = parser.Parse();
-
-            // Assert
-            //Assert.IsType<Stmt.Select>(stmt);
-            //Stmt.Select select = (Stmt.Select)stmt;
-
-            //Assert.IsType<TableReference>(select.From.TableSource);
-            //TableReference tableReference = (TableReference)select.From.TableSource;
-            //Assert.Equal("T", tableReference.TableName);
-
-            //Assert.Single(select.Columns);
-            //Assert.IsType<Expr.Column>(select.Columns[0].Expression);
-            //Expr.Column columnExpr = (Expr.Column)select.Columns[0].Expression;
-
-            //Assert.Equal("*", columnExpr.ColumnName);
-        }
 
         [Fact]
         public void ParsePrefixAlias_SimpleColumn_ParsesCorrectly()
@@ -2124,7 +2095,7 @@ namespace TSQL.Tests
         public void Parse_OptionFast_HasValue()
         {
             Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (FAST 10)");
-            QueryHint hint = stmt.Option.Hints[0];
+            ValueQueryHint hint = Assert.IsType<ValueQueryHint>(stmt.Option.Hints[0]);
             Assert.Equal(QueryHintType.Fast, hint.HintType);
             Assert.NotNull(hint.Value);
         }
@@ -2133,7 +2104,7 @@ namespace TSQL.Tests
         public void Parse_OptionOptimizeFor_HasVariables()
         {
             Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (OPTIMIZE FOR (@x = 1, @y UNKNOWN))");
-            QueryHint hint = stmt.Option.Hints[0];
+            OptimizeForQueryHint hint = Assert.IsType<OptimizeForQueryHint>(stmt.Option.Hints[0]);
             Assert.Equal(QueryHintType.OptimizeFor, hint.HintType);
             Assert.Equal(2, hint.OptimizeForVariables.Count);
         }
@@ -2142,7 +2113,7 @@ namespace TSQL.Tests
         public void Parse_OptionUseHint_HasHintNames()
         {
             Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (USE HINT ('ENABLE_HIST_AMENDMENT_FOR_ASC_KEYS'))");
-            QueryHint hint = stmt.Option.Hints[0];
+            UseHintQueryHint hint = Assert.IsType<UseHintQueryHint>(stmt.Option.Hints[0]);
             Assert.Equal(QueryHintType.UseHint, hint.HintType);
             Assert.Equal(1, hint.UseHintNames.Count);
         }
@@ -2151,7 +2122,7 @@ namespace TSQL.Tests
         public void Parse_OptionTableHint_ReusesTableHintParsing()
         {
             Stmt.Select stmt = ParseSelect("SELECT a FROM T OPTION (TABLE HINT (T, NOLOCK))");
-            QueryHint hint = stmt.Option.Hints[0];
+            TableHintQueryHint hint = Assert.IsType<TableHintQueryHint>(stmt.Option.Hints[0]);
             Assert.Equal(QueryHintType.QueryTableHint, hint.HintType);
             Assert.NotNull(hint.TableHintObjectName);
             Assert.Equal(1, hint.TableHints.Count);

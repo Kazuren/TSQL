@@ -21,8 +21,6 @@ namespace TSQL
     /// </summary>
     public class ConcreteToken : Token
     {
-        public static ConcreteToken Empty = new ConcreteToken(TokenType.NONE, null, null);
-
         private readonly string _lexeme;
 
         public ConcreteToken(TokenType type, string lexeme, object literal) : base(type, literal)

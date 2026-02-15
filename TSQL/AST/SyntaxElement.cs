@@ -5,10 +5,6 @@ namespace TSQL
 {
     public interface ISyntaxElement
     {
-        SyntaxElement Parent { get; }
-        SyntaxElement SiblingLeft { get; }
-        SyntaxElement SiblingRight { get; }
-
         IEnumerable<Token> DescendantTokens();
         string ToSource();
     }
@@ -104,8 +100,5 @@ namespace TSQL
             field = SetWithTrivia(field, value);
         }
 
-        public SyntaxElement Parent { get; internal set; }
-        public SyntaxElement SiblingLeft { get; internal set; }
-        public SyntaxElement SiblingRight { get; internal set; }
     }
 }

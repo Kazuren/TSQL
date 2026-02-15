@@ -9,53 +9,35 @@ namespace TSQL.AST
     {
         public abstract T Accept<T>(Visitor<T> visitor);
 
-        internal static ComparisonOperator TokenTypeToComparisonOperator(TokenType type)
-        {
-            switch (type)
+        private static readonly Dictionary<ComparisonOperator, (TokenType Type, string Lexeme)> ComparisonOpToToken =
+            new Dictionary<ComparisonOperator, (TokenType, string)>
             {
-                case TokenType.EQUAL: return ComparisonOperator.Equal;
-                case TokenType.NOT_EQUAL: return ComparisonOperator.NotEqual;
-                case TokenType.LESS: return ComparisonOperator.LessThan;
-                case TokenType.LESS_EQUAL: return ComparisonOperator.LessThanOrEqual;
-                case TokenType.GREATER: return ComparisonOperator.GreaterThan;
-                case TokenType.GREATER_EQUAL: return ComparisonOperator.GreaterThanOrEqual;
-                case TokenType.NOT_LESS: return ComparisonOperator.NotLessThan;
-                case TokenType.NOT_GREATER: return ComparisonOperator.NotGreaterThan;
-                default: throw new System.ArgumentException($"Unknown comparison operator token type: {type}");
+                { ComparisonOperator.Equal, (TokenType.EQUAL, "=") },
+                { ComparisonOperator.NotEqual, (TokenType.NOT_EQUAL, "<>") },
+                { ComparisonOperator.LessThan, (TokenType.LESS, "<") },
+                { ComparisonOperator.LessThanOrEqual, (TokenType.LESS_EQUAL, "<=") },
+                { ComparisonOperator.GreaterThan, (TokenType.GREATER, ">") },
+                { ComparisonOperator.GreaterThanOrEqual, (TokenType.GREATER_EQUAL, ">=") },
+                { ComparisonOperator.NotLessThan, (TokenType.NOT_LESS, "!<") },
+                { ComparisonOperator.NotGreaterThan, (TokenType.NOT_GREATER, "!>") },
+            };
+
+        private static readonly Dictionary<TokenType, ComparisonOperator> TokenToComparisonOp = BuildReverse(ComparisonOpToToken);
+
+        private static Dictionary<TokenType, TEnum> BuildReverse<TEnum>(Dictionary<TEnum, (TokenType Type, string Lexeme)> forward)
+            where TEnum : struct
+        {
+            var reverse = new Dictionary<TokenType, TEnum>();
+            foreach (var kvp in forward)
+            {
+                reverse[kvp.Value.Type] = kvp.Key;
             }
+            return reverse;
         }
 
-        internal static string ComparisonOperatorToLexeme(ComparisonOperator op)
-        {
-            switch (op)
-            {
-                case ComparisonOperator.Equal: return "=";
-                case ComparisonOperator.NotEqual: return "<>";
-                case ComparisonOperator.LessThan: return "<";
-                case ComparisonOperator.LessThanOrEqual: return "<=";
-                case ComparisonOperator.GreaterThan: return ">";
-                case ComparisonOperator.GreaterThanOrEqual: return ">=";
-                case ComparisonOperator.NotLessThan: return "!<";
-                case ComparisonOperator.NotGreaterThan: return "!>";
-                default: throw new System.ArgumentException($"Unknown comparison operator: {op}");
-            }
-        }
-
-        internal static TokenType ComparisonOperatorToTokenType(ComparisonOperator op)
-        {
-            switch (op)
-            {
-                case ComparisonOperator.Equal: return TokenType.EQUAL;
-                case ComparisonOperator.NotEqual: return TokenType.NOT_EQUAL;
-                case ComparisonOperator.LessThan: return TokenType.LESS;
-                case ComparisonOperator.LessThanOrEqual: return TokenType.LESS_EQUAL;
-                case ComparisonOperator.GreaterThan: return TokenType.GREATER;
-                case ComparisonOperator.GreaterThanOrEqual: return TokenType.GREATER_EQUAL;
-                case ComparisonOperator.NotLessThan: return TokenType.NOT_LESS;
-                case ComparisonOperator.NotGreaterThan: return TokenType.NOT_GREATER;
-                default: throw new System.ArgumentException($"Unknown comparison operator: {op}");
-            }
-        }
+        internal static ComparisonOperator TokenTypeToComparisonOperator(TokenType type) => TokenToComparisonOp[type];
+        internal static string ComparisonOperatorToLexeme(ComparisonOperator op) => ComparisonOpToToken[op].Lexeme;
+        internal static TokenType ComparisonOperatorToTokenType(ComparisonOperator op) => ComparisonOpToToken[op].Type;
 
         internal static QuantifierType TokenTypeToQuantifierType(TokenType type)
         {

@@ -1444,62 +1444,199 @@ namespace TSQL
         }
     }
 
-    public class QueryHint : SyntaxElement
+    public abstract class QueryHint : SyntaxElement
     {
         public QueryHintType HintType { get; }
 
-        public Expr Value { get; }
-        public ParameterizationMode? ParameterizationMode { get; }
-        internal Token _parameterizationModeToken;
-        public SyntaxElementList<OptimizeForVariable> OptimizeForVariables { get; }
-        public SyntaxElementList<Expr> UseHintNames { get; }
-        public Expr.ObjectIdentifier TableHintObjectName { get; }
-        public SyntaxElementList<TableHint> TableHints { get; }
-
         internal Token _hintToken;
-        internal Token _hintToken2;
-        internal Token _unknownToken;
-        internal Token _equalsToken;
-        internal Token _leftParen;
-        internal Token _rightParen;
-        internal Token _commaAfterObjectName;
-        internal Token _timestampToken;
-        internal Token _asToken;
-        internal Token _ofToken;
 
-        public QueryHint(QueryHintType hintType)
+        protected QueryHint(QueryHintType hintType)
         {
             HintType = hintType;
         }
+    }
 
-        public QueryHint(QueryHintType hintType, Expr value)
+    /// <summary>
+    /// Simple keyword hints: RECOMPILE, HASH GROUP, KEEP PLAN, FORCE ORDER, etc.
+    /// One or two keyword tokens with no additional data.
+    /// </summary>
+    public class SimpleQueryHint : QueryHint
+    {
+        internal Token _hintToken2;
+
+        public SimpleQueryHint(QueryHintType hintType) : base(hintType) { }
+
+        public override IEnumerable<Token> DescendantTokens()
         {
-            HintType = hintType;
+            yield return _hintToken;
+            if (_hintToken2 != null)
+            {
+                yield return _hintToken2;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Value hints: FAST N, MAXDOP N, MAX_GRANT_PERCENT = N, LABEL = 'name', etc.
+    /// A keyword followed by an optional equals sign and a value expression.
+    /// </summary>
+    public class ValueQueryHint : QueryHint
+    {
+        public Expr Value { get; }
+        internal Token _equalsToken;
+
+        public ValueQueryHint(QueryHintType hintType, Expr value) : base(hintType)
+        {
             Value = value;
         }
 
-        internal QueryHint(QueryHintType hintType, ParameterizationMode mode, Token parameterizationModeToken)
+        public override IEnumerable<Token> DescendantTokens()
         {
-            HintType = hintType;
+            yield return _hintToken;
+            if (_equalsToken != null)
+            {
+                yield return _equalsToken;
+            }
+            foreach (Token token in Value.DescendantTokens())
+            {
+                yield return token;
+            }
+        }
+    }
+
+    /// <summary>
+    /// PARAMETERIZATION { SIMPLE | FORCED }
+    /// </summary>
+    public class ParameterizationQueryHint : QueryHint
+    {
+        public ParameterizationMode ParameterizationMode { get; }
+        internal Token _modeToken;
+
+        internal ParameterizationQueryHint(ParameterizationMode mode, Token modeToken) : base(QueryHintType.Parameterization)
+        {
             ParameterizationMode = mode;
-            _parameterizationModeToken = parameterizationModeToken;
+            _modeToken = modeToken;
         }
 
-        public QueryHint(QueryHintType hintType, SyntaxElementList<OptimizeForVariable> optimizeForVariables)
+        public override IEnumerable<Token> DescendantTokens()
         {
-            HintType = hintType;
+            yield return _hintToken;
+            yield return _modeToken;
+        }
+    }
+
+    /// <summary>
+    /// OPTIMIZE FOR ( @var { UNKNOWN | = literal } [, ...n] )
+    /// </summary>
+    public class OptimizeForQueryHint : QueryHint
+    {
+        public SyntaxElementList<OptimizeForVariable> OptimizeForVariables { get; }
+        internal Token _forToken;
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public OptimizeForQueryHint(SyntaxElementList<OptimizeForVariable> optimizeForVariables) : base(QueryHintType.OptimizeFor)
+        {
             OptimizeForVariables = optimizeForVariables;
         }
 
-        public QueryHint(QueryHintType hintType, SyntaxElementList<Expr> useHintNames)
+        public override IEnumerable<Token> DescendantTokens()
         {
-            HintType = hintType;
+            yield return _hintToken;
+            yield return _forToken;
+            yield return _leftParen;
+            foreach (Token token in OptimizeForVariables.DescendantTokens())
+            {
+                yield return token;
+            }
+            yield return _rightParen;
+        }
+    }
+
+    /// <summary>
+    /// OPTIMIZE FOR UNKNOWN
+    /// </summary>
+    public class OptimizeForUnknownQueryHint : QueryHint
+    {
+        internal Token _forToken;
+        internal Token _unknownToken;
+
+        public OptimizeForUnknownQueryHint() : base(QueryHintType.OptimizeForUnknown) { }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _hintToken;
+            yield return _forToken;
+            yield return _unknownToken;
+        }
+    }
+
+    /// <summary>
+    /// USE HINT ( 'hint_name' [, ...n] )
+    /// </summary>
+    public class UseHintQueryHint : QueryHint
+    {
+        public SyntaxElementList<Expr> UseHintNames { get; }
+        internal Token _hintToken2;
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public UseHintQueryHint(SyntaxElementList<Expr> useHintNames) : base(QueryHintType.UseHint)
+        {
             UseHintNames = useHintNames;
         }
 
-        public QueryHint(QueryHintType hintType, Expr.ObjectIdentifier tableHintObjectName, SyntaxElementList<TableHint> tableHints)
+        public override IEnumerable<Token> DescendantTokens()
         {
-            HintType = hintType;
+            yield return _hintToken;
+            yield return _hintToken2;
+            yield return _leftParen;
+            foreach (Token token in UseHintNames.DescendantTokens())
+            {
+                yield return token;
+            }
+            yield return _rightParen;
+        }
+    }
+
+    /// <summary>
+    /// USE PLAN N'xml_plan'
+    /// </summary>
+    public class UsePlanQueryHint : QueryHint
+    {
+        public Expr Value { get; }
+        internal Token _planToken;
+
+        public UsePlanQueryHint(Expr value) : base(QueryHintType.UsePlan)
+        {
+            Value = value;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _hintToken;
+            yield return _planToken;
+            foreach (Token token in Value.DescendantTokens())
+            {
+                yield return token;
+            }
+        }
+    }
+
+    /// <summary>
+    /// TABLE HINT ( exposed_object_name [, table_hint [, ...n]] )
+    /// </summary>
+    public class TableHintQueryHint : QueryHint
+    {
+        public Expr.ObjectIdentifier TableHintObjectName { get; }
+        public SyntaxElementList<TableHint> TableHints { get; }
+        internal Token _hintToken2;
+        internal Token _leftParen;
+        internal Token _rightParen;
+        internal Token _commaAfterObjectName;
+
+        public TableHintQueryHint(Expr.ObjectIdentifier tableHintObjectName, SyntaxElementList<TableHint> tableHints) : base(QueryHintType.QueryTableHint)
+        {
             TableHintObjectName = tableHintObjectName;
             TableHints = tableHints;
         }
@@ -1507,114 +1644,48 @@ namespace TSQL
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
-
-            switch (HintType)
+            yield return _hintToken2;
+            yield return _leftParen;
+            foreach (Token token in TableHintObjectName.DescendantTokens())
             {
-                // Two-token simple hints
-                case QueryHintType.HashGroup:
-                case QueryHintType.OrderGroup:
-                case QueryHintType.ConcatUnion:
-                case QueryHintType.HashUnion:
-                case QueryHintType.MergeUnion:
-                case QueryHintType.LoopJoin:
-                case QueryHintType.MergeJoin:
-                case QueryHintType.HashJoin:
-                case QueryHintType.ExpandViews:
-                case QueryHintType.ForceOrder:
-                case QueryHintType.KeepPlan:
-                case QueryHintType.KeepfixedPlan:
-                case QueryHintType.RobustPlan:
-                case QueryHintType.ForceExternalPushdown:
-                case QueryHintType.DisableExternalPushdown:
-                case QueryHintType.ForceScaleoutExecution:
-                case QueryHintType.DisableScaleoutExecution:
-                    yield return _hintToken2;
-                    break;
+                yield return token;
+            }
+            if (TableHints != null && TableHints.Count > 0)
+            {
+                yield return _commaAfterObjectName;
+                foreach (Token token in TableHints.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+            yield return _rightParen;
+        }
+    }
 
-                // Single-token simple hints
-                case QueryHintType.Recompile:
-                case QueryHintType.NoPerformanceSpool:
-                case QueryHintType.IgnoreNonclusteredColumnstoreIndex:
-                case QueryHintType.DisableOptimizedPlanForcing:
-                    break;
+    /// <summary>
+    /// FOR TIMESTAMP AS OF 'time'
+    /// </summary>
+    public class ForTimestampQueryHint : QueryHint
+    {
+        public Expr Value { get; }
+        internal Token _timestampToken;
+        internal Token _asToken;
+        internal Token _ofToken;
 
-                // OPTIMIZE FOR UNKNOWN (three tokens)
-                case QueryHintType.OptimizeForUnknown:
-                    yield return _hintToken2;
-                    yield return _unknownToken;
-                    break;
+        public ForTimestampQueryHint(Expr value) : base(QueryHintType.ForTimestamp)
+        {
+            Value = value;
+        }
 
-                // Value hints without =
-                case QueryHintType.Fast:
-                case QueryHintType.Maxdop:
-                case QueryHintType.Maxrecursion:
-                case QueryHintType.QueryTraceOn:
-                    foreach (Token token in Value.DescendantTokens())
-                        yield return token;
-                    break;
-
-                // Value hints with =
-                case QueryHintType.MaxGrantPercent:
-                case QueryHintType.MinGrantPercent:
-                case QueryHintType.Label:
-                    yield return _equalsToken;
-                    foreach (Token token in Value.DescendantTokens())
-                        yield return token;
-                    break;
-
-                // PARAMETERIZATION { SIMPLE | FORCED }
-                case QueryHintType.Parameterization:
-                    yield return _parameterizationModeToken;
-                    break;
-
-                // OPTIMIZE FOR ( @var ... )
-                case QueryHintType.OptimizeFor:
-                    yield return _hintToken2;
-                    yield return _leftParen;
-                    foreach (Token token in OptimizeForVariables.DescendantTokens())
-                        yield return token;
-                    yield return _rightParen;
-                    break;
-
-                // USE HINT ( 'name' ... )
-                case QueryHintType.UseHint:
-                    yield return _hintToken2;
-                    yield return _leftParen;
-                    foreach (Token token in UseHintNames.DescendantTokens())
-                        yield return token;
-                    yield return _rightParen;
-                    break;
-
-                // USE PLAN N'xml'
-                case QueryHintType.UsePlan:
-                    yield return _hintToken2;
-                    foreach (Token token in Value.DescendantTokens())
-                        yield return token;
-                    break;
-
-                // TABLE HINT ( name [, table_hint ...] )
-                case QueryHintType.QueryTableHint:
-                    yield return _hintToken2;
-                    yield return _leftParen;
-                    foreach (Token token in TableHintObjectName.DescendantTokens())
-                        yield return token;
-                    if (TableHints != null && TableHints.Count > 0)
-                    {
-                        yield return _commaAfterObjectName;
-                        foreach (Token token in TableHints.DescendantTokens())
-                            yield return token;
-                    }
-                    yield return _rightParen;
-                    break;
-
-                // FOR TIMESTAMP AS OF 'time'
-                case QueryHintType.ForTimestamp:
-                    yield return _timestampToken;
-                    yield return _asToken;
-                    yield return _ofToken;
-                    foreach (Token token in Value.DescendantTokens())
-                        yield return token;
-                    break;
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _hintToken;
+            yield return _timestampToken;
+            yield return _asToken;
+            yield return _ofToken;
+            foreach (Token token in Value.DescendantTokens())
+            {
+                yield return token;
             }
         }
     }
