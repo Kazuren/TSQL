@@ -18,11 +18,6 @@ namespace TSQL.Tests
         [Fact]
         public void ParsePrefixAlias_SimpleColumn_ParsesCorrectly()
         {
-            // Arrange
-            Scanner scanner = new Scanner("SELECT bAlias = b FROM T");
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
             // Act
             Stmt.Select select = Stmt.ParseSelect("SELECT bAlias = b FROM T");
 
@@ -988,25 +983,13 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_RowNumberWithoutOver_ThrowsParseError()
         {
-            // Arrange
-            Scanner scanner = new Scanner("SELECT ROW_NUMBER() FROM T");
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act & Assert
-            Assert.ThrowsAny<Exception>(() => parser.Parse());
+            Assert.ThrowsAny<Exception>(() => Stmt.Parse("SELECT ROW_NUMBER() FROM T"));
         }
 
         [Fact]
         public void Parse_FrameWithoutOrderBy_ThrowsParseError()
         {
-            // Arrange
-            Scanner scanner = new Scanner("SELECT SUM(x) OVER (ROWS UNBOUNDED PRECEDING) FROM T");
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-
-            // Act & Assert
-            Assert.ThrowsAny<Exception>(() => parser.Parse());
+            Assert.ThrowsAny<Exception>(() => Stmt.Parse("SELECT SUM(x) OVER (ROWS UNBOUNDED PRECEDING) FROM T"));
         }
 
         // === Round-Trip Tests ===
