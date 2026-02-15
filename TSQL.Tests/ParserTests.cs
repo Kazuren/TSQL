@@ -24,7 +24,6 @@ namespace TSQL.Tests
         }
         #endregion
 
-        #region Existing Tests
         [Fact]
         public void TestParser()
         {
@@ -101,7 +100,6 @@ namespace TSQL.Tests
             string source = "SELECT *, o.*, d..o.*, d.s.o.*, d.s.o.a, d..o.a, o.a, a FROM T";
             Assert.Equal(source, RoundTrip(source));
         }
-        #endregion
 
         #region AST Structure Tests - Select Columns
 
@@ -190,7 +188,6 @@ namespace TSQL.Tests
             Assert.NotNull(columnId.ColumnName);
             Assert.Equal("c", columnId.ColumnName.Name);
         }
-
         #endregion
 
         #region AST Structure Tests - Aliases
