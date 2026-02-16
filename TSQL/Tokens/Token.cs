@@ -21,6 +21,8 @@ namespace TSQL
     /// </summary>
     internal class ConcreteToken : Token
     {
+        internal static readonly ConcreteToken Comma = new ConcreteToken(TokenType.COMMA, ",", null);
+
         private readonly string _lexeme;
 
         public ConcreteToken(TokenType type, string lexeme, object literal) : base(type, literal)
@@ -210,17 +212,21 @@ namespace TSQL
             }
         }
 
-        public string ToSource()
+        internal void AppendTo(StringBuilder sb)
         {
-            StringBuilder sb = new StringBuilder();
-            foreach (Trivia trivia in LeadingTrivia)
+            if (_leadingTriviaList != null)
             {
-                sb.Append(trivia.Content);
+                for (int i = 0; i < _leadingTriviaList.Count; i++)
+                {
+                    sb.Append(_leadingTriviaList[i].Content);
+                }
+            }
+            else if (_leadingTriviaSingle != null)
+            {
+                sb.Append(_leadingTriviaSingle.Content);
             }
 
             sb.Append(Lexeme);
-
-            return sb.ToString();
         }
     }
 

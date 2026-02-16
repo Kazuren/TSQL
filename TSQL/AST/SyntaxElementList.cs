@@ -36,7 +36,7 @@ namespace TSQL
                 {
                     _separators = new List<Token>();
                 }
-                _separators.Add(new ConcreteToken(TokenType.COMMA, ",", null));
+                _separators.Add(ConcreteToken.Comma);
             }
 
             _items.Add(item);

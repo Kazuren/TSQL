@@ -49,6 +49,23 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         /// <summary>
+        /// Appends a WHERE condition to SELECT statements, but only for tables that contain
+        /// all referenced columns (verified via the <paramref name="columnExists"/> callback).
+        /// Unprefixed column references are automatically prefixed with the table alias/name.
+        /// If ALL columns are already prefixed, falls back to regular AddCondition behavior.
+        /// Defaults to all query levels (outermost + subqueries + CTEs).
+        /// </summary>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
+            ColumnExistenceChecker columnExists,
+            WhereClauseTarget target = WhereClauseTarget.All)
+        {
+            SchemaAwareConditionAppender.AddCondition(stmt, condition, columnExists, target);
+            return stmt;
+        }
+
+        /// <summary>
         /// Collects all table references and qualified joins found in this statement.
         /// </summary>
         /// <remarks>This method does not modify the statement.</remarks>

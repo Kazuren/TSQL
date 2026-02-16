@@ -22,7 +22,7 @@ namespace TSQL
             StringBuilder sb = new StringBuilder();
             foreach (Token token in DescendantTokens())
             {
-                sb.Append(token.ToSource());
+                token.AppendTo(sb);
             }
             return sb.ToString();
         }

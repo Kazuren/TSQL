@@ -172,6 +172,12 @@ namespace TSQL
                 DatabaseName = databaseName;
                 SchemaName = schemaName;
                 ObjectName = objectName;
+                _serverToDatabaseDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _databaseToSchemaDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                databaseName.FirstToken()?.ClearLeadingTrivia();
+                schemaName.FirstToken()?.ClearLeadingTrivia();
+                objectName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ObjectIdentifier(DatabaseName databaseName, SchemaName schemaName, ObjectName objectName)
@@ -179,12 +185,18 @@ namespace TSQL
                 DatabaseName = databaseName;
                 SchemaName = schemaName;
                 ObjectName = objectName;
+                _databaseToSchemaDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                schemaName.FirstToken()?.ClearLeadingTrivia();
+                objectName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ObjectIdentifier(SchemaName schemaName, ObjectName objectName)
             {
                 SchemaName = schemaName;
                 ObjectName = objectName;
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                objectName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ObjectIdentifier(ObjectName objectName)
@@ -323,6 +335,12 @@ namespace TSQL
                 SchemaName = schemaName;
                 ObjectName = objectName;
                 ColumnName = columnName;
+                _databaseToSchemaDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _objectToColumnDot = new ConcreteToken(TokenType.DOT, ".", null);
+                schemaName.FirstToken()?.ClearLeadingTrivia();
+                objectName.FirstToken()?.ClearLeadingTrivia();
+                columnName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ColumnIdentifier(DatabaseName databaseName, ObjectName objectName, ColumnName columnName)
@@ -330,6 +348,11 @@ namespace TSQL
                 DatabaseName = databaseName;
                 ObjectName = objectName;
                 ColumnName = columnName;
+                _databaseToSchemaDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _objectToColumnDot = new ConcreteToken(TokenType.DOT, ".", null);
+                objectName.FirstToken()?.ClearLeadingTrivia();
+                columnName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ColumnIdentifier(SchemaName schemaName, ObjectName objectName, ColumnName columnName)
@@ -337,12 +360,18 @@ namespace TSQL
                 SchemaName = schemaName;
                 ObjectName = objectName;
                 ColumnName = columnName;
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _objectToColumnDot = new ConcreteToken(TokenType.DOT, ".", null);
+                objectName.FirstToken()?.ClearLeadingTrivia();
+                columnName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ColumnIdentifier(ObjectName objectName, ColumnName columnName)
             {
                 ObjectName = objectName;
                 ColumnName = columnName;
+                _objectToColumnDot = new ConcreteToken(TokenType.DOT, ".", null);
+                columnName.FirstToken()?.ClearLeadingTrivia();
             }
 
             public ColumnIdentifier(ColumnName columnName)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TSQL.AST;
 using static TSQL.Expr;
 
@@ -222,7 +221,7 @@ namespace TSQL
 
     internal class Parser
     {
-        private readonly List<Token> _tokens;
+        private readonly IReadOnlyList<Token> _tokens;
         private int _current = 0;
 
         /// <summary>
@@ -332,9 +331,9 @@ namespace TSQL
             TokenType.TIMESTAMP
         };
 
-        public Parser(IEnumerable<Token> tokens)
+        public Parser(IReadOnlyList<Token> tokens)
         {
-            _tokens = tokens.ToList();
+            _tokens = tokens;
         }
 
         private void Reset()
