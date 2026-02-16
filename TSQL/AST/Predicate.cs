@@ -7,6 +7,8 @@ namespace TSQL.AST
 
     public abstract class Predicate : SyntaxElement
     {
+        /// <summary>Parses a SQL predicate (search condition) from the given string.</summary>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Predicate ParsePredicate(string sql)
         {
             return new Parser(new Scanner(sql).ScanTokens()).ParseSearchCondition();

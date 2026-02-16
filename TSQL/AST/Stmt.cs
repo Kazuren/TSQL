@@ -6,6 +6,8 @@ namespace TSQL
     #region Statement Base and Select
     public abstract class Stmt : SyntaxElement
     {
+        /// <summary>Parses a SQL statement from the given string.</summary>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Stmt Parse(string sql)
         {
             Scanner scanner = new Scanner(sql);
@@ -14,6 +16,8 @@ namespace TSQL
             return parser.Parse();
         }
 
+        /// <summary>Parses a SQL SELECT statement from the given string.</summary>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Select ParseSelect(string sql)
         {
             Scanner scanner = new Scanner(sql);

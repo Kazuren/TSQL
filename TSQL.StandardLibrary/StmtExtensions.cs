@@ -11,6 +11,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// Defaults to outermost query only (both sides of UNION, etc.).
         /// </summary>
         /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddCondition(this Stmt stmt, string condition, WhereClauseTarget target = WhereClauseTarget.OutermostQuery)
         {
             WhereClauseAppender.AddCondition(stmt, condition, target);
@@ -23,6 +24,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
         /// </summary>
         /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddCondition(this Stmt stmt, string condition,
             out IReadOnlyDictionary<string, object> parameters,
             IEnumerable<object> values,
