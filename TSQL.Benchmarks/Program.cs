@@ -1,5 +1,4 @@
-﻿using BenchmarkDotNet.Reports;
-using BenchmarkDotNet.Running;
+﻿using BenchmarkDotNet.Running;
 
 namespace TSQL.Benchmarks
 {
@@ -7,7 +6,7 @@ namespace TSQL.Benchmarks
     {
         static void Main(string[] args)
         {
-            Summary[] _ = BenchmarkRunner.Run(typeof(Program).Assembly);
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
         }
     }
 }

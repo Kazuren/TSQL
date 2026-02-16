@@ -12,5 +12,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TSQL\TSQL.csproj" />
+    <ProjectReference Include="..\TSQL.StandardLibrary\TSQL.StandardLibrary.csproj" />
   </ItemGroup>
 </Project>
