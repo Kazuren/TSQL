@@ -305,7 +305,7 @@ namespace TSQL.Tests
         [Fact]
         public void ParseSearchCondition_ParsesSimpleComparison()
         {
-            var predicate = new Parser(new Scanner("Active = 1").ScanTokens()).ParseSearchCondition();
+            var predicate = AST.Predicate.ParsePredicate("Active = 1");
 
             Assert.IsType<AST.Predicate.Comparison>(predicate);
             Assert.Equal("Active = 1", predicate.ToSource());
@@ -314,7 +314,7 @@ namespace TSQL.Tests
         [Fact]
         public void ParseSearchCondition_ParsesCompoundCondition()
         {
-            var predicate = new Parser(new Scanner("A = 1 AND B = 2").ScanTokens()).ParseSearchCondition();
+            var predicate = AST.Predicate.ParsePredicate("A = 1 AND B = 2");
 
             Assert.IsType<AST.Predicate.And>(predicate);
             Assert.Equal("A = 1 AND B = 2", predicate.ToSource());
