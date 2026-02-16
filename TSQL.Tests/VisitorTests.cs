@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TSQL.AST;
 using TSQL.StandardLibrary.Visitors;
 
@@ -388,6 +389,186 @@ namespace TSQL.Tests
 
             Assert.Single(tables.Tables);
             Assert.Equal("T", tables.Tables[0].TableName.ObjectName.Name);
+        }
+
+        #endregion
+
+        #region AddCondition Parameterized
+
+        [Fact]
+        public void AddConditionParameterized_UnnamedNoCollision()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Active = @P0", out var parameters, new object[] { 1 });
+
+            Assert.Equal("SELECT * FROM T WHERE Active = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(1, parameters["@P0"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_NamedValueTuple_NoCollision()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("TenantId = @TenantId", out var parameters,
+                new object[] { ("@TenantId", 42) });
+
+            Assert.Equal("SELECT * FROM T WHERE TenantId = @TenantId", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(42, parameters["@TenantId"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_NamedKeyValuePair()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Status = @Status", out var parameters,
+                new object[] { new KeyValuePair<string, object>("@Status", "active") });
+
+            Assert.Equal("SELECT * FROM T WHERE Status = @Status", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal("active", parameters["@Status"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_CollisionWithExisting()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
+            stmt.AddCondition("Active = @P0", out var parameters, new object[] { 1 });
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND Active = @P0_1", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(1, parameters["@P0_1"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_MultipleParams_MixedCollisions()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
+            stmt.AddCondition("a = @P0 AND b = @P1", out var parameters,
+                new object[] { ("@P0", 10), ("@P1", 20) });
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND a = @P0_1 AND b = @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(10, parameters["@P0_1"]);
+            Assert.Equal(20, parameters["@P1"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_WithWhereClauseTargetAll()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT * FROM T UNION ALL SELECT * FROM S");
+            stmt.AddCondition("Active = @P0", out var parameters,
+                new object[] { 1 }, WhereClauseTarget.All);
+
+            Assert.Contains("T WHERE Active = @P0", stmt.ToSource());
+            Assert.Contains("S WHERE Active = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(1, parameters["@P0"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_SameVariableTwiceInCondition()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
+            stmt.AddCondition("a = @P0 OR b = @P0", out var parameters,
+                new object[] { ("@P0", 99) });
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND (a = @P0_1 OR b = @P0_1)", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(99, parameters["@P0_1"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ConditionVarNotInValues()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @Existing");
+            stmt.AddCondition("a = @Existing AND b = @New", out var parameters,
+                new object[] { ("@New", 5) });
+
+            Assert.Equal("SELECT * FROM T WHERE x = @Existing AND a = @Existing AND b = @New", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(5, parameters["@New"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_EmptyValuesArray()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Active = 1", out var parameters, Array.Empty<object>());
+
+            Assert.Equal("SELECT * FROM T WHERE Active = 1", stmt.ToSource());
+            Assert.Empty(parameters);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ChainThenParameterize()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
+                .AddCondition("TenantId = @TenantId", out var p1,
+                    new object[] { ("@TenantId", 42) })
+                .Parameterize(out var p2);
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND TenantId = @TenantId", stmt.ToSource());
+            Assert.Single(p1);
+            Assert.Equal(42, p1["@TenantId"]);
+            Assert.Single(p2);
+            Assert.Equal(1, p2["@P0"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ChainTwoAddConditions()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T")
+                .AddCondition("TenantId = @TenantId", out var p1,
+                    new object[] { ("@TenantId", 1) })
+                .AddCondition("Active = @Active", out var p2,
+                    new object[] { ("@Active", true) });
+
+            Assert.Equal("SELECT * FROM T WHERE TenantId = @TenantId AND Active = @Active", stmt.ToSource());
+            Assert.Single(p1);
+            Assert.Equal(1, p1["@TenantId"]);
+            Assert.Single(p2);
+            Assert.Equal(true, p2["@Active"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ErrorMissingAtPrefix()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            Assert.Throws<ArgumentException>(() =>
+                stmt.AddCondition("x = @P0", out _, new object[] { ("P0", 1) }));
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ParamNotInCondition_SilentlyIgnored()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Active = @P0", out var parameters,
+                new object[] { ("@P0", 1), ("@Extra", 99) });
+
+            Assert.Equal("SELECT * FROM T WHERE Active = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(1, parameters["@P0"]);
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ErrorDuplicateNames()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            Assert.Throws<ArgumentException>(() =>
+                stmt.AddCondition("x = @P0", out _,
+                    new object[] { ("@P0", 1), ("@P0", 2) }));
+        }
+
+        [Fact]
+        public void AddConditionParameterized_ReturnsSameInstance()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            var returned = stmt.AddCondition("Active = @P0", out _, new object[] { 1 });
+
+            Assert.Same(stmt, returned);
         }
 
         #endregion

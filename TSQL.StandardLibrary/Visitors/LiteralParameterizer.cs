@@ -17,24 +17,14 @@ namespace TSQL.StandardLibrary.Visitors
         public static IReadOnlyDictionary<string, object> Parameterize(Stmt stmt)
         {
             // Phase 1: Collect existing variable names
-            var variableCollector = new VariableNameCollector();
+            VariableNameCollector variableCollector = new VariableNameCollector();
             variableCollector.Walk(stmt);
 
             // Phase 2: Walk the tree and replace literals with variables
-            var replacer = new LiteralReplacer(variableCollector.ExistingVariableNames);
+            LiteralReplacer replacer = new LiteralReplacer(variableCollector.Names);
             replacer.Walk(stmt);
 
             return replacer.Parameters;
-        }
-
-        private class VariableNameCollector : SqlWalker
-        {
-            public HashSet<string> ExistingVariableNames { get; } = new HashSet<string>();
-
-            protected override void VisitVariable(Expr.Variable expr)
-            {
-                ExistingVariableNames.Add(expr.Name.ToUpperInvariant());
-            }
         }
 
         private class LiteralReplacer : SqlWalker
