@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace TSQL.StandardLibrary.Visitors
 {
     public static class StmtExtensions
@@ -7,23 +9,28 @@ namespace TSQL.StandardLibrary.Visitors
         /// Use <see cref="WhereClauseTarget"/> flags to control which queries are modified.
         /// Defaults to outermost query only (both sides of UNION, etc.).
         /// </summary>
-        public static void AddCondition(this Stmt stmt, string condition, WhereClauseTarget target = WhereClauseTarget.OutermostQuery)
+        /// <remarks>This method mutates the statement in place.</remarks>
+        public static Stmt AddCondition(this Stmt stmt, string condition, WhereClauseTarget target = WhereClauseTarget.OutermostQuery)
         {
             WhereClauseAppender.AddCondition(stmt, condition, target);
+            return stmt;
         }
 
         /// <summary>
         /// Parameterizes all non-NULL literals in this statement, replacing them with
-        /// @P0, @P1, etc. Returns the parameterized SQL and a dictionary of parameter values.
+        /// @P0, @P1, etc. The parameter dictionary is returned via <paramref name="parameters"/>.
         /// </summary>
-        public static ParameterizedQuery Parameterize(this Stmt stmt)
+        /// <remarks>This method mutates the statement in place.</remarks>
+        public static Stmt Parameterize(this Stmt stmt, out IReadOnlyDictionary<string, object> parameters)
         {
-            return LiteralParameterizer.Parameterize(stmt);
+            parameters = LiteralParameterizer.Parameterize(stmt);
+            return stmt;
         }
 
         /// <summary>
         /// Collects all table references and qualified joins found in this statement.
         /// </summary>
+        /// <remarks>This method does not modify the statement.</remarks>
         public static TableReferences CollectTableReferences(this Stmt stmt)
         {
             return TableReferenceCollector.Collect(stmt);
@@ -35,6 +42,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// and <paramref name="clauses"/> to control which SQL clauses are collected from.
         /// Both must be satisfied for a column to be included. Wildcards are excluded.
         /// </summary>
+        /// <remarks>This method does not modify the statement.</remarks>
         public static System.Collections.Generic.IReadOnlyList<Expr.ColumnIdentifier> CollectColumnReferences(
             this Stmt stmt,
             ColumnReferenceScope scope = ColumnReferenceScope.OutermostQuery,

@@ -4,33 +4,17 @@ using TSQL.AST;
 namespace TSQL.StandardLibrary.Visitors
 {
     /// <summary>
-    /// The result of parameterizing a SQL statement.
-    /// Contains the parameterized SQL string and a dictionary mapping parameter names to values.
-    /// </summary>
-    public class ParameterizedQuery
-    {
-        public string Sql { get; }
-        public IReadOnlyDictionary<string, object> Parameters { get; }
-
-        internal ParameterizedQuery(string sql, IReadOnlyDictionary<string, object> parameters)
-        {
-            Sql = sql;
-            Parameters = parameters;
-        }
-    }
-
-    /// <summary>
     /// Converts literal values in a SQL statement into parameters (@P0, @P1, etc.)
-    /// and produces a parameterized SQL string with a parameter dictionary.
+    /// and produces a parameter dictionary mapping names to original values.
     /// NULL literals are not parameterized since IS NULL semantics differ from = @param.
     /// </summary>
     internal static class LiteralParameterizer
     {
         /// <summary>
-        /// Parameterizes all non-NULL literals in the statement.
-        /// Returns the parameterized SQL and a dictionary of parameter name to original value.
+        /// Parameterizes all non-NULL literals in the statement in place.
+        /// Returns a dictionary mapping parameter names to their original values.
         /// </summary>
-        public static ParameterizedQuery Parameterize(Stmt stmt)
+        public static IReadOnlyDictionary<string, object> Parameterize(Stmt stmt)
         {
             // Phase 1: Collect existing variable names
             var variableCollector = new VariableNameCollector();
@@ -40,10 +24,7 @@ namespace TSQL.StandardLibrary.Visitors
             var replacer = new LiteralReplacer(variableCollector.ExistingVariableNames);
             replacer.Walk(stmt);
 
-            // Phase 3: Get the modified SQL
-            string sql = stmt.ToSource();
-
-            return new ParameterizedQuery(sql, replacer.Parameters);
+            return replacer.Parameters;
         }
 
         private class VariableNameCollector : SqlWalker

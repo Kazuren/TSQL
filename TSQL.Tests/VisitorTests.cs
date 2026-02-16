@@ -245,92 +245,149 @@ namespace TSQL.Tests
         public void LiteralParameterizer_ParameterizesIntLiteral()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE x = @P0", result.Sql);
-            Assert.Single(result.Parameters);
-            Assert.Equal(42, result.Parameters["@P0"]);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(42, parameters["@P0"]);
         }
 
         [Fact]
         public void LiteralParameterizer_ParameterizesStringLiteral()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE name = @P0", result.Sql);
-            Assert.Single(result.Parameters);
-            Assert.Equal("hello", result.Parameters["@P0"]);
+            Assert.Equal("SELECT * FROM T WHERE name = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal("hello", parameters["@P0"]);
         }
 
         [Fact]
         public void LiteralParameterizer_ParameterizesMultipleLiterals()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = 42 AND y = 'hello'");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", result.Sql);
-            Assert.Equal(2, result.Parameters.Count);
-            Assert.Equal(42, result.Parameters["@P0"]);
-            Assert.Equal("hello", result.Parameters["@P1"]);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(42, parameters["@P0"]);
+            Assert.Equal("hello", parameters["@P1"]);
         }
 
         [Fact]
         public void LiteralParameterizer_SkipsNullLiteral()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x IS NULL");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE x IS NULL", result.Sql);
-            Assert.Empty(result.Parameters);
+            Assert.Equal("SELECT * FROM T WHERE x IS NULL", stmt.ToSource());
+            Assert.Empty(parameters);
         }
 
         [Fact]
         public void LiteralParameterizer_AvoidsConflictWithExistingVariables()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x = @P0 AND y = 42");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", result.Sql);
-            Assert.Single(result.Parameters);
-            Assert.Equal(42, result.Parameters["@P1"]);
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(42, parameters["@P1"]);
         }
 
         [Fact]
         public void LiteralParameterizer_ParameterizesLiteralsInFunctionArgs()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE LEN('test') > 0");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE LEN(@P0) > @P1", result.Sql);
-            Assert.Equal(2, result.Parameters.Count);
-            Assert.Equal("test", result.Parameters["@P0"]);
-            Assert.Equal(0, result.Parameters["@P1"]);
+            Assert.Equal("SELECT * FROM T WHERE LEN(@P0) > @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal("test", parameters["@P0"]);
+            Assert.Equal(0, parameters["@P1"]);
         }
 
         [Fact]
         public void LiteralParameterizer_ParameterizesLiteralsInBetween()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x BETWEEN 10 AND 20");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE x BETWEEN @P0 AND @P1", result.Sql);
-            Assert.Equal(2, result.Parameters.Count);
-            Assert.Equal(10, result.Parameters["@P0"]);
-            Assert.Equal(20, result.Parameters["@P1"]);
+            Assert.Equal("SELECT * FROM T WHERE x BETWEEN @P0 AND @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(10, parameters["@P0"]);
+            Assert.Equal(20, parameters["@P1"]);
         }
 
         [Fact]
         public void LiteralParameterizer_ParameterizesLiteralsInInList()
         {
             var stmt = ParseSelect("SELECT * FROM T WHERE x IN (1, 2, 3)");
-            var result = stmt.Parameterize();
+            stmt.Parameterize(out var parameters);
 
-            Assert.Equal("SELECT * FROM T WHERE x IN (@P0, @P1, @P2)", result.Sql);
-            Assert.Equal(3, result.Parameters.Count);
-            Assert.Equal(1, result.Parameters["@P0"]);
-            Assert.Equal(2, result.Parameters["@P1"]);
-            Assert.Equal(3, result.Parameters["@P2"]);
+            Assert.Equal("SELECT * FROM T WHERE x IN (@P0, @P1, @P2)", stmt.ToSource());
+            Assert.Equal(3, parameters.Count);
+            Assert.Equal(1, parameters["@P0"]);
+            Assert.Equal(2, parameters["@P1"]);
+            Assert.Equal(3, parameters["@P2"]);
+        }
+
+        #endregion
+
+        #region Fluent API
+
+        [Fact]
+        public void FluentApi_AddCondition_ReturnsSameInstance()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T");
+            var returned = stmt.AddCondition("Active = 1");
+
+            Assert.Same(stmt, returned);
+        }
+
+        [Fact]
+        public void FluentApi_Parameterize_ReturnsSameInstance()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1");
+            var returned = stmt.Parameterize(out _);
+
+            Assert.Same(stmt, returned);
+        }
+
+        [Fact]
+        public void FluentApi_ChainAddConditionThenParameterize()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
+                .AddCondition("y = 2")
+                .Parameterize(out var parameters);
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(1, parameters["@P0"]);
+            Assert.Equal(2, parameters["@P1"]);
+        }
+
+        [Fact]
+        public void FluentApi_ChainMultipleAddConditions()
+        {
+            string sql = Stmt.Parse("SELECT * FROM T")
+                .AddCondition("TenantId = 1")
+                .AddCondition("Active = 1")
+                .ToSource();
+
+            Assert.Equal("SELECT * FROM T WHERE TenantId = 1 AND Active = 1", sql);
+        }
+
+        [Fact]
+        public void FluentApi_TransformThenQuery()
+        {
+            var tables = Stmt.Parse("SELECT * FROM T")
+                .AddCondition("Active = 1")
+                .CollectTableReferences();
+
+            Assert.Single(tables.Tables);
+            Assert.Equal("T", tables.Tables[0].TableName.ObjectName.Name);
         }
 
         #endregion
