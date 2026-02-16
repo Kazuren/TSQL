@@ -6,10 +6,8 @@
         <ProjectReference Include="..\TSQL.Generators\TSQL.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
-
     <ItemGroup>
         <InternalsVisibleTo Include="TSQL.Tests" />
-        <InternalsVisibleTo Include="TSQL.StandardLibrary" />
         <InternalsVisibleTo Include="TSQL.Benchmarks" />
     </ItemGroup>
 </Project>

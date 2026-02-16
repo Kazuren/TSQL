@@ -47,7 +47,7 @@ namespace TSQL.StandardLibrary.Visitors
             ColumnReferenceScope scope,
             ColumnReferenceClause clauses)
         {
-            var collector = new ColumnReferenceCollector(scope, clauses);
+            ColumnReferenceCollector collector = new ColumnReferenceCollector(scope, clauses);
             collector.Walk(stmt);
             return collector._columns;
         }

@@ -7,7 +7,7 @@ namespace TSQL
     /// <summary>
     /// Public interface for tokens, exposing Lexeme as string for external consumption.
     /// </summary>
-    public interface IToken
+    internal interface IToken
     {
         TokenType Type { get; }
         string Lexeme { get; }
@@ -19,7 +19,7 @@ namespace TSQL
     /// <summary>
     /// A token created programmatically (not from source parsing). Stores lexeme as string.
     /// </summary>
-    public class ConcreteToken : Token
+    internal class ConcreteToken : Token
     {
         private readonly string _lexeme;
 
@@ -34,7 +34,7 @@ namespace TSQL
     /// <summary>
     /// A token parsed from source code. Stores lexeme as StringSlice for deferred allocation.
     /// </summary>
-    public class SourceToken : Token
+    internal class SourceToken : Token
     {
         private readonly StringSlice _lexemeSlice;
         private string _lexemeCache;

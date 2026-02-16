@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using BenchmarkDotNet.Attributes;
 using Microsoft.VSDiagnostics;
+using System.Collections.Generic;
 
 namespace TSQL.Benchmarks
 {
@@ -10,7 +10,7 @@ namespace TSQL.Benchmarks
     [CPUUsageDiagnoser]
     [MemoryDiagnoser]
     [BenchmarkCategory("Scanner")]
-    public class ScannerBenchmarks
+    internal class ScannerBenchmarks
     {
         private const string SimpleQuery = "SELECT Id, Name FROM Users";
         private const string MediumQuery = "SELECT u.Id, u.Name, u.Email, o.OrderId, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1";
@@ -36,21 +36,21 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Scan simple query (~25 chars)")]
         public List<SourceToken> ScanSimpleQuery()
         {
-            var scanner = new Scanner(SimpleQuery);
+            Scanner scanner = new Scanner(SimpleQuery);
             return scanner.ScanTokens();
         }
 
         [Benchmark(Description = "Scan medium query (~130 chars)")]
         public List<SourceToken> ScanMediumQuery()
         {
-            var scanner = new Scanner(MediumQuery);
+            Scanner scanner = new Scanner(MediumQuery);
             return scanner.ScanTokens();
         }
 
         [Benchmark(Description = "Scan complex query (~850 chars)")]
         public List<SourceToken> ScanComplexQuery()
         {
-            var scanner = new Scanner(ComplexQuery);
+            Scanner scanner = new Scanner(ComplexQuery);
             return scanner.ScanTokens();
         }
     }
@@ -72,45 +72,45 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Parse single column")]
         public Stmt ParseSingleColumn()
         {
-            var scanner = new Scanner(SingleColumn);
+            Scanner scanner = new Scanner(SingleColumn);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Parse 5 columns")]
         public Stmt ParseMultipleColumns()
         {
-            var scanner = new Scanner(MultipleColumns);
+            Scanner scanner = new Scanner(MultipleColumns);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Parse with aliases")]
         public Stmt ParseWithAliases()
         {
-            var scanner = new Scanner(WithAlias);
+            Scanner scanner = new Scanner(WithAlias);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Parse with expressions")]
         public Stmt ParseWithExpressions()
         {
-            var scanner = new Scanner(WithExpressions);
+            Scanner scanner = new Scanner(WithExpressions);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Parse with scalar subquery")]
         public Stmt ParseWithSubquery()
         {
-            var scanner = new Scanner(WithSubquery);
+            Scanner scanner = new Scanner(WithSubquery);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -141,54 +141,54 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "ROW_NUMBER() simple")]
         public Stmt ParseSimpleRowNumber()
         {
-            var scanner = new Scanner(SimpleRowNumber);
+            Scanner scanner = new Scanner(SimpleRowNumber);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "RANK() with PARTITION BY")]
         public Stmt ParseRankWithPartition()
         {
-            var scanner = new Scanner(RankWithPartition);
+            Scanner scanner = new Scanner(RankWithPartition);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "SUM() OVER with partition")]
         public Stmt ParseAggregateWithOver()
         {
-            var scanner = new Scanner(AggregateWithOver);
+            Scanner scanner = new Scanner(AggregateWithOver);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Window with frame clause")]
         public Stmt ParseWithFrameClause()
         {
-            var scanner = new Scanner(WithFrameClause);
+            Scanner scanner = new Scanner(WithFrameClause);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Window with complex frame")]
         public Stmt ParseComplexFrame()
         {
-            var scanner = new Scanner(ComplexFrame);
+            Scanner scanner = new Scanner(ComplexFrame);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Multiple window functions")]
         public Stmt ParseMultipleWindowFunctions()
         {
-            var scanner = new Scanner(MultipleWindowFunctions);
+            Scanner scanner = new Scanner(MultipleWindowFunctions);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -210,45 +210,45 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Function with no args")]
         public Stmt ParseNoArgs()
         {
-            var scanner = new Scanner(NoArgs);
+            Scanner scanner = new Scanner(NoArgs);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Function with single arg")]
         public Stmt ParseSingleArg()
         {
-            var scanner = new Scanner(SingleArg);
+            Scanner scanner = new Scanner(SingleArg);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "COALESCE with 5 args")]
         public Stmt ParseMultipleArgs()
         {
-            var scanner = new Scanner(MultipleArgs);
+            Scanner scanner = new Scanner(MultipleArgs);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Nested function calls")]
         public Stmt ParseNestedFunctions()
         {
-            var scanner = new Scanner(NestedFunctions);
+            Scanner scanner = new Scanner(NestedFunctions);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Schema-qualified functions")]
         public Stmt ParseSchemaQualified()
         {
-            var scanner = new Scanner(SchemaQualified);
+            Scanner scanner = new Scanner(SchemaQualified);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -268,9 +268,9 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Round-trip simple query")]
         public string RoundTripSimple()
         {
-            var scanner = new Scanner(SimpleQuery);
+            Scanner scanner = new Scanner(SimpleQuery);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             var stmt = parser.Parse();
             return stmt.ToSource();
         }
@@ -278,9 +278,9 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Round-trip window function")]
         public string RoundTripWindowFunction()
         {
-            var scanner = new Scanner(QueryWithWindowFunction);
+            Scanner scanner = new Scanner(QueryWithWindowFunction);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             var stmt = parser.Parse();
             return stmt.ToSource();
         }
@@ -288,9 +288,9 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Round-trip with frame clause")]
         public string RoundTripFrameClause()
         {
-            var scanner = new Scanner(QueryWithFrameClause);
+            Scanner scanner = new Scanner(QueryWithFrameClause);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             var stmt = parser.Parse();
             return stmt.ToSource();
         }
@@ -310,23 +310,23 @@ namespace TSQL.Benchmarks
         [GlobalSetup]
         public void Setup()
         {
-            var scanner = new Scanner(Query);
+            Scanner scanner = new Scanner(Query);
             _preTokenized = scanner.ScanTokens();
         }
 
         [Benchmark(Description = "Full pipeline (scan + parse)", Baseline = true)]
         public Stmt FullPipeline()
         {
-            var scanner = new Scanner(Query);
+            Scanner scanner = new Scanner(Query);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Parse only (pre-tokenized)")]
         public Stmt ParseOnly()
         {
-            var parser = new Parser(_preTokenized);
+            Parser parser = new Parser(_preTokenized);
             return parser.Parse();
         }
     }
@@ -348,45 +348,45 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Simple column")]
         public Stmt ParseSimpleColumn()
         {
-            var scanner = new Scanner(SimpleColumn);
+            Scanner scanner = new Scanner(SimpleColumn);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Table.column")]
         public Stmt ParseTableQualified()
         {
-            var scanner = new Scanner(TableQualified);
+            Scanner scanner = new Scanner(TableQualified);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Schema.table.column")]
         public Stmt ParseSchemaQualified()
         {
-            var scanner = new Scanner(SchemaQualified);
+            Scanner scanner = new Scanner(SchemaQualified);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Database.schema.table.column")]
         public Stmt ParseFullyQualified()
         {
-            var scanner = new Scanner(FullyQualified);
+            Scanner scanner = new Scanner(FullyQualified);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Mixed qualification levels")]
         public Stmt ParseMixedIdentifiers()
         {
-            var scanner = new Scanner(MixedIdentifiers);
+            Scanner scanner = new Scanner(MixedIdentifiers);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -416,12 +416,12 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Parse 10 different queries")]
         public Stmt[] Parse10Queries()
         {
-            var results = new Stmt[Queries.Length];
+            Stmt[] results = new Stmt[Queries.Length];
             for (int i = 0; i < Queries.Length; i++)
             {
-                var scanner = new Scanner(Queries[i]);
+                Scanner scanner = new Scanner(Queries[i]);
                 var tokens = scanner.ScanTokens();
-                var parser = new Parser(tokens);
+                Parser parser = new Parser(tokens);
                 results[i] = parser.Parse();
             }
             return results;
@@ -431,12 +431,12 @@ namespace TSQL.Benchmarks
         public Stmt[] ParseSameQuery100Times()
         {
             const string query = "SELECT ROW_NUMBER() OVER (ORDER BY Id) AS RowNum, Name FROM Users";
-            var results = new Stmt[100];
+            Stmt[] results = new Stmt[100];
             for (int i = 0; i < 100; i++)
             {
-                var scanner = new Scanner(query);
+                Scanner scanner = new Scanner(query);
                 var tokens = scanner.ScanTokens();
-                var parser = new Parser(tokens);
+                Parser parser = new Parser(tokens);
                 results[i] = parser.Parse();
             }
             return results;
@@ -461,54 +461,54 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Simple comparison")]
         public Stmt ParseSimpleComparison()
         {
-            var scanner = new Scanner(SimpleComparison);
+            Scanner scanner = new Scanner(SimpleComparison);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Multiple AND predicates with LIKE")]
         public Stmt ParseMultiplePredicate()
         {
-            var scanner = new Scanner(MultiplePredicate);
+            Scanner scanner = new Scanner(MultiplePredicate);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "IN list with 5 values")]
         public Stmt ParseInList()
         {
-            var scanner = new Scanner(InList);
+            Scanner scanner = new Scanner(InList);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "BETWEEN predicates")]
         public Stmt ParseBetweenPredicate()
         {
-            var scanner = new Scanner(BetweenPredicate);
+            Scanner scanner = new Scanner(BetweenPredicate);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "EXISTS subquery")]
         public Stmt ParseExistsSubquery()
         {
-            var scanner = new Scanner(ExistsSubquery);
+            Scanner scanner = new Scanner(ExistsSubquery);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Complex boolean with NOT")]
         public Stmt ParseComplexBoolean()
         {
-            var scanner = new Scanner(ComplexBoolean);
+            Scanner scanner = new Scanner(ComplexBoolean);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -530,45 +530,45 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "INNER JOIN")]
         public Stmt ParseInnerJoin()
         {
-            var scanner = new Scanner(InnerJoin);
+            Scanner scanner = new Scanner(InnerJoin);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Multi JOIN chain (4 tables)")]
         public Stmt ParseMultiJoin()
         {
-            var scanner = new Scanner(MultiJoin);
+            Scanner scanner = new Scanner(MultiJoin);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "CROSS APPLY with subquery")]
         public Stmt ParseCrossApply()
         {
-            var scanner = new Scanner(CrossApply);
+            Scanner scanner = new Scanner(CrossApply);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "JOIN with table hints")]
         public Stmt ParseJoinWithHints()
         {
-            var scanner = new Scanner(JoinWithHints);
+            Scanner scanner = new Scanner(JoinWithHints);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "FULL OUTER JOIN")]
         public Stmt ParseFullOuterJoin()
         {
-            var scanner = new Scanner(FullOuterJoin);
+            Scanner scanner = new Scanner(FullOuterJoin);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -588,27 +588,27 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Simple CTE")]
         public Stmt ParseSimpleCTE()
         {
-            var scanner = new Scanner(SimpleCTE);
+            Scanner scanner = new Scanner(SimpleCTE);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Multiple CTEs (3)")]
         public Stmt ParseMultipleCTEs()
         {
-            var scanner = new Scanner(MultipleCTEs);
+            Scanner scanner = new Scanner(MultipleCTEs);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "CTE with column list")]
         public Stmt ParseCTEWithColumns()
         {
-            var scanner = new Scanner(CTEWithColumns);
+            Scanner scanner = new Scanner(CTEWithColumns);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -629,36 +629,36 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "UNION ALL")]
         public Stmt ParseUnionAll()
         {
-            var scanner = new Scanner(UnionAll);
+            Scanner scanner = new Scanner(UnionAll);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Multi UNION chain (4 selects)")]
         public Stmt ParseMultiUnion()
         {
-            var scanner = new Scanner(MultiUnion);
+            Scanner scanner = new Scanner(MultiUnion);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "UNION with ORDER BY and OFFSET")]
         public Stmt ParseUnionWithOrderBy()
         {
-            var scanner = new Scanner(UnionWithOrderBy);
+            Scanner scanner = new Scanner(UnionWithOrderBy);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "INTERSECT and EXCEPT")]
         public Stmt ParseIntersectExcept()
         {
-            var scanner = new Scanner(IntersectExcept);
+            Scanner scanner = new Scanner(IntersectExcept);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -679,36 +679,36 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Table hints (NOLOCK, INDEX)")]
         public Stmt ParseTableHints()
         {
-            var scanner = new Scanner(TableHints);
+            Scanner scanner = new Scanner(TableHints);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Simple query hint (RECOMPILE)")]
         public Stmt ParseQueryHintSimple()
         {
-            var scanner = new Scanner(QueryHintSimple);
+            Scanner scanner = new Scanner(QueryHintSimple);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Complex query hints")]
         public Stmt ParseQueryHintComplex()
         {
-            var scanner = new Scanner(QueryHintComplex);
+            Scanner scanner = new Scanner(QueryHintComplex);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "USE HINT with strings")]
         public Stmt ParseQueryHintUseHint()
         {
-            var scanner = new Scanner(QueryHintUseHint);
+            Scanner scanner = new Scanner(QueryHintUseHint);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -732,63 +732,63 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "GROUP BY ROLLUP")]
         public Stmt ParseGroupByRollup()
         {
-            var scanner = new Scanner(GroupByRollup);
+            Scanner scanner = new Scanner(GroupByRollup);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "GROUP BY CUBE")]
         public Stmt ParseGroupByCube()
         {
-            var scanner = new Scanner(GroupByCube);
+            Scanner scanner = new Scanner(GroupByCube);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "GROUPING SETS")]
         public Stmt ParseGroupingSets()
         {
-            var scanner = new Scanner(GroupingSets);
+            Scanner scanner = new Scanner(GroupingSets);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "OFFSET/FETCH paging")]
         public Stmt ParseOffsetFetch()
         {
-            var scanner = new Scanner(OffsetFetch);
+            Scanner scanner = new Scanner(OffsetFetch);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "FOR XML PATH with options")]
         public Stmt ParseForXmlPath()
         {
-            var scanner = new Scanner(ForXmlPath);
+            Scanner scanner = new Scanner(ForXmlPath);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "FOR JSON PATH with options")]
         public Stmt ParseForJsonPath()
         {
-            var scanner = new Scanner(ForJsonPath);
+            Scanner scanner = new Scanner(ForJsonPath);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "PIVOT")]
         public Stmt ParsePivot()
         {
-            var scanner = new Scanner(Pivot);
+            Scanner scanner = new Scanner(Pivot);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -810,45 +810,45 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Searched CASE (3 WHEN)")]
         public Stmt ParseSearchedCase()
         {
-            var scanner = new Scanner(SearchedCase);
+            Scanner scanner = new Scanner(SearchedCase);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Simple CASE (3 WHEN)")]
         public Stmt ParseSimpleCase()
         {
-            var scanner = new Scanner(SimpleCase);
+            Scanner scanner = new Scanner(SimpleCase);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Nested CASE expressions")]
         public Stmt ParseNestedCase()
         {
-            var scanner = new Scanner(NestedCase);
+            Scanner scanner = new Scanner(NestedCase);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "CAST/CONVERT/TRY variants")]
         public Stmt ParseCastConvert()
         {
-            var scanner = new Scanner(CastConvert);
+            Scanner scanner = new Scanner(CastConvert);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Nested IIF expressions")]
         public Stmt ParseIifExpression()
         {
-            var scanner = new Scanner(IifExpression);
+            Scanner scanner = new Scanner(IifExpression);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }
@@ -947,18 +947,18 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Report query (~1500 chars)")]
         public Stmt ParseReportQuery()
         {
-            var scanner = new Scanner(ReportQuery);
+            Scanner scanner = new Scanner(ReportQuery);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
 
         [Benchmark(Description = "Analytics query (~1200 chars)")]
         public Stmt ParseAnalyticsQuery()
         {
-            var scanner = new Scanner(AnalyticsQuery);
+            Scanner scanner = new Scanner(AnalyticsQuery);
             var tokens = scanner.ScanTokens();
-            var parser = new Parser(tokens);
+            Parser parser = new Parser(tokens);
             return parser.Parse();
         }
     }

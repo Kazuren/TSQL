@@ -31,14 +31,10 @@ namespace TSQL.StandardLibrary.Visitors
                 return;
             }
 
-            var walker = new WhereConditionWalker(condition, target);
+            WhereConditionWalker walker = new WhereConditionWalker(condition, target);
             walker.Walk(stmt);
         }
 
-        private static Predicate ParseCondition(string condition)
-        {
-            return new Parser(new Scanner(condition).ScanTokens()).ParseSearchCondition();
-        }
 
         private class WhereConditionWalker : SqlWalker
         {
@@ -111,7 +107,7 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     if (HasFlag(requiredFlag))
                     {
-                        Predicate predicate = ParseCondition(_condition);
+                        Predicate predicate = Predicate.ParsePredicate(_condition);
                         selectExpr.AddWhere(predicate);
                     }
                     WalkSelectExpression(selectExpr);

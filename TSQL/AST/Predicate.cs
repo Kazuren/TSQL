@@ -7,6 +7,11 @@ namespace TSQL.AST
 
     public abstract class Predicate : SyntaxElement
     {
+        public static Predicate ParsePredicate(string sql)
+        {
+            return new Parser(new Scanner(sql).ScanTokens()).ParseSearchCondition();
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
 
         private static readonly Dictionary<ComparisonOperator, (TokenType Type, string Lexeme)> ComparisonOpToToken =
@@ -27,8 +32,8 @@ namespace TSQL.AST
         private static Dictionary<TokenType, TEnum> BuildReverse<TEnum>(Dictionary<TEnum, (TokenType Type, string Lexeme)> forward)
             where TEnum : struct
         {
-            var reverse = new Dictionary<TokenType, TEnum>();
-            foreach (var kvp in forward)
+            Dictionary<TokenType, TEnum> reverse = new Dictionary<TokenType, TEnum>();
+            foreach (KeyValuePair<TEnum, (TokenType Type, string Lexeme)> kvp in forward)
             {
                 reverse[kvp.Value.Type] = kvp.Key;
             }
