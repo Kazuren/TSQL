@@ -79,6 +79,15 @@ namespace TSQL
                 return _lexemeCache;
             }
         }
+
+        /// <summary>
+        /// Appends the lexeme directly from the underlying StringSlice, bypassing the Lexeme property
+        /// to avoid allocating an intermediate string.
+        /// </summary>
+        protected override void AppendLexemeTo(StringBuilder sb)
+        {
+            _lexemeSlice.AppendTo(sb);
+        }
     }
 
     /// <summary>
@@ -212,21 +221,26 @@ namespace TSQL
             }
         }
 
+        protected virtual void AppendLexemeTo(StringBuilder sb)
+        {
+            sb.Append(Lexeme);
+        }
+
         internal void AppendTo(StringBuilder sb)
         {
             if (_leadingTriviaList != null)
             {
                 for (int i = 0; i < _leadingTriviaList.Count; i++)
                 {
-                    sb.Append(_leadingTriviaList[i].Content);
+                    _leadingTriviaList[i].AppendTo(sb);
                 }
             }
             else if (_leadingTriviaSingle != null)
             {
-                sb.Append(_leadingTriviaSingle.Content);
+                _leadingTriviaSingle.AppendTo(sb);
             }
 
-            sb.Append(Lexeme);
+            AppendLexemeTo(sb);
         }
     }
 

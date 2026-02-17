@@ -166,7 +166,7 @@ namespace TSQL
                     }
                     break;
                 default:
-                    if (Char.IsWhiteSpace(c))
+                    if (IsWhiteSpace(c))
                     {
                         Whitespace();
                     }
@@ -254,7 +254,7 @@ namespace TSQL
         private void Whitespace()
         {
             char c = Peek();
-            while (char.IsWhiteSpace(c))
+            while (IsWhiteSpace(c))
             {
                 // repeating check to see if current character is a new line to increment line counter
                 if (c == '\n')
@@ -496,6 +496,15 @@ namespace TSQL
         private bool IsAlphaNumeric(char c)
         {
             return IsAlpha(c) || IsDigit(c);
+        }
+
+        /// <summary>
+        /// Inline ASCII-only whitespace check. Avoids char.IsWhiteSpace which checks the full
+        /// Unicode whitespace category — T-SQL only uses ASCII whitespace characters.
+        /// </summary>
+        private static bool IsWhiteSpace(char c)
+        {
+            return c == ' ' || c == '\t' || c == '\n' || c == '\r';
         }
     }
 }

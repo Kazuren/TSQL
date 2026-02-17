@@ -1,8 +1,16 @@
+using System.Text;
+
 namespace TSQL
 {
     public interface Trivia
     {
         string Content { get; }
+
+        /// <summary>
+        /// Appends this trivia's content directly to a StringBuilder, bypassing the Content property
+        /// to avoid allocating an intermediate string.
+        /// </summary>
+        void AppendTo(StringBuilder sb);
     }
 
     public class Whitespace : Trivia
@@ -38,6 +46,11 @@ namespace TSQL
                 return _contentCache;
             }
         }
+
+        public void AppendTo(StringBuilder sb)
+        {
+            sb.Append(_source, _start, _length);
+        }
     }
 
     public class Comment : Trivia
@@ -72,6 +85,11 @@ namespace TSQL
                 }
                 return _contentCache;
             }
+        }
+
+        public void AppendTo(StringBuilder sb)
+        {
+            sb.Append(_source, _start, _length);
         }
     }
 }

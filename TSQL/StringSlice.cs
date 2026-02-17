@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace TSQL
 {
@@ -43,6 +44,17 @@ namespace TSQL
                 if (index < 0 || index >= _length)
                     throw new IndexOutOfRangeException();
                 return _source[_start + index];
+            }
+        }
+
+        /// <summary>
+        /// Appends this slice's characters directly to a StringBuilder without allocating an intermediate string.
+        /// </summary>
+        internal void AppendTo(StringBuilder sb)
+        {
+            if (_source != null)
+            {
+                sb.Append(_source, _start, _length);
             }
         }
 
