@@ -300,6 +300,47 @@ namespace TSQL.Tests
 
         #endregion
 
+        // When the condition itself contains subqueries (EXISTS, IN, quantifier) and the target
+        // includes matching subquery flags, the walker must not re-enter HandleQueryExpression
+        // for the freshly-added predicate's subqueries. These tests verify that the condition
+        // is added exactly once and does not cause infinite recursion.
+        #region Condition With Subqueries
+
+        [Fact]
+        public void ConditionWithExists_TargetAll_AddsOnceWithoutRecursion()
+        {
+            string sql = "SELECT * FROM T1";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddCondition("EXISTS (SELECT 1 FROM T2)", WhereClauseTarget.All);
+
+            Assert.Equal("SELECT * FROM T1 WHERE EXISTS (SELECT 1 FROM T2)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ConditionWithInSubquery_TargetAll_AddsOnceWithoutRecursion()
+        {
+            string sql = "SELECT * FROM T1";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddCondition("ID IN (SELECT ID FROM T2)", WhereClauseTarget.All);
+
+            Assert.Equal("SELECT * FROM T1 WHERE ID IN (SELECT ID FROM T2)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ConditionWithQuantifier_TargetAll_AddsOnceWithoutRecursion()
+        {
+            string sql = "SELECT * FROM T1";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddCondition("PRICE > ALL (SELECT PRICE FROM T2)", WhereClauseTarget.All);
+
+            Assert.Equal("SELECT * FROM T1 WHERE PRICE > ALL (SELECT PRICE FROM T2)", stmt.ToSource());
+        }
+
+        #endregion
+
         #region ParseSearchCondition
 
         [Fact]

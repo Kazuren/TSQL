@@ -356,6 +356,7 @@ namespace TSQL.StandardLibrary.Visitors
 
             protected override void VisitContains(Predicate.Contains pred)
             {
+                TryPrefixFullTextColumns(pred.Columns);
                 pred.SearchCondition = TryPrefix(pred.SearchCondition);
                 if (pred.Language != null)
                 {
@@ -365,10 +366,22 @@ namespace TSQL.StandardLibrary.Visitors
 
             protected override void VisitFreetext(Predicate.Freetext pred)
             {
+                TryPrefixFullTextColumns(pred.Columns);
                 pred.SearchCondition = TryPrefix(pred.SearchCondition);
                 if (pred.Language != null)
                 {
                     pred.Language = TryPrefix(pred.Language);
+                }
+            }
+
+            private void TryPrefixFullTextColumns(Predicate.FullTextColumns columns)
+            {
+                if (columns is Predicate.FullTextColumnNames columnNames)
+                {
+                    for (int i = 0; i < columnNames.Columns.Count; i++)
+                    {
+                        columnNames.Columns[i] = (Expr.ColumnIdentifier)TryPrefix(columnNames.Columns[i]);
+                    }
                 }
             }
 
@@ -483,11 +496,15 @@ namespace TSQL.StandardLibrary.Visitors
             {
                 if (queryExpr is SelectExpression selectExpr)
                 {
+                    // Walk must happen before adding the condition so that the walk only
+                    // traverses the original AST. If the condition is added first and it
+                    // contains subqueries (EXISTS, IN, quantifier), walking the freshly-added
+                    // WHERE predicate re-enters HandleQueryExpression and causes infinite recursion.
+                    WalkSelectExpression(selectExpr);
                     if (HasFlag(requiredFlag))
                     {
                         ProcessSelectExpression(selectExpr);
                     }
-                    WalkSelectExpression(selectExpr);
                 }
                 else if (queryExpr is SetOperation setOp)
                 {

@@ -432,5 +432,131 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Predicate Type Coverage
+
+        [Fact]
+        public void Like_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "NAME" }));
+
+            stmt.AddSchemaAwareCondition("NAME LIKE '%test%'", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.NAME LIKE '%test%'", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Between_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "AGE" }));
+
+            stmt.AddSchemaAwareCondition("AGE BETWEEN 18 AND 65", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.AGE BETWEEN 18 AND 65", stmt.ToSource());
+        }
+
+        [Fact]
+        public void IsNull_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS" }));
+
+            stmt.AddSchemaAwareCondition("STATUS IS NULL", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS IS NULL", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Freetext_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "DESCRIPTION" }));
+
+            stmt.AddSchemaAwareCondition("FREETEXT(DESCRIPTION, 'search')", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE FREETEXT(T1.DESCRIPTION, 'search')", stmt.ToSource());
+        }
+
+        [Fact]
+        public void InValueList_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS" }));
+
+            stmt.AddSchemaAwareCondition("STATUS IN (1, 2, 3)", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS IN (1, 2, 3)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Quantifier_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "PRICE" }));
+
+            stmt.AddSchemaAwareCondition("PRICE > ALL (SELECT 1)", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.PRICE > ALL (SELECT 1)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Exists_FallsBackToRegularAddCondition()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "ID" }));
+
+            // EXISTS has no unprefixed columns — falls back to regular AddCondition
+            stmt.AddSchemaAwareCondition("EXISTS (SELECT 1 FROM T2)", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE EXISTS (SELECT 1 FROM T2)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void PredicateGrouping_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS" }));
+
+            stmt.AddSchemaAwareCondition("(STATUS = 1)", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE (T1.STATUS = 1)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void And_AllColumnsGetPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS", "AGE" }));
+
+            stmt.AddSchemaAwareCondition("STATUS = 1 AND AGE > 18", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS = 1 AND T1.AGE > 18", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Or_AllColumnsGetPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS", "AGE" }));
+
+            stmt.AddSchemaAwareCondition("STATUS = 1 OR AGE > 18", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS = 1 OR T1.AGE > 18", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Not_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS" }));
+
+            stmt.AddSchemaAwareCondition("NOT STATUS = 1", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE NOT T1.STATUS = 1", stmt.ToSource());
+        }
+
+        #endregion
     }
 }

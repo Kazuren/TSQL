@@ -524,8 +524,6 @@ namespace TSQL.AST
 
             internal Token _operatorToken;
             internal Token _quantifierToken;
-            internal Token _leftParen;
-            internal Token _rightParen;
 
             internal Quantifier(Expr left, Token operatorToken, Token quantifierToken, Expr.Subquery subquery)
             {
@@ -545,10 +543,8 @@ namespace TSQL.AST
                     yield return token;
                 yield return _operatorToken;
                 yield return _quantifierToken;
-                yield return _leftParen;
-                foreach (Token token in Subquery.Query.DescendantTokens())
+                foreach (Token token in Subquery.DescendantTokens())
                     yield return token;
-                yield return _rightParen;
             }
         }
 

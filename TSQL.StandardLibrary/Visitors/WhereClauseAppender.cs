@@ -105,12 +105,16 @@ namespace TSQL.StandardLibrary.Visitors
             {
                 if (queryExpr is SelectExpression selectExpr)
                 {
+                    // Walk must happen before adding the condition so that the walk only
+                    // traverses the original AST. If the condition is added first and it
+                    // contains subqueries (EXISTS, IN, quantifier), walking the freshly-added
+                    // WHERE predicate re-enters HandleQueryExpression and causes infinite recursion.
+                    WalkSelectExpression(selectExpr);
                     if (HasFlag(requiredFlag))
                     {
                         Predicate predicate = Predicate.ParsePredicate(_condition);
                         selectExpr.AddWhere(predicate);
                     }
-                    WalkSelectExpression(selectExpr);
                 }
                 else if (queryExpr is SetOperation setOp)
                 {
