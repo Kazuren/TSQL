@@ -1,14 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\TSQL.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\TSQL.Generators\TSQL.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="TSQL.Tests" />
-        <InternalsVisibleTo Include="TSQL.Benchmarks" />
+        <InternalsVisibleTo Include="TSQL.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100118adba18f3c1e6202a44071424157d6f9b6fbf707774be4a06acd37226f5fd578838f3fcc6693b3dfe83ca4241862bc39124cd20cffd4e8d623668fe3cf92236855d4efdd0fee4e9837efa594d89a65ff443cde2cb6c0dd9931aab3917efe9d40e9a8fa1e3ace78bcdd46dc8dff3f8d58fa5c7ae1e7a5ef4689b0154e75eae7" />
+        <InternalsVisibleTo Include="TSQL.Benchmarks, PublicKey=0024000004800000940000000602000000240000525341310004000001000100118adba18f3c1e6202a44071424157d6f9b6fbf707774be4a06acd37226f5fd578838f3fcc6693b3dfe83ca4241862bc39124cd20cffd4e8d623668fe3cf92236855d4efdd0fee4e9837efa594d89a65ff443cde2cb6c0dd9931aab3917efe9d40e9a8fa1e3ace78bcdd46dc8dff3f8d58fa5c7ae1e7a5ef4689b0154e75eae7" />
     </ItemGroup>
 </Project>
 
