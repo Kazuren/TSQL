@@ -6,9 +6,9 @@ namespace TSQL.StandardLibrary.Visitors
 {
     /// <summary>
     /// Callback delegate: "Does table 'tableName' have ALL of these columns?"
-    /// The C# walker calls this to check column existence.
-    /// The VB.NET transformer provides the implementation (queries INFORMATION_SCHEMA.COLUMNS).
-    /// This keeps the parser library free of any database dependency.
+    /// The walker calls this to check column existence.
+    /// The user provides the implementation (e.g. queries INFORMATION_SCHEMA.COLUMNS).
+    /// This keeps the parser library free of any external dependencies.
     /// </summary>
     public delegate bool ColumnExistenceChecker(string tableName, IReadOnlyList<string> columnNames);
 
@@ -63,6 +63,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// Walks a parsed predicate to collect all ColumnIdentifier nodes.
         /// Classifies them as prefixed (has ObjectName) or unprefixed (just ColumnName).
         /// </summary>
+        /// TODO: some way to store this in a better way? what if we have two prefixed column names with the same column name?
         private class ConditionColumnCollector : SqlWalker
         {
             public List<string> UnprefixedColumnNames { get; } = new List<string>();
@@ -101,7 +102,7 @@ namespace TSQL.StandardLibrary.Visitors
             public static List<(TableReference Table, string PhysicalName, string EffectiveName)>
                 Collect(SelectExpression selectExpr)
             {
-                var results = new List<(TableReference, string, string)>();
+                List<(TableReference, string, string)> results = new List<(TableReference, string, string)>();
                 if (selectExpr.From == null)
                 {
                     return results;
@@ -160,7 +161,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         private static List<Predicate> FlattenTopLevelAnd(Predicate pred)
         {
-            var result = new List<Predicate>();
+            List<Predicate> result = new List<Predicate>();
             FlattenAndHelper(pred, result);
             return result;
         }
@@ -513,9 +514,9 @@ namespace TSQL.StandardLibrary.Visitors
             /// </summary>
             private void ProcessFullyUnprefixedCondition(SelectExpression selectExpr)
             {
-                var tables = SelectLevelTableCollector.Collect(selectExpr);
+                List<(TableReference Table, string PhysicalName, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
 
-                foreach (var (table, physicalName, effectiveName) in tables)
+                foreach ((TableReference table, string physicalName, string effectiveName) in tables)
                 {
                     if (_columnExists(physicalName, _unprefixedColumnNames))
                     {
@@ -536,14 +537,14 @@ namespace TSQL.StandardLibrary.Visitors
             /// </summary>
             private void ProcessMixedCondition(SelectExpression selectExpr)
             {
-                var tables = SelectLevelTableCollector.Collect(selectExpr);
+                List<(TableReference Table, string PhysicalName, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
 
                 // Decompose the condition into top-level AND conjuncts and classify them
                 Predicate parsed = Predicate.ParsePredicate(_condition);
                 List<Predicate> conjuncts = FlattenTopLevelAnd(parsed);
 
-                var prefixedOnlySources = new List<string>();
-                var unprefixedSources = new List<string>();
+                List<string> prefixedOnlySources = new List<string>();
+                List<string> unprefixedSources = new List<string>();
 
                 foreach (Predicate conjunct in conjuncts)
                 {
@@ -570,7 +571,7 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     string unprefixedCondition = string.Join(" AND ", unprefixedSources);
 
-                    foreach (var (table, physicalName, effectiveName) in tables)
+                    foreach ((TableReference table, string physicalName, string effectiveName) in tables)
                     {
                         if (_columnExists(physicalName, _unprefixedColumnNames))
                         {
