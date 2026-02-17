@@ -655,6 +655,92 @@ namespace TSQL.Benchmarks
     }
 
     /// <summary>
+    /// Benchmarks for schema-aware condition appending (column existence checking + auto-prefixing)
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("StandardLibrary")]
+    public class SchemaAwareConditionBenchmarks
+    {
+        private const string SimpleQuery = "SELECT * FROM T1";
+        private const string MediumQuery = "SELECT A.ID, B.ID FROM T1 AS A JOIN T2 AS B ON A.ID = B.T1_ID";
+        private const string ComplexQuery = "WITH CTE AS (SELECT * FROM T1) SELECT * FROM CTE JOIN T2 ON CTE.ID = T2.ID";
+
+        private static readonly Dictionary<string, HashSet<string>> SimpleSchema = new Dictionary<string, HashSet<string>>
+        {
+            ["T1"] = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "I_ID" }
+        };
+
+        private static readonly Dictionary<string, HashSet<string>> MediumSchema = new Dictionary<string, HashSet<string>>
+        {
+            ["T1"] = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "ID", "I_ID" },
+            ["T2"] = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "ID", "T1_ID", "I_ID" }
+        };
+
+        private static readonly Dictionary<string, HashSet<string>> ComplexSchema = new Dictionary<string, HashSet<string>>
+        {
+            ["T1"] = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "ID", "I_ID" },
+            ["T2"] = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "ID", "STATUS", "I_ID" }
+        };
+
+        private static readonly ColumnExistenceChecker SimpleChecker = CreateChecker(SimpleSchema);
+        private static readonly ColumnExistenceChecker MediumChecker = CreateChecker(MediumSchema);
+        private static readonly ColumnExistenceChecker ComplexChecker = CreateChecker(ComplexSchema);
+
+        private static ColumnExistenceChecker CreateChecker(Dictionary<string, HashSet<string>> schema)
+        {
+            return (tableName, columnNames) =>
+            {
+                if (!schema.TryGetValue(tableName, out HashSet<string> columns))
+                {
+                    return false;
+                }
+                foreach (string col in columnNames)
+                {
+                    if (!columns.Contains(col))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }
+
+        [Benchmark(Description = "Single table, single column")]
+        public string Simple()
+        {
+            Scanner scanner = new Scanner(SimpleQuery);
+            var tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            Stmt stmt = parser.Parse();
+            stmt.AddSchemaAwareCondition("I_ID = 0", SimpleChecker);
+            return stmt.ToSource();
+        }
+
+        [Benchmark(Description = "Multi-table JOIN with alias resolution")]
+        public string Medium()
+        {
+            Scanner scanner = new Scanner(MediumQuery);
+            var tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            Stmt stmt = parser.Parse();
+            stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", MediumChecker);
+            return stmt.ToSource();
+        }
+
+        [Benchmark(Description = "CTE + JOIN with mixed prefixed/unprefixed columns")]
+        public string Complex()
+        {
+            Scanner scanner = new Scanner(ComplexQuery);
+            var tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            Stmt stmt = parser.Parse();
+            stmt.AddSchemaAwareCondition("T2.STATUS = 1 AND I_ID = 0", ComplexChecker, WhereClauseTarget.All);
+            return stmt.ToSource();
+        }
+    }
+
+    /// <summary>
     /// Benchmarks for parameterized AddCondition with collision resolution
     /// </summary>
     [CPUUsageDiagnoser]
