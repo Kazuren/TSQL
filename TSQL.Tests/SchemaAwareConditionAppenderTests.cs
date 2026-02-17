@@ -557,6 +557,39 @@ namespace TSQL.Tests
             Assert.Equal("SELECT * FROM T1 WHERE NOT T1.STATUS = 1", stmt.ToSource());
         }
 
+        [Fact]
+        public void Contains_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "DESCRIPTION" }));
+
+            stmt.AddSchemaAwareCondition("CONTAINS(DESCRIPTION, 'search')", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE CONTAINS(T1.DESCRIPTION, 'search')", stmt.ToSource());
+        }
+
+        [Fact]
+        public void InSubquery_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "STATUS" }));
+
+            stmt.AddSchemaAwareCondition("STATUS IN (SELECT STATUS FROM T2)", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS IN (SELECT STATUS FROM T2)", stmt.ToSource());
+        }
+
+        [Fact]
+        public void LikeWithEscape_ColumnGetsPrefixed()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "NAME" }));
+
+            stmt.AddSchemaAwareCondition("NAME LIKE '%[_]test' ESCAPE '['", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.NAME LIKE '%[_]test' ESCAPE '['", stmt.ToSource());
+        }
+
         #endregion
     }
 }

@@ -339,6 +339,17 @@ namespace TSQL.Tests
             Assert.Equal("SELECT * FROM T1 WHERE PRICE > ALL (SELECT PRICE FROM T2)", stmt.ToSource());
         }
 
+        [Fact]
+        public void ConditionWithScalarSubquery_TargetAll_AddsOnceWithoutRecursion()
+        {
+            string sql = "SELECT * FROM T1";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddCondition("(SELECT COUNT(*) FROM T2) > 0", WhereClauseTarget.All);
+
+            Assert.Equal("SELECT * FROM T1 WHERE (SELECT COUNT(*) FROM T2) > 0", stmt.ToSource());
+        }
+
         #endregion
 
         #region ParseSearchCondition
