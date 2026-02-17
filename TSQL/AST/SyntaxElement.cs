@@ -63,6 +63,12 @@ namespace TSQL
             token.AddLeadingTrivia(new Whitespace(" "));
         }
 
+        public override string ToString()
+        {
+            System.Type type = GetType();
+            return $"[{type.BaseType.Name}.{type.Name}]: {ToSource()}";
+        }
+
         /// <summary>
         /// Copies the leading trivia from one node's first token to another's,
         /// replacing any existing leading trivia on the target.
