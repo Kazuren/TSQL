@@ -71,7 +71,7 @@ namespace TSQL
         query_expression -> union_except (order_by_clause (offset_fetch)?)? (for_clause)?
         union_except -> intersect (("UNION" ("ALL")? | "EXCEPT") intersect)*
         intersect -> select_core ("INTERSECT" select_core)*
-        select_core -> "SELECT" ("DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
+        select_core -> "SELECT" ("ALL" | "DISTINCT")? ("TOP" (WHOLE_NUMBER | "(" expression ")") ("PERCENT")? ("WITH TIES")? )? select_list (from_clause)? (where_clause)? (group_by_clause)? (having_clause)?
         parenthesized_expression -> ( "(" query_expression | expression ")" )
 
         wildcard -> STAR
