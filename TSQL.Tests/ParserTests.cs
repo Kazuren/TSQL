@@ -3276,5 +3276,24 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region SELECT ALL
+
+        [Fact]
+        public void Parse_SelectAll_RoundTrips()
+        {
+            string source = "SELECT ALL a FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_SelectAll_SetsQuantifier()
+        {
+            Stmt.Select select = Stmt.ParseSelect("SELECT ALL a FROM T");
+            SelectExpression expr = SelectExpressionOf(select);
+            Assert.Equal(SetQuantifier.All, expr.Quantifier);
+        }
+
+        #endregion
     }
 }

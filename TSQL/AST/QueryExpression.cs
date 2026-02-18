@@ -681,7 +681,7 @@ namespace TSQL
             _selectKeyword = new ConcreteToken(TokenType.SELECT, "SELECT", null);
             Columns = new SyntaxElementList<SelectItem>();
         }
-        internal Token _distinctKeyword;
+        internal Token _quantifierKeyword;
         internal Token _whereKeyword;
         internal Token _havingKeyword;
 
@@ -748,9 +748,9 @@ namespace TSQL
         {
             yield return _selectKeyword;
 
-            if (_distinctKeyword != null)
+            if (_quantifierKeyword != null)
             {
-                yield return _distinctKeyword;
+                yield return _quantifierKeyword;
             }
 
             if (Top != null)
