@@ -241,8 +241,12 @@ namespace TSQL
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _leftParen;
+
             foreach (Token token in Columns.DescendantTokens())
+            {
                 yield return token;
+            }
+
             yield return _rightParen;
         }
     }

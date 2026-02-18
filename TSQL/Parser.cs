@@ -348,19 +348,25 @@ namespace TSQL
             _current = 0;
         }
 
-        public Stmt Parse()
+        /// <summary>
+        /// Consumes an optional trailing semicolon and verifies the entire input has been consumed.
+        /// Shared by all single-statement entry points (Parse, ParseSelect, ParseInsert).
+        /// </summary>
+        private void ExpectEnd()
         {
-            Reset();
-            Stmt stmt = Statement();
-
-            // Allow optional trailing semicolon
             Match(TokenType.SEMICOLON);
 
             if (!IsAtEnd())
             {
                 throw Error(Peek(), "Expected valid token.");
             }
+        }
 
+        public Stmt Parse()
+        {
+            Reset();
+            Stmt stmt = Statement();
+            ExpectEnd();
             return stmt;
         }
 
@@ -368,15 +374,7 @@ namespace TSQL
         {
             Reset();
             Stmt.Select selectStmt = SelectStatement();
-
-            // Allow optional trailing semicolon
-            Match(TokenType.SEMICOLON);
-
-            if (!IsAtEnd())
-            {
-                throw Error(Peek(), "Expected valid token.");
-            }
-
+            ExpectEnd();
             return selectStmt;
         }
 
@@ -384,15 +382,7 @@ namespace TSQL
         {
             Reset();
             Stmt.Insert insertStmt = InsertStatement(null);
-
-            // Allow optional trailing semicolon
-            Match(TokenType.SEMICOLON);
-
-            if (!IsAtEnd())
-            {
-                throw Error(Peek(), "Expected valid token.");
-            }
-
+            ExpectEnd();
             return insertStmt;
         }
 
@@ -591,18 +581,15 @@ namespace TSQL
 
                 SyntaxElementList<Expr> arguments = new SyntaxElementList<Expr>();
 
-                // Parse optional arguments (comma-separated expressions, no parentheses)
-                if (!IsAtEnd() && !Check(TokenType.SEMICOLON) && !Check(TokenType.EOF))
+                // Parse optional arguments (comma-separated expressions, no parentheses).
+                // Check if there's something that looks like an expression argument.
+                if (!IsAtEnd() && !Check(TokenType.SEMICOLON) && !Check(TokenType.OPTION) && !IsStatementStart())
                 {
-                    // Check if there's something that looks like an expression argument
-                    if (!Check(TokenType.OPTION) && !IsStatementStart())
-                    {
-                        arguments.Add(Expression());
+                    arguments.Add(Expression());
 
-                        while (Match(TokenType.COMMA, out Token comma))
-                        {
-                            arguments.Add(Expression(), comma);
-                        }
+                    while (Match(TokenType.COMMA, out Token comma))
+                    {
+                        arguments.Add(Expression(), comma);
                     }
                 }
 
@@ -612,18 +599,16 @@ namespace TSQL
             }
 
             // Otherwise, it's a SELECT source (query expression with optional OPTION)
+            QueryExpression query = QueryExpression();
+
+            SelectSource selectSource = new SelectSource(query);
+
+            if (Check(TokenType.OPTION))
             {
-                QueryExpression query = QueryExpression();
-
-                SelectSource source = new SelectSource(query);
-
-                if (Check(TokenType.OPTION))
-                {
-                    source.Option = ParseOptionClause();
-                }
-
-                return source;
+                selectSource.Option = ParseOptionClause();
             }
+
+            return selectSource;
         }
 
         /// <summary>
@@ -3967,7 +3952,7 @@ namespace TSQL
             }
             else
             {
-                throw Error(Peek(), "Invalid function identifier format");
+                throw Error(Peek(), "Invalid object identifier format");
             }
         }
 

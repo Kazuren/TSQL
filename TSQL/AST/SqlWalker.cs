@@ -42,25 +42,13 @@ namespace TSQL
 
         protected virtual void VisitSelect(Stmt.Select stmt)
         {
-            if (stmt.CteStmt != null)
-            {
-                foreach (CteDefinition cte in stmt.CteStmt.Ctes)
-                {
-                    Walk(cte.Query);
-                }
-            }
+            WalkCte(stmt.CteStmt);
             WalkQueryExpression(stmt.Query);
         }
 
         protected virtual void VisitInsert(Stmt.Insert stmt)
         {
-            if (stmt.CteStmt != null)
-            {
-                foreach (CteDefinition cte in stmt.CteStmt.Ctes)
-                {
-                    Walk(cte.Query);
-                }
-            }
+            WalkCte(stmt.CteStmt);
 
             if (stmt.Source is SelectSource selectSource)
             {
@@ -404,6 +392,17 @@ namespace TSQL
         #endregion
 
         #region Helper Methods
+
+        private void WalkCte(Cte cte)
+        {
+            if (cte != null)
+            {
+                foreach (CteDefinition cteDef in cte.Ctes)
+                {
+                    Walk(cteDef.Query);
+                }
+            }
+        }
 
         protected void WalkQueryExpression(QueryExpression queryExpr)
         {
