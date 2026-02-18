@@ -2988,5 +2988,293 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region SELECT INTO Tests
+
+        [Fact]
+        public void ParseSelectInto_BasicTempTable_RoundTrips()
+        {
+            string source = "SELECT col1, col2 INTO #Temp FROM T";
+            var stmt = Stmt.ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseSelectInto_ParsesIntoTarget()
+        {
+            var stmt = Stmt.ParseSelect("SELECT col1 INTO #Temp FROM T");
+            var selectExpr = SelectExpressionOf(stmt);
+            Assert.NotNull(selectExpr.Into);
+            Assert.Equal("#Temp", selectExpr.Into.ObjectName.Name);
+        }
+
+        [Fact]
+        public void ParseSelectInto_GlobalTempTable_RoundTrips()
+        {
+            string source = "SELECT * INTO ##GlobalTemp FROM T";
+            var stmt = Stmt.ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseSelectInto_SchemaQualifiedTarget_RoundTrips()
+        {
+            string source = "SELECT a, b INTO dbo.NewTable FROM T";
+            var stmt = Stmt.ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseSelectInto_WithWhere_RoundTrips()
+        {
+            string source = "SELECT col1 INTO #Temp FROM T WHERE col1 > 10";
+            var stmt = Stmt.ParseSelect(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        #endregion
+
+        #region INSERT Tests
+
+        [Fact]
+        public void ParseInsert_SelectSource_RoundTrips()
+        {
+            string source = "INSERT INTO #Temp SELECT col1, col2 FROM T";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_WithoutInto_RoundTrips()
+        {
+            string source = "INSERT #Temp SELECT col1 FROM T";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_WithColumnList_RoundTrips()
+        {
+            string source = "INSERT INTO #Temp (col1, col2) SELECT a, b FROM T";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_Values_RoundTrips()
+        {
+            string source = "INSERT INTO T (col1, col2) VALUES (1, 'hello')";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_MultipleValueRows_RoundTrips()
+        {
+            string source = "INSERT INTO T VALUES (1, 'a'), (2, 'b'), (3, 'c')";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_DefaultValues_RoundTrips()
+        {
+            string source = "INSERT INTO T DEFAULT VALUES";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_ExecSource_RoundTrips()
+        {
+            string source = "INSERT INTO #Temp EXEC sp_GetData";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_ExecWithArgs_RoundTrips()
+        {
+            string source = "INSERT INTO #Temp EXEC sp_GetData @Param1, @Param2";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_TableVariable_RoundTrips()
+        {
+            string source = "INSERT INTO @TableVar SELECT col1 FROM T";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_WithCte_RoundTrips()
+        {
+            string source = "WITH cte AS (SELECT col1 FROM T) INSERT INTO #Temp SELECT col1 FROM cte";
+            var stmt = Stmt.Parse(source);
+            Assert.IsType<Stmt.Insert>(stmt);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_SelectSource_HasCorrectSourceType()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO T SELECT 1");
+            Assert.IsType<SelectSource>(stmt.Source);
+        }
+
+        [Fact]
+        public void ParseInsert_ValuesSource_HasCorrectSourceType()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO T VALUES (1)");
+            Assert.IsType<ValuesSource>(stmt.Source);
+        }
+
+        [Fact]
+        public void ParseInsert_DefaultValuesSource_HasCorrectSourceType()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO T DEFAULT VALUES");
+            Assert.IsType<DefaultValuesSource>(stmt.Source);
+        }
+
+        [Fact]
+        public void ParseInsert_ExecSource_HasCorrectSourceType()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO T EXEC sp_Proc");
+            Assert.IsType<ExecSource>(stmt.Source);
+        }
+
+        [Fact]
+        public void ParseInsert_TargetIsObjectIdentifier()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO dbo.T VALUES (1)");
+            var target = Assert.IsType<Expr.ObjectIdentifier>(stmt.Target);
+            Assert.Equal("T", target.ObjectName.Name);
+            Assert.Equal("dbo", target.SchemaName.Name);
+        }
+
+        [Fact]
+        public void ParseInsert_TargetIsVariable()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO @TableVar VALUES (1)");
+            Assert.IsType<Expr.Variable>(stmt.Target);
+        }
+
+        [Fact]
+        public void ParseInsert_ColumnListParsed()
+        {
+            var stmt = Stmt.ParseInsert("INSERT INTO T (a, b, c) VALUES (1, 2, 3)");
+            Assert.NotNull(stmt.ColumnList);
+            Assert.Equal(3, stmt.ColumnList.Columns.Count);
+            Assert.Equal("a", stmt.ColumnList.Columns[0].Name);
+            Assert.Equal("b", stmt.ColumnList.Columns[1].Name);
+            Assert.Equal("c", stmt.ColumnList.Columns[2].Name);
+        }
+
+        [Fact]
+        public void ParseInsert_SchemaQualifiedTable_RoundTrips()
+        {
+            string source = "INSERT INTO dbo.MyTable (col1) VALUES (1)";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        [Fact]
+        public void ParseInsert_Execute_RoundTrips()
+        {
+            string source = "INSERT INTO #Temp EXECUTE sp_GetData";
+            var stmt = Stmt.ParseInsert(source);
+            Assert.Equal(source, stmt.ToSource());
+        }
+
+        #endregion
+
+        #region Script (Multi-Statement) Tests
+
+        [Fact]
+        public void ParseScript_SingleSelect_RoundTrips()
+        {
+            string source = "SELECT 1";
+            var script = Script.Parse(source);
+            Assert.Single(script.Statements);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ParseScript_TwoSelects_WithSemicolons_RoundTrips()
+        {
+            string source = "SELECT 1; SELECT 2";
+            var script = Script.Parse(source);
+            Assert.Equal(2, script.Statements.Count);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ParseScript_SelectThenInsert_RoundTrips()
+        {
+            string source = "SELECT col1 FROM T; INSERT INTO #Temp SELECT col1 FROM T";
+            var script = Script.Parse(source);
+            Assert.Equal(2, script.Statements.Count);
+            Assert.IsType<Stmt.Select>(script.Statements[0]);
+            Assert.IsType<Stmt.Insert>(script.Statements[1]);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ParseScript_InsertThenSelect_RoundTrips()
+        {
+            string source = "INSERT INTO #Temp SELECT 1; SELECT * FROM #Temp";
+            var script = Script.Parse(source);
+            Assert.Equal(2, script.Statements.Count);
+            Assert.IsType<Stmt.Insert>(script.Statements[0]);
+            Assert.IsType<Stmt.Select>(script.Statements[1]);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ParseScript_ThreeStatements_RoundTrips()
+        {
+            string source = "SELECT 1; SELECT 2; SELECT 3";
+            var script = Script.Parse(source);
+            Assert.Equal(3, script.Statements.Count);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ParseScript_TrailingSemicolon_RoundTrips()
+        {
+            string source = "SELECT 1;";
+            var script = Script.Parse(source);
+            Assert.Single(script.Statements);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ParseScript_NoSemicolonBetweenSelectAndInsert_RoundTrips()
+        {
+            // Statements can be separated by the next statement keyword without semicolon
+            string source = "SELECT 1\nINSERT INTO T VALUES (1)";
+            var script = Script.Parse(source);
+            Assert.Equal(2, script.Statements.Count);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void Parse_SingleStatement_AllowsTrailingSemicolon()
+        {
+            string source = "SELECT 1;";
+            var stmt = Stmt.Parse(source);
+            Assert.IsType<Stmt.Select>(stmt);
+        }
+
+        [Fact]
+        public void Parse_InsertViaGenericParse_ReturnsInsert()
+        {
+            var stmt = Stmt.Parse("INSERT INTO T VALUES (1)");
+            Assert.IsType<Stmt.Insert>(stmt);
+        }
+
+        #endregion
     }
 }

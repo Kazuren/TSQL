@@ -52,6 +52,39 @@ namespace TSQL
             WalkQueryExpression(stmt.Query);
         }
 
+        protected virtual void VisitInsert(Stmt.Insert stmt)
+        {
+            if (stmt.CteStmt != null)
+            {
+                foreach (CteDefinition cte in stmt.CteStmt.Ctes)
+                {
+                    Walk(cte.Query);
+                }
+            }
+
+            if (stmt.Source is SelectSource selectSource)
+            {
+                WalkQueryExpression(selectSource.Query);
+            }
+            else if (stmt.Source is ValuesSource valuesSource)
+            {
+                foreach (ValuesRow row in valuesSource.Rows)
+                {
+                    foreach (Expr val in row.Values)
+                    {
+                        Walk(val);
+                    }
+                }
+            }
+            else if (stmt.Source is ExecSource execSource)
+            {
+                foreach (Expr arg in execSource.Arguments)
+                {
+                    Walk(arg);
+                }
+            }
+        }
+
         #endregion
 
         #region Expr Visit Methods
@@ -485,6 +518,7 @@ namespace TSQL
         #region Explicit Interface Implementations
 
         object Stmt.Visitor<object>.VisitSelectStmt(Stmt.Select stmt) { VisitSelect(stmt); return null; }
+        object Stmt.Visitor<object>.VisitInsertStmt(Stmt.Insert stmt) { VisitInsert(stmt); return null; }
 
         object Expr.Visitor<object>.VisitBinaryExpr(Expr.Binary expr) { VisitBinary(expr); return null; }
         object Expr.Visitor<object>.VisitStringLiteralExpr(Expr.StringLiteral expr) { VisitStringLiteral(expr); return null; }

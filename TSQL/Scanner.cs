@@ -491,7 +491,7 @@ namespace TSQL
         {
             return (c >= 'a' && c <= 'z') ||
                 (c >= 'A' && c <= 'Z') ||
-                c == '_';
+                c == '_' || c == '#';
         }
         private bool IsAlphaNumeric(char c)
         {

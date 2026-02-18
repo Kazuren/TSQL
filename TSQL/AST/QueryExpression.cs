@@ -659,6 +659,8 @@ namespace TSQL
         public bool Distinct { get; set; }
         public TopClause Top { get; set; }
         public SyntaxElementList<SelectItem> Columns { get; set; }
+        public Expr.ObjectIdentifier Into { get; set; }
+        internal Token _intoKeyword;
         public FromClause From { get; set; }
         private AST.Predicate _where;
         public AST.Predicate Where
@@ -767,6 +769,15 @@ namespace TSQL
             foreach (Token token in Columns.DescendantTokens())
             {
                 yield return token;
+            }
+
+            if (Into != null)
+            {
+                yield return _intoKeyword;
+                foreach (Token token in Into.DescendantTokens())
+                {
+                    yield return token;
+                }
             }
 
             if (From != null)

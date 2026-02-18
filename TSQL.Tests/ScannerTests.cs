@@ -227,6 +227,40 @@
 
             Assert.Equal(2, tokens[0].Line);
         }
+
+        [Fact]
+        public void ScanTokens_TempTable_ScansAsIdentifier()
+        {
+            var scanner = new Scanner("#Temp");
+            var tokens = scanner.ScanTokens();
+
+            Assert.Equal(2, tokens.Count); // IDENTIFIER + EOF
+            Assert.Equal(TokenType.IDENTIFIER, tokens[0].Type);
+            Assert.Equal("#Temp", tokens[0].Lexeme);
+        }
+
+        [Fact]
+        public void ScanTokens_GlobalTempTable_ScansAsIdentifier()
+        {
+            var scanner = new Scanner("##GlobalTemp");
+            var tokens = scanner.ScanTokens();
+
+            Assert.Equal(2, tokens.Count);
+            Assert.Equal(TokenType.IDENTIFIER, tokens[0].Type);
+            Assert.Equal("##GlobalTemp", tokens[0].Lexeme);
+        }
+
+        [Fact]
+        public void ScanTokens_TempTableInSelect_ScansCorrectly()
+        {
+            var scanner = new Scanner("SELECT * FROM #Temp");
+            var tokens = scanner.ScanTokens();
+
+            // SELECT, *, FROM, #Temp, EOF
+            Assert.Equal(5, tokens.Count);
+            Assert.Equal(TokenType.IDENTIFIER, tokens[3].Type);
+            Assert.Equal("#Temp", tokens[3].Lexeme);
+        }
     }
 
     public record ExpectedToken(TokenType Type, string Lexeme, object? Literal = null);

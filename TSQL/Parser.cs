@@ -21,7 +21,14 @@ namespace TSQL
 
     === Statements ===
 
-        Statement -> ("WITH" cte_list)? query_expression (option_clause)?
+        script -> statement (";" statement)* ";"?
+        statement -> ("WITH" cte_list)? (select_statement | insert_statement)
+        select_statement -> query_expression (option_clause)?
+        insert_statement -> "INSERT" ("INTO")? target (column_list)? insert_source
+        target -> fully_qualified_identifier | VARIABLE
+        column_list -> "(" IDENTIFIER ("," IDENTIFIER)* ")"
+        insert_source -> "DEFAULT" "VALUES" | "VALUES" values_row ("," values_row)* | ("EXEC" | "EXECUTE") fully_qualified_identifier (expression ("," expression)*)? | query_expression (option_clause)?
+
         cte_list -> cte_definition ("," cte_definition)*
         cte_definition -> IDENTIFIER ("(" IDENTIFIER ("," IDENTIFIER)* ")")? "AS" "(" query_expression ")"
 
@@ -344,7 +351,26 @@ namespace TSQL
         public Stmt Parse()
         {
             Reset();
+            Stmt stmt = Statement();
+
+            // Allow optional trailing semicolon
+            Match(TokenType.SEMICOLON);
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected valid token.");
+            }
+
+            return stmt;
+        }
+
+        public Stmt.Select ParseSelect()
+        {
+            Reset();
             Stmt.Select selectStmt = SelectStatement();
+
+            // Allow optional trailing semicolon
+            Match(TokenType.SEMICOLON);
 
             if (!IsAtEnd())
             {
@@ -354,17 +380,38 @@ namespace TSQL
             return selectStmt;
         }
 
-        public Stmt.Select ParseSelect()
+        public Stmt.Insert ParseInsert()
         {
             Reset();
-            Stmt.Select selectStmt = SelectStatement();
+            Stmt.Insert insertStmt = InsertStatement(null);
+
+            // Allow optional trailing semicolon
+            Match(TokenType.SEMICOLON);
 
             if (!IsAtEnd())
             {
                 throw Error(Peek(), "Expected valid token.");
             }
 
-            return selectStmt;
+            return insertStmt;
+        }
+
+        public Script ParseScript()
+        {
+            Reset();
+            List<Stmt> statements = new List<Stmt>();
+            List<Token> semicolons = new List<Token>();
+
+            while (!IsAtEnd())
+            {
+                statements.Add(Statement());
+
+                Token semi = null;
+                Match(TokenType.SEMICOLON, out semi);
+                semicolons.Add(semi);
+            }
+
+            return new Script(statements, semicolons);
         }
 
         public AST.Predicate ParseSearchCondition()
@@ -381,6 +428,28 @@ namespace TSQL
         }
 
         /// <summary>
+        /// Dispatches to the correct statement parser based on the next token.
+        /// Handles optional leading CTE (WITH clause).
+        /// </summary>
+        private Stmt Statement()
+        {
+            Cte cte = null;
+            if (Check(TokenType.WITH))
+            {
+                cte = ParseCte();
+            }
+
+            if (Check(TokenType.INSERT))
+            {
+                return InsertStatement(cte);
+            }
+            else
+            {
+                return SelectStatementWithCte(cte);
+            }
+        }
+
+        /// <summary>
         /// (WITH cte_list)? query_expression (OPTION clause)?
         /// </summary>
         private Stmt.Select SelectStatement()
@@ -391,6 +460,11 @@ namespace TSQL
                 cte = ParseCte();
             }
 
+            return SelectStatementWithCte(cte);
+        }
+
+        private Stmt.Select SelectStatementWithCte(Cte cte)
+        {
             Stmt.Select selectStmt = new Stmt.Select(QueryExpression());
             selectStmt.CteStmt = cte;
 
@@ -401,6 +475,165 @@ namespace TSQL
             }
 
             return selectStmt;
+        }
+
+        /// <summary>
+        /// INSERT [INTO] target [(column_list)] insert_source
+        /// </summary>
+        private Stmt.Insert InsertStatement(Cte cte)
+        {
+            Token insertToken = Consume(TokenType.INSERT, "Expected INSERT");
+
+            // INTO is optional in T-SQL
+            Token intoToken = null;
+            Match(TokenType.INTO, out intoToken);
+
+            // Parse target: VARIABLE or object identifier
+            Expr target;
+            if (Check(TokenType.VARIABLE))
+            {
+                target = new Expr.Variable(Advance());
+            }
+            else
+            {
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
+                target = ObjectIdentifier(parts);
+            }
+
+            // Optional column list: (col1, col2, ...)
+            InsertColumnList columnList = null;
+            if (Check(TokenType.LEFT_PAREN) && !IsInsertSourceLookahead())
+            {
+                columnList = ParseInsertColumnList();
+            }
+
+            // Parse the source
+            InsertSource source = ParseInsertSource();
+
+            Stmt.Insert insertStmt = new Stmt.Insert(target, source);
+            insertStmt._insertToken = insertToken;
+            insertStmt._intoToken = intoToken;
+            insertStmt.CteStmt = cte;
+            insertStmt.ColumnList = columnList;
+
+            return insertStmt;
+        }
+
+        /// <summary>
+        /// Looks ahead to determine if the current LEFT_PAREN starts an insert source
+        /// (e.g., a subquery SELECT) rather than a column list.
+        /// </summary>
+        private bool IsInsertSourceLookahead()
+        {
+            // If the token after LEFT_PAREN is SELECT, it's a subquery, not a column list
+            return CheckNext(TokenType.SELECT);
+        }
+
+        private InsertColumnList ParseInsertColumnList()
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '('");
+
+            SyntaxElementList<ColumnName> columns = new SyntaxElementList<ColumnName>();
+            columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
+
+            InsertColumnList colList = new InsertColumnList(columns);
+            colList._leftParen = leftParen;
+            colList._rightParen = rightParen;
+            return colList;
+        }
+
+        private InsertSource ParseInsertSource()
+        {
+            // DEFAULT VALUES
+            if (Check(TokenType.DEFAULT))
+            {
+                Token defaultToken = Advance();
+                Token valuesToken = Consume(TokenType.VALUES, "Expected VALUES after DEFAULT");
+
+                DefaultValuesSource source = new DefaultValuesSource();
+                source._defaultToken = defaultToken;
+                source._valuesToken = valuesToken;
+                return source;
+            }
+
+            // VALUES (row), (row), ...
+            if (Check(TokenType.VALUES))
+            {
+                Token valuesToken = Advance();
+
+                SyntaxElementList<ValuesRow> rows = new SyntaxElementList<ValuesRow>();
+                rows.Add(ParseValuesRow());
+
+                while (Match(TokenType.COMMA, out Token comma))
+                {
+                    rows.Add(ParseValuesRow(), comma);
+                }
+
+                ValuesSource source = new ValuesSource(rows);
+                source._valuesToken = valuesToken;
+                return source;
+            }
+
+            // EXEC / EXECUTE procedure_name [args]
+            if (Check(TokenType.EXEC) || Check(TokenType.EXECUTE))
+            {
+                Token execToken = Advance();
+
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
+                Expr.ObjectIdentifier procName = ObjectIdentifier(parts);
+
+                SyntaxElementList<Expr> arguments = new SyntaxElementList<Expr>();
+
+                // Parse optional arguments (comma-separated expressions, no parentheses)
+                if (!IsAtEnd() && !Check(TokenType.SEMICOLON) && !Check(TokenType.EOF))
+                {
+                    // Check if there's something that looks like an expression argument
+                    if (!Check(TokenType.OPTION) && !IsStatementStart())
+                    {
+                        arguments.Add(Expression());
+
+                        while (Match(TokenType.COMMA, out Token comma))
+                        {
+                            arguments.Add(Expression(), comma);
+                        }
+                    }
+                }
+
+                ExecSource source = new ExecSource(procName, arguments);
+                source._execToken = execToken;
+                return source;
+            }
+
+            // Otherwise, it's a SELECT source (query expression with optional OPTION)
+            {
+                QueryExpression query = QueryExpression();
+
+                SelectSource source = new SelectSource(query);
+
+                if (Check(TokenType.OPTION))
+                {
+                    source.Option = ParseOptionClause();
+                }
+
+                return source;
+            }
+        }
+
+        /// <summary>
+        /// Returns true if the current token looks like the start of a new statement.
+        /// Used to stop parsing EXEC arguments.
+        /// </summary>
+        private bool IsStatementStart()
+        {
+            TokenType t = Peek().Type;
+            return t == TokenType.SELECT || t == TokenType.INSERT || t == TokenType.WITH;
         }
 
         private Expr.Subquery Subquery()
@@ -542,6 +775,14 @@ namespace TSQL
             while (Match(TokenType.COMMA, out Token comma))
             {
                 selectExpr.Columns.Add(SelectItem(), comma);
+            }
+
+            // SELECT INTO (between column list and FROM)
+            if (Match(TokenType.INTO, out Token intoToken))
+            {
+                IdentifierPartsBuffer intoParts = CollectIdentifierParts();
+                selectExpr.Into = ObjectIdentifier(intoParts);
+                selectExpr._intoKeyword = intoToken;
             }
 
             selectExpr.From = FromClause();
@@ -905,7 +1146,7 @@ namespace TSQL
         private TableReference ParseNamedTableSource()
         {
             IdentifierPartsBuffer parts = CollectIdentifierParts();
-            Expr.ObjectIdentifier objectId = FunctionIdentifier(parts);
+            Expr.ObjectIdentifier objectId = ObjectIdentifier(parts);
 
             TableReference tableRef = new TableReference(objectId);
 
@@ -1319,14 +1560,14 @@ namespace TSQL
 
             // Parse aggregate function call: e.g. SUM(Amount)
             IdentifierPartsBuffer parts = CollectIdentifierParts();
-            Expr.ObjectIdentifier functionId = FunctionIdentifier(parts);
+            Expr.ObjectIdentifier functionId = ObjectIdentifier(parts);
             Expr.FunctionCall aggregateFunction = FinishCall(functionId);
 
             Token forToken = Consume(TokenType.FOR, "Expected FOR");
 
             // Parse pivot column identifier
             IdentifierPartsBuffer pivotParts = CollectIdentifierParts();
-            Expr.ObjectIdentifier pivotColumn = FunctionIdentifier(pivotParts);
+            Expr.ObjectIdentifier pivotColumn = ObjectIdentifier(pivotParts);
 
             Token inToken = Consume(TokenType.IN, "Expected IN");
             Token inLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
@@ -1362,13 +1603,13 @@ namespace TSQL
 
             // Parse value column identifier
             IdentifierPartsBuffer valueParts = CollectIdentifierParts();
-            Expr.ObjectIdentifier valueColumn = FunctionIdentifier(valueParts);
+            Expr.ObjectIdentifier valueColumn = ObjectIdentifier(valueParts);
 
             Token forToken = Consume(TokenType.FOR, "Expected FOR");
 
             // Parse pivot column identifier
             IdentifierPartsBuffer pivotParts = CollectIdentifierParts();
-            Expr.ObjectIdentifier pivotColumn = FunctionIdentifier(pivotParts);
+            Expr.ObjectIdentifier pivotColumn = ObjectIdentifier(pivotParts);
 
             Token inToken = Consume(TokenType.IN, "Expected IN");
             Token inLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
@@ -1946,7 +2187,7 @@ namespace TSQL
 
                 if (Check(TokenType.LEFT_PAREN))
                 {
-                    ObjectIdentifier functionIdentifier = FunctionIdentifier(parts);
+                    ObjectIdentifier functionIdentifier = ObjectIdentifier(parts);
                     FunctionCall functionCall = FinishCall(functionIdentifier);
 
                     // Check for optional WITHIN GROUP clause
@@ -2018,7 +2259,7 @@ namespace TSQL
                 // Fall back to table name
                 _current = saved;
                 IdentifierPartsBuffer parts = CollectIdentifierParts();
-                ObjectIdentifier tableName = FunctionIdentifier(parts);
+                ObjectIdentifier tableName = ObjectIdentifier(parts);
 
                 Expr.OpenXmlTableName table = new Expr.OpenXmlTableName(tableName);
                 table._withKeyword = withToken;
@@ -3379,7 +3620,7 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after TABLE HINT");
 
             IdentifierPartsBuffer parts = CollectIdentifierParts();
-            Expr.ObjectIdentifier objectName = FunctionIdentifier(parts);
+            Expr.ObjectIdentifier objectName = ObjectIdentifier(parts);
 
             SyntaxElementList<TableHint> tableHints = new SyntaxElementList<TableHint>();
             Token commaAfterObjectName = null;
@@ -3683,7 +3924,7 @@ namespace TSQL
             }
         }
 
-        private ObjectIdentifier FunctionIdentifier(IdentifierPartsBuffer parts)
+        private ObjectIdentifier ObjectIdentifier(IdentifierPartsBuffer parts)
         {
             if (IsPattern_Object(parts))
             {

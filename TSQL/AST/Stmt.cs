@@ -26,10 +26,21 @@ namespace TSQL
             return parser.ParseSelect();
         }
 
+        /// <summary>Parses a SQL INSERT statement from the given string.</summary>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Insert ParseInsert(string sql)
+        {
+            Scanner scanner = new Scanner(sql);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            return parser.ParseInsert();
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
         public interface Visitor<T>
         {
             T VisitSelectStmt(Stmt.Select stmt);
+            T VisitInsertStmt(Stmt.Insert stmt);
         }
 
         public class Select : Stmt
@@ -73,7 +84,211 @@ namespace TSQL
                 }
             }
         }
+
+        public class Insert : Stmt
+        {
+            public Cte CteStmt { get; set; }
+            public Expr Target { get; }
+            public InsertColumnList ColumnList { get; set; }
+            public InsertSource Source { get; }
+
+            internal Token _insertToken;
+            internal Token _intoToken;
+
+            public Insert(Expr target, InsertSource source)
+            {
+                Target = target;
+                Source = source;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitInsertStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                if (CteStmt != null)
+                {
+                    foreach (Token token in CteStmt.DescendantTokens())
+                        yield return token;
+                }
+
+                yield return _insertToken;
+
+                if (_intoToken != null)
+                {
+                    yield return _intoToken;
+                }
+
+                foreach (Token token in Target.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (ColumnList != null)
+                {
+                    foreach (Token token in ColumnList.DescendantTokens())
+                        yield return token;
+                }
+
+                foreach (Token token in Source.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
     }
+    #endregion
+
+    #region INSERT Source Types
+
+    public abstract class InsertSource : SyntaxElement { }
+
+    public class SelectSource : InsertSource
+    {
+        public QueryExpression Query { get; }
+        public OptionClause Option { get; set; }
+
+        public SelectSource(QueryExpression query)
+        {
+            Query = query;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in Query.DescendantTokens())
+                yield return token;
+
+            if (Option != null)
+            {
+                foreach (Token token in Option.DescendantTokens())
+                    yield return token;
+            }
+        }
+    }
+
+    public class ValuesSource : InsertSource
+    {
+        public SyntaxElementList<ValuesRow> Rows { get; }
+
+        internal Token _valuesToken;
+
+        public ValuesSource(SyntaxElementList<ValuesRow> rows)
+        {
+            Rows = rows;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _valuesToken;
+            foreach (Token token in Rows.DescendantTokens())
+                yield return token;
+        }
+    }
+
+    public class DefaultValuesSource : InsertSource
+    {
+        internal Token _defaultToken;
+        internal Token _valuesToken;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _defaultToken;
+            yield return _valuesToken;
+        }
+    }
+
+    public class ExecSource : InsertSource
+    {
+        public Expr.ObjectIdentifier ProcedureName { get; }
+        public SyntaxElementList<Expr> Arguments { get; }
+
+        internal Token _execToken;
+
+        public ExecSource(Expr.ObjectIdentifier procedureName, SyntaxElementList<Expr> arguments)
+        {
+            ProcedureName = procedureName;
+            Arguments = arguments;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _execToken;
+            foreach (Token token in ProcedureName.DescendantTokens())
+                yield return token;
+
+            if (Arguments.Count > 0)
+            {
+                foreach (Token token in Arguments.DescendantTokens())
+                    yield return token;
+            }
+        }
+    }
+
+    public class InsertColumnList : SyntaxElement
+    {
+        public SyntaxElementList<ColumnName> Columns { get; }
+
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public InsertColumnList(SyntaxElementList<ColumnName> columns)
+        {
+            Columns = columns;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _leftParen;
+            foreach (Token token in Columns.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+        }
+    }
+
+    #endregion
+
+    #region Script
+
+    public class Script : SyntaxElement
+    {
+        public IReadOnlyList<Stmt> Statements { get; }
+        internal readonly List<Token> _semicolons;
+
+        /// <summary>Parses a SQL script containing one or more statements.</summary>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Script Parse(string sql)
+        {
+            Scanner scanner = new Scanner(sql);
+            List<SourceToken> tokens = scanner.ScanTokens();
+            Parser parser = new Parser(tokens);
+            return parser.ParseScript();
+        }
+
+        internal Script(IReadOnlyList<Stmt> statements, List<Token> semicolons)
+        {
+            Statements = statements;
+            _semicolons = semicolons;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            for (int i = 0; i < Statements.Count; i++)
+            {
+                foreach (Token token in Statements[i].DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (_semicolons[i] != null)
+                {
+                    yield return _semicolons[i];
+                }
+            }
+        }
+    }
+
     #endregion
 
     #region Common Table Expressions
