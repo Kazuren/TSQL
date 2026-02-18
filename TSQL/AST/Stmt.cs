@@ -264,6 +264,34 @@ namespace TSQL
             _semicolons = semicolons;
         }
 
+        public Script(IReadOnlyList<Stmt> statements)
+        {
+            Statements = statements;
+            _semicolons = new List<Token>();
+            for (int i = 0; i < statements.Count; i++)
+            {
+                if (i < statements.Count - 1)
+                {
+                    _semicolons.Add(new ConcreteToken(TokenType.SEMICOLON, ";", null));
+                }
+                else
+                {
+                    _semicolons.Add(null);
+                }
+
+                // Add newline before each statement after the first
+                if (i > 0)
+                {
+                    Token first = FirstTokenOf(statements[i]);
+                    if (first != null)
+                    {
+                        first.ClearLeadingTrivia();
+                        first.AddLeadingTrivia(new Whitespace("\n"));
+                    }
+                }
+            }
+        }
+
         public override IEnumerable<Token> DescendantTokens()
         {
             for (int i = 0; i < Statements.Count; i++)

@@ -810,6 +810,232 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region TempTableReplacer
+
+        [Fact]
+        public void TempTableReplacer_QualifiedColumns_SpecificColumnsInSelectInto()
+        {
+            var stmt = Stmt.Parse("SELECT u.Name, u.Email FROM dbo.Users u WHERE u.Age > 25");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Email, Age INTO #Users FROM dbo.Users;\n" +
+                "SELECT u.Name, u.Email FROM #Users u WHERE u.Age > 25",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_SchemaQualifiedTable_PreservesFullQualification()
+        {
+            var stmt = Stmt.Parse("SELECT u.Id FROM dbo.Users u");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Id INTO #Users FROM dbo.Users;\n" +
+                "SELECT u.Id FROM #Users u",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_BracketedIdentifiers_CaseInsensitiveMatch()
+        {
+            var stmt = Stmt.Parse("SELECT u.Name FROM [dbo].[Users] u");
+            string result = stmt.ReplaceWithTempTables("users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name INTO #Users FROM [dbo].[Users];\n" +
+                "SELECT u.Name FROM #Users u",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_JoinMultipleTables_EachGetsOwnSelectInto()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId");
+            string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT Total, UserId INTO #Orders FROM Orders;\n" +
+                "SELECT u.Name, o.Total FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_SelfJoin_OneSelectInto()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT a.Name, b.Name FROM Users a INNER JOIN Users b ON a.Id = b.ParentId");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id, ParentId INTO #Users FROM Users;\n" +
+                "SELECT a.Name, b.Name FROM #Users a INNER JOIN #Users b ON a.Id = b.ParentId",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_BareStar_SelectStarInSelectInto()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM Users");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #Users FROM Users;\n" +
+                "SELECT * FROM #Users",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_QualifiedWildcard_SelectStarForThatTable()
+        {
+            var stmt = Stmt.Parse("SELECT u.* FROM Users u");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #Users FROM Users;\n" +
+                "SELECT u.* FROM #Users u",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_UnqualifiedColumns_SelectStarFallback()
+        {
+            var stmt = Stmt.Parse("SELECT Name, Email FROM Users");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #Users FROM Users;\n" +
+                "SELECT Name, Email FROM #Users",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_ColumnsFromAllClauses_IncludedInSelectInto()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name FROM Users u WHERE u.Age > 25 ORDER BY u.CreatedAt");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Age, CreatedAt INTO #Users FROM Users;\n" +
+                "SELECT u.Name FROM #Users u WHERE u.Age > 25 ORDER BY u.CreatedAt",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_TableHints_PreservedOnTempTable()
+        {
+            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WITH (NOLOCK)");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name INTO #Users FROM Users;\n" +
+                "SELECT u.Name FROM #Users u WITH (NOLOCK)",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_NoMatch_ReturnsOriginalSource()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM Users");
+            string result = stmt.ReplaceWithTempTables("Products").ToSource();
+
+            Assert.Equal("SELECT * FROM Users", result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_EmptyNames_ReturnsOriginalSource()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM Users");
+            string result = stmt.ReplaceWithTempTables().ToSource();
+
+            Assert.Equal("SELECT * FROM Users", result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_CteMatched_MaterializedAndRemoved()
+        {
+            var stmt = Stmt.Parse("WITH cte AS (SELECT * FROM T) SELECT * FROM cte");
+            string result = stmt.ReplaceWithTempTables("cte").ToSource();
+
+            Assert.Equal(
+                "WITH cte AS (SELECT * FROM T) SELECT * INTO #cte FROM cte;\n" +
+                "SELECT * FROM #cte",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_CteWithPrerequisites_IncludesPrerequisitesInSelectInto()
+        {
+            var stmt = Stmt.Parse(
+                "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A WHERE x > 1) SELECT * FROM B");
+            string result = stmt.ReplaceWithTempTables("B").ToSource();
+
+            Assert.Equal(
+                "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A WHERE x > 1) SELECT * INTO #B FROM B;\n" +
+                "WITH A AS (SELECT * FROM T) SELECT * FROM #B",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_MixedCteAndRegularTable()
+        {
+            var stmt = Stmt.Parse(
+                "WITH cte AS (SELECT t.Id FROM TableA t) SELECT c.Id FROM cte c JOIN TableB b ON c.Id = b.CteId");
+            string result = stmt.ReplaceWithTempTables("cte", "TableA").ToSource();
+
+            Assert.Equal(
+                "SELECT Id INTO #TableA FROM TableA;\n" +
+                "WITH cte AS (SELECT t.Id FROM #TableA t) SELECT * INTO #cte FROM cte;\n" +
+                "SELECT c.Id FROM #cte c JOIN TableB b ON c.Id = b.CteId",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_AllCtesRemoved_NoWithClause()
+        {
+            var stmt = Stmt.Parse(
+                "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A) SELECT * FROM B");
+            string result = stmt.ReplaceWithTempTables("A", "B").ToSource();
+
+            Assert.Equal(
+                "WITH A AS (SELECT * FROM T) SELECT * INTO #A FROM A;\n" +
+                "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM #A) SELECT * INTO #B FROM B;\n" +
+                "SELECT * FROM #B",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_PartialCteRemoval_RemainingCtesKept()
+        {
+            var stmt = Stmt.Parse(
+                "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A) SELECT * FROM A CROSS JOIN B");
+            string result = stmt.ReplaceWithTempTables("B").ToSource();
+
+            Assert.Equal(
+                "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A) SELECT * INTO #B FROM B;\n" +
+                "WITH A AS (SELECT * FROM T) SELECT * FROM A CROSS JOIN #B",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_ColumnsFromJoinOn_IncludedInSelectInto()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE o.Total > 100");
+            string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT UserId, Total INTO #Orders FROM Orders;\n" +
+                "SELECT u.Name FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId WHERE o.Total > 100",
+                result);
+        }
+
+        #endregion
     }
 }
 

@@ -89,6 +89,19 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         /// <summary>
+        /// Replaces all matching table references with temp table references (#TableName)
+        /// and prepends SELECT INTO statements to materialize the data.
+        /// Regular tables get column-specific SELECT INTOs (only columns referenced across all clauses).
+        /// CTE matches get materialized via SELECT * INTO with prerequisite CTEs.
+        /// Matched CTE definitions are removed from the output query.
+        /// </summary>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        public static Script ReplaceWithTempTables(this Stmt stmt, params string[] tableNames)
+        {
+            return TempTableReplacer.Replace(stmt, tableNames);
+        }
+
+        /// <summary>
         /// Collects all table references and qualified joins found in this statement.
         /// </summary>
         /// <remarks>This method does not modify the statement.</remarks>
