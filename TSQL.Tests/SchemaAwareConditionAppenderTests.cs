@@ -591,5 +591,87 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Parameterized Overload
+
+        [Fact]
+        public void Parameterized_BasicSubstitution()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
+                out var parameters, new object[] { 42 });
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(42, parameters["@P0"]);
+        }
+
+        [Fact]
+        public void Parameterized_NamedValues()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = @TenantId", CreateChecker(schema),
+                out var parameters, new object[] { ("@TenantId", 99) });
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @TenantId", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(99, parameters["@TenantId"]);
+        }
+
+        [Fact]
+        public void Parameterized_CollisionWithExistingVariable()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.NAME = @P0");
+            var schema = Schema(("T1", new[] { "NAME", "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
+                out var parameters, new object[] { 7 });
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.NAME = @P0 AND T1.I_ID = @P0_1", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(7, parameters["@P0_1"]);
+        }
+
+        [Fact]
+        public void Parameterized_WithColumnPrefixing_JoinBothTablesMatch()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
+            var schema = Schema(
+                ("T1", new[] { "ID", "I_ID" }),
+                ("T2", new[] { "ID", "T1_ID", "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = @Filter", CreateChecker(schema),
+                out var parameters, new object[] { ("@Filter", 5) });
+
+            Assert.Equal(
+                "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = @Filter AND T2.I_ID = @Filter",
+                stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(5, parameters["@Filter"]);
+        }
+
+        [Fact]
+        public void Parameterized_Chaining_MultipleCallsWithParameters()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            var schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
+                out var p1, new object[] { 1 });
+            stmt.AddSchemaAwareCondition("STATUS = @P0", CreateChecker(schema),
+                out var p2, new object[] { 2 });
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0 AND T1.STATUS = @P0_1", stmt.ToSource());
+            Assert.Single(p1);
+            Assert.Equal(1, p1["@P0"]);
+            Assert.Single(p2);
+            Assert.Equal(2, p2["@P0_1"]);
+        }
+
+        #endregion
     }
 }

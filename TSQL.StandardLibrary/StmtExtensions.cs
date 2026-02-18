@@ -66,6 +66,29 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         /// <summary>
+        /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
+        /// that contain all referenced columns (verified via the <paramref name="columnExists"/> callback).
+        /// Variables in the condition that collide with existing variables in the statement
+        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
+        /// Unprefixed column references are automatically prefixed with the table alias/name.
+        /// Defaults to all query levels (outermost + subqueries + CTEs).
+        /// </summary>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
+            ColumnExistenceChecker columnExists,
+            out IReadOnlyDictionary<string, object> parameters,
+            IEnumerable<object> values,
+            WhereClauseTarget target = WhereClauseTarget.All)
+        {
+            (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
+                = ConditionParameterResolver.Resolve(stmt, condition, values);
+            parameters = resolvedParams;
+            SchemaAwareConditionAppender.AddCondition(stmt, resolvedCondition, columnExists, target);
+            return stmt;
+        }
+
+        /// <summary>
         /// Collects all table references and qualified joins found in this statement.
         /// </summary>
         /// <remarks>This method does not modify the statement.</remarks>
