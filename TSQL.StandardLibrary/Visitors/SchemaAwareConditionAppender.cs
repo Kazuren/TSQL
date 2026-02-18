@@ -122,7 +122,7 @@ namespace TSQL.StandardLibrary.Visitors
                 if (source is TableReference tableRef)
                 {
                     string physicalName = tableRef.TableName.ObjectName.Name;
-                    string effectiveName = tableRef.Alias != null ? tableRef.Alias.Name : physicalName;
+                    string effectiveName = tableRef.Alias != null ? tableRef.Alias.Lexeme : tableRef.TableName.ObjectName.Lexeme;
                     results.Add((tableRef, physicalName, effectiveName));
                 }
                 else if (source is QualifiedJoin qualifiedJoin)

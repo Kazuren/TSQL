@@ -880,6 +880,7 @@ namespace TSQL
     public abstract class SqlName : SyntaxElement
     {
         public string Name { get; }
+        public string Lexeme { get => _token.Lexeme; }
         private readonly Token _token;
 
         protected SqlName(string name)
@@ -890,7 +891,7 @@ namespace TSQL
 
         internal SqlName(Token token)
         {
-            Name = token.Lexeme;
+            Name = token.IdentifierName;
             _token = token;
         }
 

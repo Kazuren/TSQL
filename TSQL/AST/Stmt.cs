@@ -304,7 +304,7 @@ namespace TSQL
     {
         public string Name
         {
-            get => _nameToken.Lexeme;
+            get => _nameToken.IdentifierName;
             set { _nameToken = new ConcreteToken(TokenType.IDENTIFIER, value, null); }
         }
         public CteColumnNames ColumnNames { get; set; }
@@ -419,11 +419,13 @@ namespace TSQL
     public interface Alias : ISyntaxElement
     {
         string Name { get; }
+        string Lexeme { get; }
     }
 
     public class SuffixAlias : SyntaxElement, Alias
     {
-        public string Name { get => _nameToken.Lexeme; }
+        public string Name { get => _nameToken.IdentifierName; }
+        public string Lexeme { get => _nameToken.Lexeme; }
         internal Token _nameToken;
         internal Token _asKeyword;
 
@@ -454,7 +456,8 @@ namespace TSQL
 
     public class PrefixAlias : SyntaxElement, Alias
     {
-        public string Name { get => _nameToken.Lexeme; }
+        public string Name { get => _nameToken.IdentifierName; }
+        public string Lexeme { get => _nameToken.Lexeme; }
         internal Token _nameToken;
         internal Token _equalsToken;
 

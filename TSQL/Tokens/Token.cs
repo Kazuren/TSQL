@@ -107,6 +107,7 @@ namespace TSQL
         public TokenType Type { get; }
         public abstract string Lexeme { get; }
         public object Literal { get; }
+        internal string IdentifierName => (Literal as string) ?? Lexeme;
         public IReadOnlyList<Trivia> LeadingTrivia => GetTriviaList(_leadingTriviaSingle, _leadingTriviaList);
         public IReadOnlyList<Trivia> TrailingTrivia => GetTriviaList(_trailingTriviaSingle, _trailingTriviaList);
 

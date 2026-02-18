@@ -33,8 +33,8 @@ namespace TSQL.Tests
 
         private static Dictionary<string, HashSet<string>> Schema(params (string table, string[] columns)[] tables)
         {
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (table, columns) in tables)
+            Dictionary<string, HashSet<string>> result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach ((string? table, string[]? columns) in tables)
             {
                 result[table] = new HashSet<string>(columns, StringComparer.OrdinalIgnoreCase);
             }
@@ -48,7 +48,7 @@ namespace TSQL.Tests
         public void SingleTable_ColumnExists_AddsConditionWithPrefix()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", CreateChecker(schema));
 
@@ -59,7 +59,7 @@ namespace TSQL.Tests
         public void SingleTable_ColumnDoesNotExist_NoConditionAdded()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "OTHER_COL" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "OTHER_COL" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
 
@@ -70,7 +70,7 @@ namespace TSQL.Tests
         public void SingleTable_WithAlias_UseAliasAsPrefix()
         {
             Stmt stmt = Parse("SELECT * FROM T1 AS A");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
 
@@ -85,7 +85,7 @@ namespace TSQL.Tests
         public void Join_BothTablesHaveColumn_BothGetConditions()
         {
             Stmt stmt = Parse("SELECT T1.ID, T2.ID FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
@@ -100,7 +100,7 @@ namespace TSQL.Tests
         public void Join_OnlyOneTableHasColumn_OnlyThatTableGetsCondition()
         {
             Stmt stmt = Parse("SELECT T1.ID, T2.ID FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
@@ -115,7 +115,7 @@ namespace TSQL.Tests
         public void Join_NeitherTableHasColumn_NoConditionAdded()
         {
             Stmt stmt = Parse("SELECT T1.ID, T2.ID FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
@@ -130,7 +130,7 @@ namespace TSQL.Tests
         public void Join_WithAliases_UsesAliasesAsPrefix()
         {
             Stmt stmt = Parse("SELECT A.ID, B.ID FROM T1 AS A JOIN T2 AS B ON A.ID = B.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
@@ -149,7 +149,7 @@ namespace TSQL.Tests
         public void AlreadyPrefixed_FallsBackToRegularAddCondition()
         {
             Stmt stmt = Parse("SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
@@ -169,7 +169,7 @@ namespace TSQL.Tests
         public void FromSubquery_ConditionAddedToSubqueryTables()
         {
             Stmt stmt = Parse("SELECT * FROM (SELECT * FROM T1) AS Sub1");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
 
@@ -186,7 +186,7 @@ namespace TSQL.Tests
         public void InSubquery_ConditionAddedPerTargetFlags()
         {
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.ID IN (SELECT T2.ID FROM T2)");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
@@ -205,7 +205,7 @@ namespace TSQL.Tests
         public void ExistsSubquery_ConditionAddedToSubqueryTables()
         {
             Stmt stmt = Parse("SELECT * FROM T1 WHERE EXISTS (SELECT 1 FROM T2 WHERE T2.ID = T1.ID)");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
@@ -224,7 +224,7 @@ namespace TSQL.Tests
         public void Cte_ConditionAddedToCteAndOuterQuery()
         {
             Stmt stmt = Parse("WITH CTE AS (SELECT * FROM T1) SELECT * FROM CTE JOIN T2 ON CTE.ID = T2.ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
@@ -244,7 +244,7 @@ namespace TSQL.Tests
         public void OutermostQueryOnly_OnlyOuterQueryGetsCondition()
         {
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.ID IN (SELECT T2.ID FROM T2)");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
@@ -264,7 +264,7 @@ namespace TSQL.Tests
         public void Union_BothSidesGetConditions()
         {
             Stmt stmt = Parse("SELECT * FROM T1 UNION ALL SELECT * FROM T2");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "I_ID" }),
                 ("T2", new[] { "I_ID" }));
 
@@ -279,7 +279,7 @@ namespace TSQL.Tests
         public void Union_OnlyOneSideHasColumn()
         {
             Stmt stmt = Parse("SELECT * FROM T1 UNION ALL SELECT * FROM T2");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "I_ID" }),
                 ("T2", new[] { "OTHER" }));
 
@@ -300,7 +300,7 @@ namespace TSQL.Tests
             // T1.I_ID is already prefixed, STATUS is unprefixed.
             // T1.I_ID = 0 added once; STATUS = 1 added per matching table.
             Stmt stmt = Parse("SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID", "STATUS" }),
                 ("T2", new[] { "ID", "T1_ID", "STATUS" }));
 
@@ -317,7 +317,7 @@ namespace TSQL.Tests
             // T1.I_ID is already prefixed, STATUS is unprefixed.
             // Only T1 has STATUS. T1.I_ID = 0 added once, STATUS = 1 added for T1 only.
             Stmt stmt = Parse("SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID", "STATUS" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
@@ -334,7 +334,7 @@ namespace TSQL.Tests
             // T1.I_ID is already prefixed, STATUS is unprefixed.
             // Neither table has STATUS, but T1.I_ID = 0 should still be added.
             Stmt stmt = Parse("SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
@@ -354,7 +354,7 @@ namespace TSQL.Tests
         {
             Stmt stmt = Parse("SELECT * FROM T1");
             // Table only has I_ID, not STATUS
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0 AND STATUS = 1", CreateChecker(schema));
 
@@ -366,7 +366,7 @@ namespace TSQL.Tests
         public void MultipleColumnsInCondition_AllExist_ConditionAdded()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0 AND STATUS = 1", CreateChecker(schema));
 
@@ -381,7 +381,7 @@ namespace TSQL.Tests
         public void ExistingWhere_ConditionCombinedWithAnd()
         {
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.NAME = 'Test'");
-            var schema = Schema(("T1", new[] { "NAME", "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME", "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
 
@@ -396,7 +396,7 @@ namespace TSQL.Tests
         public void CrossJoin_BothTablesGetConditions()
         {
             Stmt stmt = Parse("SELECT * FROM T1 CROSS JOIN T2");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "I_ID" }),
                 ("T2", new[] { "I_ID" }));
 
@@ -413,7 +413,7 @@ namespace TSQL.Tests
         public void EmptyCondition_NoChange()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("", CreateChecker(schema));
 
@@ -424,7 +424,7 @@ namespace TSQL.Tests
         public void WhitespaceCondition_NoChange()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("   ", CreateChecker(schema));
 
@@ -439,7 +439,7 @@ namespace TSQL.Tests
         public void Like_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "NAME" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME" }));
 
             stmt.AddSchemaAwareCondition("NAME LIKE '%test%'", CreateChecker(schema));
 
@@ -450,7 +450,7 @@ namespace TSQL.Tests
         public void Between_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "AGE" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "AGE" }));
 
             stmt.AddSchemaAwareCondition("AGE BETWEEN 18 AND 65", CreateChecker(schema));
 
@@ -461,7 +461,7 @@ namespace TSQL.Tests
         public void IsNull_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
             stmt.AddSchemaAwareCondition("STATUS IS NULL", CreateChecker(schema));
 
@@ -472,7 +472,7 @@ namespace TSQL.Tests
         public void Freetext_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "DESCRIPTION" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "DESCRIPTION" }));
 
             stmt.AddSchemaAwareCondition("FREETEXT(DESCRIPTION, 'search')", CreateChecker(schema));
 
@@ -483,7 +483,7 @@ namespace TSQL.Tests
         public void InValueList_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
             stmt.AddSchemaAwareCondition("STATUS IN (1, 2, 3)", CreateChecker(schema));
 
@@ -494,7 +494,7 @@ namespace TSQL.Tests
         public void Quantifier_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "PRICE" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "PRICE" }));
 
             stmt.AddSchemaAwareCondition("PRICE > ALL (SELECT 1)", CreateChecker(schema));
 
@@ -505,7 +505,7 @@ namespace TSQL.Tests
         public void Exists_FallsBackToRegularAddCondition()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "ID" }));
 
             // EXISTS has no unprefixed columns — falls back to regular AddCondition
             stmt.AddSchemaAwareCondition("EXISTS (SELECT 1 FROM T2)", CreateChecker(schema));
@@ -517,7 +517,7 @@ namespace TSQL.Tests
         public void PredicateGrouping_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
             stmt.AddSchemaAwareCondition("(STATUS = 1)", CreateChecker(schema));
 
@@ -528,7 +528,7 @@ namespace TSQL.Tests
         public void And_AllColumnsGetPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS", "AGE" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS", "AGE" }));
 
             stmt.AddSchemaAwareCondition("STATUS = 1 AND AGE > 18", CreateChecker(schema));
 
@@ -539,7 +539,7 @@ namespace TSQL.Tests
         public void Or_AllColumnsGetPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS", "AGE" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS", "AGE" }));
 
             stmt.AddSchemaAwareCondition("STATUS = 1 OR AGE > 18", CreateChecker(schema));
 
@@ -550,7 +550,7 @@ namespace TSQL.Tests
         public void Not_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
             stmt.AddSchemaAwareCondition("NOT STATUS = 1", CreateChecker(schema));
 
@@ -561,7 +561,7 @@ namespace TSQL.Tests
         public void Contains_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "DESCRIPTION" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "DESCRIPTION" }));
 
             stmt.AddSchemaAwareCondition("CONTAINS(DESCRIPTION, 'search')", CreateChecker(schema));
 
@@ -572,7 +572,7 @@ namespace TSQL.Tests
         public void InSubquery_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
             stmt.AddSchemaAwareCondition("STATUS IN (SELECT STATUS FROM T2)", CreateChecker(schema));
 
@@ -583,7 +583,7 @@ namespace TSQL.Tests
         public void LikeWithEscape_ColumnGetsPrefixed()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "NAME" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME" }));
 
             stmt.AddSchemaAwareCondition("NAME LIKE '%[_]test' ESCAPE '['", CreateChecker(schema));
 
@@ -598,10 +598,10 @@ namespace TSQL.Tests
         public void Parameterized_BasicSubstitution()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
-                out var parameters, new object[] { 42 });
+                out IReadOnlyDictionary<string, object>? parameters, new object[] { 42 });
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -612,10 +612,10 @@ namespace TSQL.Tests
         public void Parameterized_NamedValues()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = @TenantId", CreateChecker(schema),
-                out var parameters, new object[] { ("@TenantId", 99) });
+                out IReadOnlyDictionary<string, object>? parameters, new object[] { ("@TenantId", 99) });
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @TenantId", stmt.ToSource());
             Assert.Single(parameters);
@@ -626,10 +626,10 @@ namespace TSQL.Tests
         public void Parameterized_CollisionWithExistingVariable()
         {
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.NAME = @P0");
-            var schema = Schema(("T1", new[] { "NAME", "I_ID" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME", "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
-                out var parameters, new object[] { 7 });
+                out IReadOnlyDictionary<string, object>? parameters, new object[] { 7 });
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.NAME = @P0 AND T1.I_ID = @P0_1", stmt.ToSource());
             Assert.Single(parameters);
@@ -640,12 +640,12 @@ namespace TSQL.Tests
         public void Parameterized_WithColumnPrefixing_JoinBothTablesMatch()
         {
             Stmt stmt = Parse("SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID");
-            var schema = Schema(
+            Dictionary<string, HashSet<string>> schema = Schema(
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = @Filter", CreateChecker(schema),
-                out var parameters, new object[] { ("@Filter", 5) });
+                out IReadOnlyDictionary<string, object>? parameters, new object[] { ("@Filter", 5) });
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = @Filter AND T2.I_ID = @Filter",
@@ -658,18 +658,55 @@ namespace TSQL.Tests
         public void Parameterized_Chaining_MultipleCallsWithParameters()
         {
             Stmt stmt = Parse("SELECT * FROM T1");
-            var schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
 
             stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
-                out var p1, new object[] { 1 });
+                out IReadOnlyDictionary<string, object>? p1, new object[] { 1 });
             stmt.AddSchemaAwareCondition("STATUS = @P0", CreateChecker(schema),
-                out var p2, new object[] { 2 });
+                out IReadOnlyDictionary<string, object>? p2, new object[] { 2 });
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0 AND T1.STATUS = @P0_1", stmt.ToSource());
             Assert.Single(p1);
             Assert.Equal(1, p1["@P0"]);
             Assert.Single(p2);
             Assert.Equal(2, p2["@P0_1"]);
+        }
+
+        #endregion
+
+        #region Bracketed Table Names
+
+        [Fact]
+        public void BracketedTableName_MatchesSchemaCallback_AddsCondition()
+        {
+            Stmt stmt = Parse("SELECT * FROM [FROM]");
+            Dictionary<string, HashSet<string>> schema = Schema(("FROM", new[] { "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM [FROM] WHERE [FROM].I_ID = 0", stmt.ToSource());
+        }
+
+        [Fact]
+        public void BracketedTableName_WithAlias_UsesAliasAsPrefix()
+        {
+            Stmt stmt = Parse("SELECT * FROM [T1] AS [A]");
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM [T1] AS [A] WHERE [A].I_ID = 0", stmt.ToSource());
+        }
+
+        [Fact]
+        public void UnbracketedTableName_PrefixHasNoBrackets()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
+
+            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+
+            Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = 0", stmt.ToSource());
         }
 
         #endregion

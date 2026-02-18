@@ -3295,5 +3295,127 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Bracket/Quote Normalization
+
+        [Fact]
+        public void Parse_BracketedTableName_NameIsNormalized()
+        {
+            var select = Stmt.ParseSelect("SELECT * FROM [users]");
+            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Assert.Equal("users", tableRef.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_BracketedTableName_LexemePreservesBrackets()
+        {
+            var select = Stmt.ParseSelect("SELECT * FROM [users]");
+            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Assert.Equal("[users]", tableRef.TableName.ObjectName.Lexeme);
+        }
+
+        [Fact]
+        public void Parse_BracketedTableName_ToSourcePreservesBrackets()
+        {
+            string source = "SELECT * FROM [users]";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_BracketedSchemaAndTable_NamesAreNormalized()
+        {
+            var select = Stmt.ParseSelect("SELECT * FROM [dbo].[MyTable]");
+            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
+            Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_BracketedSchemaAndTable_ToSourcePreservesBrackets()
+        {
+            string source = "SELECT * FROM [dbo].[MyTable]";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_BracketedColumnName_NameIsNormalized()
+        {
+            var select = Stmt.ParseSelect("SELECT [Col] FROM T");
+            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            Assert.Equal("Col", columnId.ColumnName.Name);
+        }
+
+        [Fact]
+        public void Parse_BracketedColumnName_ToSourcePreservesBrackets()
+        {
+            string source = "SELECT [Col] FROM T";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_BracketedAlias_NameIsNormalized()
+        {
+            var select = Stmt.ParseSelect("SELECT * FROM T1 AS [A]");
+            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Assert.Equal("A", tableRef.Alias.Name);
+        }
+
+        [Fact]
+        public void Parse_BracketedAlias_LexemePreservesBrackets()
+        {
+            var select = Stmt.ParseSelect("SELECT * FROM T1 AS [A]");
+            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Assert.Equal("[A]", tableRef.Alias.Lexeme);
+        }
+
+        [Fact]
+        public void Parse_BracketedAlias_ToSourcePreservesBrackets()
+        {
+            string source = "SELECT * FROM T1 AS [A]";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_BracketedCteName_NameIsNormalized()
+        {
+            var stmt = Stmt.ParseSelect("WITH [MyCTE] AS (SELECT a FROM T) SELECT a FROM MyCTE");
+            Assert.Equal("MyCTE", stmt.CteStmt.Ctes[0].Name);
+        }
+
+        [Fact]
+        public void Parse_BracketedCteName_ToSourcePreservesBrackets()
+        {
+            string source = "WITH [MyCTE] AS (SELECT a FROM T) SELECT a FROM MyCTE";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_MixedBracketedAndUnbracketed_AllNamesNormalized()
+        {
+            var select = Stmt.ParseSelect("SELECT [a], b FROM [dbo].[T1]");
+            var expr = SelectExpressionOf(select);
+
+            var col0 = Assert.IsType<SelectColumn>(expr.Columns[0]);
+            var colId0 = Assert.IsType<Expr.ColumnIdentifier>(col0.Expression);
+            Assert.Equal("a", colId0.ColumnName.Name);
+
+            var col1 = Assert.IsType<SelectColumn>(expr.Columns[1]);
+            var colId1 = Assert.IsType<Expr.ColumnIdentifier>(col1.Expression);
+            Assert.Equal("b", colId1.ColumnName.Name);
+
+            var tableRef = Assert.IsType<TableReference>(expr.From.TableSources[0]);
+            Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
+            Assert.Equal("T1", tableRef.TableName.ObjectName.Name);
+        }
+
+        [Fact]
+        public void Parse_MixedBracketedAndUnbracketed_ToSourcePreservesBrackets()
+        {
+            string source = "SELECT [a], b FROM [dbo].[T1]";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
     }
 }
