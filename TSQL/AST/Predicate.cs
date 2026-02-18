@@ -4,6 +4,7 @@ namespace TSQL.AST
 {
     public enum ComparisonOperator { Equal, NotEqual, LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual, NotLessThan, NotGreaterThan }
     public enum QuantifierType { All, Any, Some }
+    public enum Negation { NotNegated, Negated }
 
     public abstract class Predicate : SyntaxElement
     {
@@ -11,7 +12,7 @@ namespace TSQL.AST
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Predicate ParsePredicate(string sql)
         {
-            return new Parser(new Scanner(sql).ScanTokens()).ParseSearchCondition();
+            return Parser.CreateParser(sql).ParseSearchCondition();
         }
 
         public abstract T Accept<T>(Visitor<T> visitor);
@@ -91,11 +92,9 @@ namespace TSQL.AST
                 set
                 {
                     _operator = value;
-                    _operatorToken = new ConcreteToken(
+                    _operatorToken = ConcreteToken.WithLeadingSpace(
                         ComparisonOperatorToTokenType(value),
-                        ComparisonOperatorToLexeme(value),
-                        null);
-                    _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                        ComparisonOperatorToLexeme(value));
                 }
             }
             private Expr _right;
@@ -111,11 +110,9 @@ namespace TSQL.AST
             {
                 _left = left;
                 _operator = op;
-                _operatorToken = new ConcreteToken(
+                _operatorToken = ConcreteToken.WithLeadingSpace(
                     ComparisonOperatorToTokenType(op),
-                    ComparisonOperatorToLexeme(op),
-                    null);
-                _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                    ComparisonOperatorToLexeme(op));
                 _right = right;
             }
 
@@ -163,13 +160,13 @@ namespace TSQL.AST
                 get => _escapeExpr;
                 set => SetWithTrivia(ref _escapeExpr, value);
             }
-            public bool Negated { get; set; }
+            public Negation Negated { get; set; }
 
             internal Token _notToken;
             internal Token _likeToken;
             internal Token _escapeToken;
 
-            public Like(Expr left, Expr pattern, Expr escapeExpr, bool negated)
+            public Like(Expr left, Expr pattern, Expr escapeExpr, Negation negated)
             {
                 _left = left;
                 _pattern = pattern;
@@ -221,13 +218,13 @@ namespace TSQL.AST
                 get => _highRangeExpr;
                 set => SetWithTrivia(ref _highRangeExpr, value);
             }
-            public bool Negated { get; set; }
+            public Negation Negated { get; set; }
 
             internal Token _notToken;
             internal Token _betweenToken;
             internal Token _andToken;
 
-            public Between(Expr expr, Expr lowRangeExpr, Expr highRangeExpr, bool negated)
+            public Between(Expr expr, Expr lowRangeExpr, Expr highRangeExpr, Negation negated)
             {
                 _expr = expr;
                 _lowRangeExpr = lowRangeExpr;
@@ -264,13 +261,13 @@ namespace TSQL.AST
                 get => _expr;
                 set => SetWithTrivia(ref _expr, value);
             }
-            public bool Negated { get; set; }
+            public Negation Negated { get; set; }
 
             internal Token _isToken;
             internal Token _notToken;
             internal Token _nullToken;
 
-            public Null(Expr expr, bool negated)
+            public Null(Expr expr, Negation negated)
             {
                 _expr = expr;
                 Negated = negated;
@@ -449,7 +446,7 @@ namespace TSQL.AST
                 get => _expr;
                 set => SetWithTrivia(ref _expr, value);
             }
-            public bool Negated { get; set; }
+            public Negation Negated { get; set; }
             public SyntaxElementList<Expr> ValueList { get; set; }
             private Expr.Subquery _subquery;
             public Expr.Subquery Subquery
@@ -463,14 +460,14 @@ namespace TSQL.AST
             internal Token _leftParen;
             internal Token _rightParen;
 
-            public In(Expr expr, bool negated, SyntaxElementList<Expr> valueList)
+            public In(Expr expr, Negation negated, SyntaxElementList<Expr> valueList)
             {
                 _expr = expr;
                 Negated = negated;
                 ValueList = valueList;
             }
 
-            public In(Expr expr, bool negated, Expr.Subquery subquery)
+            public In(Expr expr, Negation negated, Expr.Subquery subquery)
             {
                 _expr = expr;
                 Negated = negated;

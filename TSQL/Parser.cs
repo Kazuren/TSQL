@@ -343,6 +343,11 @@ namespace TSQL
             _tokens = tokens;
         }
 
+        internal static Parser CreateParser(string sql)
+        {
+            return new Parser(new Scanner(sql).ScanTokens());
+        }
+
         private void Reset()
         {
             _current = 0;
@@ -746,7 +751,7 @@ namespace TSQL
 
             if (Match(TokenType.DISTINCT))
             {
-                selectExpr.Distinct = true;
+                selectExpr.Quantifier = SetQuantifier.Distinct;
                 selectExpr._distinctKeyword = Previous();
             }
 
@@ -827,13 +832,13 @@ namespace TSQL
 
             if (Match(TokenType.PERCENT, out Token percentToken))
             {
-                top.Percent = true;
+                top.Modifiers |= TopModifier.Percent;
                 top._percentKeyword = percentToken;
             }
 
             if (Check(TokenType.WITH) && CheckNext(TokenType.TIES))
             {
-                top.WithTies = true;
+                top.Modifiers |= TopModifier.WithTies;
                 top._withKeyword = Advance();
                 top._tiesKeyword = Advance();
             }
@@ -2533,17 +2538,17 @@ namespace TSQL
             Expr expr = Expression();
 
             Token orderToken = null;
-            bool desc = false;
+            SortDirection direction = SortDirection.Ascending;
             if (Match(TokenType.DESC, out orderToken))
             {
-                desc = true;
+                direction = SortDirection.Descending;
             }
             else
             {
                 Match(TokenType.ASC, out orderToken);
             }
 
-            OrderByItem item = new OrderByItem { Expression = expr, Descending = desc };
+            OrderByItem item = new OrderByItem { Expression = expr, Direction = direction };
             item._orderToken = orderToken;
             return item;
         }
@@ -3670,11 +3675,11 @@ namespace TSQL
 
         #endregion
 
-        private (Token token, bool negated) TryConsumeNot()
+        private (Token token, AST.Negation negated) TryConsumeNot()
         {
             if (Match(TokenType.NOT, out Token notToken))
-                return (notToken, true);
-            return (null, false);
+                return (notToken, AST.Negation.Negated);
+            return (null, AST.Negation.NotNegated);
         }
 
         private Token Consume(TokenType type, string message)

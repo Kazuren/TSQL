@@ -60,7 +60,7 @@ namespace TSQL
             Token token = FirstToken();
             if (token == null) return;
             token.AddLeadingTrivia(new Comment("/* " + comment + " */"));
-            token.AddLeadingTrivia(new Whitespace(" "));
+            token.AddLeadingTrivia(Whitespace.Space);
         }
 
         public override string ToString()

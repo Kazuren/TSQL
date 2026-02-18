@@ -246,8 +246,7 @@ namespace TSQL
 
             public Wildcard()
             {
-                _wildcardToken = new ConcreteToken(TokenType.STAR, "*", null);
-                _wildcardToken.AddLeadingTrivia(new Whitespace(" "));
+                _wildcardToken = ConcreteToken.WithLeadingSpace(TokenType.STAR, "*");
             }
 
             internal Wildcard(Token wildcardToken)
@@ -497,11 +496,9 @@ namespace TSQL
                 set
                 {
                     _operator = value;
-                    _operatorToken = new ConcreteToken(
+                    _operatorToken = ConcreteToken.WithLeadingSpace(
                         ArithmeticOperatorToTokenType(value),
-                        ArithmeticOperatorToLexeme(value),
-                        null);
-                    _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                        ArithmeticOperatorToLexeme(value));
                 }
             }
             private Expr _right;
@@ -517,11 +514,9 @@ namespace TSQL
             {
                 _left = left;
                 _operator = op;
-                _operatorToken = new ConcreteToken(
+                _operatorToken = ConcreteToken.WithLeadingSpace(
                     ArithmeticOperatorToTokenType(op),
-                    ArithmeticOperatorToLexeme(op),
-                    null);
-                _operatorToken.AddLeadingTrivia(new Whitespace(" "));
+                    ArithmeticOperatorToLexeme(op));
                 _right = right;
             }
 
@@ -558,8 +553,7 @@ namespace TSQL
 
             public Variable(string name)
             {
-                _token = new ConcreteToken(TokenType.VARIABLE, name, null);
-                _token.AddLeadingTrivia(new Whitespace(" "));
+                _token = ConcreteToken.WithLeadingSpace(TokenType.VARIABLE, name);
             }
 
             internal Variable(Token token)
@@ -590,8 +584,7 @@ namespace TSQL
             public StringLiteral(string value)
             {
                 Value = value;
-                _token = new ConcreteToken(TokenType.STRING, "'" + value.Replace("'", "''") + "'", value);
-                _token.AddLeadingTrivia(new Whitespace(" "));
+                _token = ConcreteToken.WithLeadingSpace(TokenType.STRING, "'" + value.Replace("'", "''") + "'", value);
             }
 
             internal StringLiteral(Token token)
@@ -616,8 +609,7 @@ namespace TSQL
             public IntLiteral(int value)
             {
                 Value = value;
-                _token = new ConcreteToken(TokenType.WHOLE_NUMBER, value.ToString(), value);
-                _token.AddLeadingTrivia(new Whitespace(" "));
+                _token = ConcreteToken.WithLeadingSpace(TokenType.WHOLE_NUMBER, value.ToString(), value);
             }
 
             internal IntLiteral(Token token)
@@ -642,8 +634,7 @@ namespace TSQL
             public DecimalLiteral(decimal value)
             {
                 Value = value;
-                _token = new ConcreteToken(TokenType.DECIMAL, value.ToString(), value);
-                _token.AddLeadingTrivia(new Whitespace(" "));
+                _token = ConcreteToken.WithLeadingSpace(TokenType.DECIMAL, value.ToString(), value);
             }
 
             internal DecimalLiteral(Token token)
@@ -666,8 +657,7 @@ namespace TSQL
 
             public NullLiteral()
             {
-                _token = new ConcreteToken(TokenType.NULL, "NULL", null);
-                _token.AddLeadingTrivia(new Whitespace(" "));
+                _token = ConcreteToken.WithLeadingSpace(TokenType.NULL, "NULL");
             }
 
             internal NullLiteral(Token token)

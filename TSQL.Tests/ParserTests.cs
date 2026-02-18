@@ -793,7 +793,7 @@ namespace TSQL.Tests
             Assert.Single(windowFunc.Over.PartitionBy);
             Assert.NotNull(windowFunc.Over.OrderBy);
             Assert.Single(windowFunc.Over.OrderBy);
-            Assert.True(windowFunc.Over.OrderBy[0].Descending);
+            Assert.Equal(SortDirection.Descending, windowFunc.Over.OrderBy[0].Direction);
         }
 
         [Fact]
@@ -1042,7 +1042,7 @@ namespace TSQL.Tests
 
             // Assert
             var nullPred = Assert.IsType<AST.Predicate.Null>(SelectExpressionOf(select).Where);
-            Assert.False(nullPred.Negated);
+            Assert.Equal(AST.Negation.NotNegated, nullPred.Negated);
         }
 
         [Fact]
@@ -1053,7 +1053,7 @@ namespace TSQL.Tests
 
             // Assert
             var nullPred = Assert.IsType<AST.Predicate.Null>(SelectExpressionOf(select).Where);
-            Assert.True(nullPred.Negated);
+            Assert.Equal(AST.Negation.Negated, nullPred.Negated);
         }
 
         [Fact]
@@ -1082,7 +1082,7 @@ namespace TSQL.Tests
             var select = Stmt.ParseSelect("SELECT a FROM T WHERE a LIKE '%test%'");
 
             var likePred = Assert.IsType<AST.Predicate.Like>(SelectExpressionOf(select).Where);
-            Assert.False(likePred.Negated);
+            Assert.Equal(AST.Negation.NotNegated, likePred.Negated);
             Assert.IsType<Expr.ColumnIdentifier>(likePred.Left);
             Assert.IsType<Expr.StringLiteral>(likePred.Pattern);
         }
@@ -1093,7 +1093,7 @@ namespace TSQL.Tests
             var select = Stmt.ParseSelect("SELECT a FROM T WHERE a BETWEEN 1 AND 10");
 
             var between = Assert.IsType<AST.Predicate.Between>(SelectExpressionOf(select).Where);
-            Assert.False(between.Negated);
+            Assert.Equal(AST.Negation.NotNegated, between.Negated);
         }
 
         [Fact]
@@ -1102,7 +1102,7 @@ namespace TSQL.Tests
             var select = Stmt.ParseSelect("SELECT a FROM T WHERE a IN (1, 2, 3)");
 
             var inPred = Assert.IsType<AST.Predicate.In>(SelectExpressionOf(select).Where);
-            Assert.False(inPred.Negated);
+            Assert.Equal(AST.Negation.NotNegated, inPred.Negated);
             Assert.NotNull(inPred.ValueList);
             Assert.Equal(3, inPred.ValueList.Count);
         }
@@ -1609,8 +1609,8 @@ namespace TSQL.Tests
 
             Assert.NotNull(orderBy);
             Assert.Equal(2, orderBy.Items.Count);
-            Assert.False(orderBy.Items[0].Descending);
-            Assert.True(orderBy.Items[1].Descending);
+            Assert.Equal(SortDirection.Ascending, orderBy.Items[0].Direction);
+            Assert.Equal(SortDirection.Descending, orderBy.Items[1].Direction);
         }
 
         [Fact]

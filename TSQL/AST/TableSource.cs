@@ -22,8 +22,7 @@ namespace TSQL
 
         public FromClause()
         {
-            _fromToken = new ConcreteToken(TokenType.FROM, "FROM", null);
-            _fromToken.AddLeadingTrivia(new Whitespace(" "));
+            _fromToken = ConcreteToken.WithLeadingSpace(TokenType.FROM, "FROM");
         }
 
         internal FromClause(Token fromToken)

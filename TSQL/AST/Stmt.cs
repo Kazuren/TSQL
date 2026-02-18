@@ -10,30 +10,21 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Stmt Parse(string sql)
         {
-            Scanner scanner = new Scanner(sql);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
+            return Parser.CreateParser(sql).Parse();
         }
 
         /// <summary>Parses a SQL SELECT statement from the given string.</summary>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Select ParseSelect(string sql)
         {
-            Scanner scanner = new Scanner(sql);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.ParseSelect();
+            return Parser.CreateParser(sql).ParseSelect();
         }
 
         /// <summary>Parses a SQL INSERT statement from the given string.</summary>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Insert ParseInsert(string sql)
         {
-            Scanner scanner = new Scanner(sql);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.ParseInsert();
+            return Parser.CreateParser(sql).ParseInsert();
         }
 
         public abstract T Accept<T>(Visitor<T> visitor);
@@ -264,10 +255,7 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Script Parse(string sql)
         {
-            Scanner scanner = new Scanner(sql);
-            List<SourceToken> tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.ParseScript();
+            return Parser.CreateParser(sql).ParseScript();
         }
 
         internal Script(IReadOnlyList<Stmt> statements, List<Token> semicolons)
@@ -441,12 +429,10 @@ namespace TSQL
 
         public SuffixAlias(string name, bool useAs = true)
         {
-            _nameToken = new ConcreteToken(TokenType.IDENTIFIER, name, null);
-            _nameToken.AddLeadingTrivia(new Whitespace(" "));
+            _nameToken = ConcreteToken.WithLeadingSpace(TokenType.IDENTIFIER, name);
             if (useAs)
             {
-                _asKeyword = new ConcreteToken(TokenType.AS, "AS", null);
-                _asKeyword.AddLeadingTrivia(new Whitespace(" "));
+                _asKeyword = ConcreteToken.WithLeadingSpace(TokenType.AS, "AS");
             }
         }
 
@@ -475,8 +461,7 @@ namespace TSQL
         public PrefixAlias(string name)
         {
             _nameToken = new ConcreteToken(TokenType.IDENTIFIER, name, null);
-            _equalsToken = new ConcreteToken(TokenType.EQUAL, "=", null);
-            _equalsToken.AddLeadingTrivia(new Whitespace(" "));
+            _equalsToken = ConcreteToken.WithLeadingSpace(TokenType.EQUAL, "=");
         }
 
         internal PrefixAlias(Token name, Token equalsToken)
@@ -494,6 +479,10 @@ namespace TSQL
     #endregion
 
     #region TOP Clause
+
+    [System.Flags]
+    public enum TopModifier { None = 0, Percent = 1, WithTies = 2 }
+
     public class TopClause : SyntaxElement
     {
         private Expr _expression;
@@ -502,8 +491,7 @@ namespace TSQL
             get => _expression;
             set => SetWithTrivia(ref _expression, value);
         }
-        public bool Percent { get; set; }
-        public bool WithTies { get; set; }
+        public TopModifier Modifiers { get; set; }
 
         public TopClause(Expr expr)
         {

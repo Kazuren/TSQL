@@ -228,6 +228,8 @@ namespace TSQL
 
     #region ORDER BY
 
+    public enum SortDirection { Ascending, Descending }
+
     public class OrderByClause : SyntaxElement
     {
         public SyntaxElementList<OrderByItem> Items { get; set; } = new SyntaxElementList<OrderByItem>();
@@ -278,7 +280,7 @@ namespace TSQL
             get => _expression;
             set => SetWithTrivia(ref _expression, value);
         }
-        public bool Descending { get; set; }
+        public SortDirection Direction { get; set; }
 
 
         // ASC, DESC
@@ -311,10 +313,8 @@ namespace TSQL
 
         public GroupByClause(SyntaxElementList<GroupByItem> items)
         {
-            _groupKeyword = new ConcreteToken(TokenType.GROUP, "GROUP", null);
-            _groupKeyword.AddLeadingTrivia(new Whitespace(" "));
-            _byKeyword = new ConcreteToken(TokenType.BY, "BY", null);
-            _byKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _groupKeyword = ConcreteToken.WithLeadingSpace(TokenType.GROUP, "GROUP");
+            _byKeyword = ConcreteToken.WithLeadingSpace(TokenType.BY, "BY");
             Items = items;
         }
 
@@ -416,8 +416,7 @@ namespace TSQL
 
         public GroupByRollup(SyntaxElementList<GroupByItem> items)
         {
-            _rollupKeyword = new ConcreteToken(TokenType.ROLLUP, "ROLLUP", null);
-            _rollupKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _rollupKeyword = ConcreteToken.WithLeadingSpace(TokenType.ROLLUP, "ROLLUP");
             _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
             Items = items;
             _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
@@ -451,8 +450,7 @@ namespace TSQL
 
         public GroupByCube(SyntaxElementList<GroupByItem> items)
         {
-            _cubeKeyword = new ConcreteToken(TokenType.CUBE, "CUBE", null);
-            _cubeKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _cubeKeyword = ConcreteToken.WithLeadingSpace(TokenType.CUBE, "CUBE");
             _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
             Items = items;
             _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
@@ -487,10 +485,8 @@ namespace TSQL
 
         public GroupByGroupingSets(SyntaxElementList<GroupByItem> items)
         {
-            _groupingKeyword = new ConcreteToken(TokenType.GROUPING, "GROUPING", null);
-            _groupingKeyword.AddLeadingTrivia(new Whitespace(" "));
-            _setsKeyword = new ConcreteToken(TokenType.SETS, "SETS", null);
-            _setsKeyword.AddLeadingTrivia(new Whitespace(" "));
+            _groupingKeyword = ConcreteToken.WithLeadingSpace(TokenType.GROUPING, "GROUPING");
+            _setsKeyword = ConcreteToken.WithLeadingSpace(TokenType.SETS, "SETS");
             _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
             Items = items;
             _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
@@ -647,6 +643,7 @@ namespace TSQL
     #region Query Expressions
 
     public enum SetOperationType { Union, UnionAll, Intersect, Except }
+    public enum SetQuantifier { All, Distinct }
 
     public abstract class QueryExpression : SyntaxElement
     {
@@ -656,7 +653,7 @@ namespace TSQL
 
     public class SelectExpression : QueryExpression
     {
-        public bool Distinct { get; set; }
+        public SetQuantifier Quantifier { get; set; }
         public TopClause Top { get; set; }
         public SyntaxElementList<SelectItem> Columns { get; set; }
         public Expr.ObjectIdentifier Into { get; set; }
@@ -692,12 +689,11 @@ namespace TSQL
         {
             if (Where == null)
             {
-                _whereKeyword = new ConcreteToken(TokenType.WHERE, "WHERE", null);
-                _whereKeyword.AddLeadingTrivia(new Whitespace(" "));
+                _whereKeyword = ConcreteToken.WithLeadingSpace(TokenType.WHERE, "WHERE");
 
                 Token conditionFirst = FirstTokenOf(condition);
                 conditionFirst.ClearLeadingTrivia();
-                conditionFirst.AddLeadingTrivia(new Whitespace(" "));
+                conditionFirst.AddLeadingTrivia(Whitespace.Space);
 
                 _where = condition;
             }
@@ -717,10 +713,9 @@ namespace TSQL
 
                 Token conditionFirst = FirstTokenOf(condition);
                 conditionFirst.ClearLeadingTrivia();
-                conditionFirst.AddLeadingTrivia(new Whitespace(" "));
+                conditionFirst.AddLeadingTrivia(Whitespace.Space);
 
-                var andToken = new ConcreteToken(TokenType.AND, "AND", null);
-                andToken.AddLeadingTrivia(new Whitespace(" "));
+                var andToken = ConcreteToken.WithLeadingSpace(TokenType.AND, "AND");
 
                 var andPredicate = new AST.Predicate.And(existing, condition);
                 andPredicate._andToken = andToken;
@@ -890,8 +885,7 @@ namespace TSQL
         protected SqlName(string name)
         {
             Name = name;
-            _token = new ConcreteToken(TokenType.IDENTIFIER, name, null);
-            _token.AddLeadingTrivia(new Whitespace(" "));
+            _token = ConcreteToken.WithLeadingSpace(TokenType.IDENTIFIER, name);
         }
 
         internal SqlName(Token token)

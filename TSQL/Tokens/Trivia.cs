@@ -13,21 +13,21 @@ namespace TSQL
         void AppendTo(StringBuilder sb);
     }
 
-    public class Whitespace : Trivia
+    public abstract class TriviaBase : Trivia
     {
         private readonly string _source;
         private readonly int _start;
         private readonly int _length;
         private string _contentCache;
 
-        public Whitespace(string source, int start, int length)
+        protected TriviaBase(string source, int start, int length)
         {
             _source = source;
             _start = start;
             _length = length;
         }
 
-        public Whitespace(string content)
+        protected TriviaBase(string content)
         {
             _source = content;
             _start = 0;
@@ -53,43 +53,17 @@ namespace TSQL
         }
     }
 
-    public class Comment : Trivia
+    public class Whitespace : TriviaBase
     {
-        private readonly string _source;
-        private readonly int _start;
-        private readonly int _length;
-        private string _contentCache;
+        internal static readonly Whitespace Space = new Whitespace(" ");
 
-        public Comment(string source, int start, int length)
-        {
-            _source = source;
-            _start = start;
-            _length = length;
-        }
+        public Whitespace(string source, int start, int length) : base(source, start, length) { }
+        public Whitespace(string content) : base(content) { }
+    }
 
-        public Comment(string content)
-        {
-            _source = content;
-            _start = 0;
-            _length = content.Length;
-            _contentCache = content;
-        }
-
-        public string Content
-        {
-            get
-            {
-                if (_contentCache == null)
-                {
-                    _contentCache = _source.Substring(_start, _length);
-                }
-                return _contentCache;
-            }
-        }
-
-        public void AppendTo(StringBuilder sb)
-        {
-            sb.Append(_source, _start, _length);
-        }
+    public class Comment : TriviaBase
+    {
+        public Comment(string source, int start, int length) : base(source, start, length) { }
+        public Comment(string content) : base(content) { }
     }
 }

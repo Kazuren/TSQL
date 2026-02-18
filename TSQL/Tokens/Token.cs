@@ -30,6 +30,13 @@ namespace TSQL
             _lexeme = lexeme;
         }
 
+        internal static ConcreteToken WithLeadingSpace(TokenType type, string lexeme, object literal = null)
+        {
+            var token = new ConcreteToken(type, lexeme, literal);
+            token.AddLeadingTrivia(Whitespace.Space);
+            return token;
+        }
+
         public override string Lexeme => _lexeme;
     }
 
