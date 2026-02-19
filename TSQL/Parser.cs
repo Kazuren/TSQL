@@ -223,29 +223,26 @@ namespace TSQL
         /// <summary>1-based line number where the error occurred, or null if unavailable.</summary>
         public int? Line { get; }
 
-        /// <summary>0-based character offset from the start of the source where the error occurred, or null if unavailable.</summary>
-        public int? Position { get; }
+        /// <summary>0-based column number within the line where the error occurred, or null if unavailable.</summary>
+        public int? Column { get; }
 
-        /// <summary>The original SQL text being parsed.</summary>
+        /// <summary>The original SQL text being parsed, or null if unavailable.</summary>
         public string SqlText { get; }
 
         public ParseError(string message) : base(message)
         {
         }
 
-        public ParseError(string message, int line, int position, string sqlText)
-            : base(message)
+        public ParseError(string message, int line, int column, string sqlText)
+            : this(message, line, column, sqlText, null)
         {
-            Line = line;
-            Position = position;
-            SqlText = sqlText;
         }
 
-        public ParseError(string message, int line, int position, string sqlText, Exception innerException)
+        public ParseError(string message, int line, int column, string sqlText, Exception innerException)
             : base(message, innerException)
         {
             Line = line;
-            Position = position;
+            Column = column;
             SqlText = sqlText;
         }
     }
@@ -3885,10 +3882,11 @@ namespace TSQL
             if (token is SourceToken sourceToken)
             {
                 int line = sourceToken.Line;
-                int columnStart = sourceToken.StartPosition;
-                int columnEnd = sourceToken.EndPosition;
-                string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {columnStart}:{columnEnd}. Token: {sourceToken.Type}";
-                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}", line, columnStart, sourceToken.Source);
+                int startColumn = sourceToken.StartColumn;
+                int endColumn = sourceToken.EndColumn;
+                string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {startColumn}:{endColumn}. Token: {sourceToken.Type}";
+
+                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}", line, startColumn, sourceToken.Source);
             }
             else
             {

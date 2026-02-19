@@ -999,8 +999,18 @@ namespace TSQL.Tests
             ParseError ex = Assert.Throws<ParseError>(() => Stmt.Parse(sql));
 
             Assert.NotNull(ex.Line);
-            Assert.NotNull(ex.Position);
+            Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
+        }
+
+        [Fact]
+        public void Parse_Error_MultiLine_ReportsCorrectColumn()
+        {
+            string sql = "SELECT\n  FROM";
+            ParseError ex = Assert.Throws<ParseError>(() => Stmt.Parse(sql));
+
+            Assert.Equal(2, ex.Line);
+            Assert.Equal(2, ex.Column);
         }
 
         // === Round-Trip Tests ===

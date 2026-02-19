@@ -185,7 +185,7 @@ namespace TSQL
                     }
                     else
                     {
-                        throw new ParseError($"Unexpected character: {c}", _line, _start, _source);
+                        throw new ParseError($"Unexpected character: {c}", _line, ColumnAtStart(), _source);
                     }
                     break;
             }
@@ -237,7 +237,7 @@ namespace TSQL
 
             if (IsAtEnd())
             {
-                throw new ParseError("Unterminated multi-line comment.", _line, _start, _source);
+                throw new ParseError("Unterminated multi-line comment.", _line, ColumnAtStart(), _source);
             }
 
             // Consume the closing "*/" of the multi-line comment
@@ -261,7 +261,6 @@ namespace TSQL
             char c = Peek();
             while (IsWhiteSpace(c))
             {
-                // repeating check to see if current character is a new line to increment line counter
                 if (c == '\n')
                 {
                     IncrementLineNumber();
@@ -281,8 +280,6 @@ namespace TSQL
                 Advance();
             }
 
-            string literal = _source.Substring(_start, _current - _start);
-
             if (Peek() == '.' && IsDigit(PeekNext()))
             {
                 Advance();
@@ -291,26 +288,27 @@ namespace TSQL
                 {
                     Advance();
                 }
-                literal = _source.Substring(_start, _current - _start);
 
+                string literal = _source.Substring(_start, _current - _start);
                 try
                 {
                     AddToken(TokenType.DECIMAL, Double.Parse(literal));
                 }
                 catch (OverflowException ex)
                 {
-                    throw new ParseError($"Numeric literal too large: {literal}", _line, _start, _source, ex);
+                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source, ex);
                 }
             }
             else
             {
+                string literal = _source.Substring(_start, _current - _start);
                 try
                 {
                     AddToken(TokenType.WHOLE_NUMBER, int.Parse(literal));
                 }
                 catch (OverflowException ex)
                 {
-                    throw new ParseError($"Numeric literal too large: {literal}", _line, _start, _source, ex);
+                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source, ex);
                 }
             }
         }
@@ -381,7 +379,7 @@ namespace TSQL
 
             if (IsAtEnd())
             {
-                throw new ParseError(unterminatedError, _line, _start, _source);
+                throw new ParseError(unterminatedError, _line, ColumnAtStart(), _source);
             }
 
             // Consume the closing delimiter
@@ -411,6 +409,24 @@ namespace TSQL
         private void IncrementLineNumber()
         {
             ++_line;
+        }
+
+        private int ColumnAtStart()
+        {
+            if (_start == 0)
+            {
+                return 0;
+            }
+
+            int lastNewline = _source.LastIndexOf('\n', _start - 1);
+            if (lastNewline != -1)
+            {
+                return _start - lastNewline - 1;
+            }
+            else
+            {
+                return _start;
+            }
         }
 
         // Character lookup

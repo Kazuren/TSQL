@@ -51,6 +51,26 @@ namespace TSQL
         internal int StartPosition { get => _lexemeSlice.Start; }
         internal int EndPosition { get => _lexemeSlice.End; }
         internal string Source { get => _lexemeSlice.Source; }
+        internal int StartColumn { get => ComputeColumn(StartPosition); }
+        internal int EndColumn { get => ComputeColumn(EndPosition); }
+
+        private int ComputeColumn(int position)
+        {
+            if (position <= 0)
+            {
+                return position;
+            }
+
+            int lastNewline = Source.LastIndexOf('\n', position - 1);
+            if (lastNewline != -1)
+            {
+                return position - lastNewline - 1;
+            }
+            else
+            {
+                return position;
+            }
+        }
 
 
         public int Line { get; }

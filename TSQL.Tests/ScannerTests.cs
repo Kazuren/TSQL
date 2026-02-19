@@ -272,7 +272,7 @@
 
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
             Assert.Equal(1, ex.Line);
-            Assert.NotNull(ex.Position);
+            Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
         }
 
@@ -284,7 +284,7 @@
 
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
             Assert.Equal(1, ex.Line);
-            Assert.NotNull(ex.Position);
+            Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
             Assert.Contains("`", ex.Message);
         }
@@ -297,7 +297,7 @@
 
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
             Assert.Equal(1, ex.Line);
-            Assert.NotNull(ex.Position);
+            Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
         }
 
@@ -309,19 +309,20 @@
 
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
             Assert.Equal(1, ex.Line);
-            Assert.NotNull(ex.Position);
+            Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
             Assert.IsType<OverflowException>(ex.InnerException);
         }
 
         [Fact]
-        public void ScanTokens_ErrorOnSecondLine_ReportsCorrectLine()
+        public void ScanTokens_ErrorOnSecondLine_ReportsCorrectLineAndColumn()
         {
             string sql = "SELECT\n'unterminated";
             var scanner = new Scanner(sql);
 
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
             Assert.Equal(2, ex.Line);
+            Assert.Equal(0, ex.Column);
         }
     }
 
