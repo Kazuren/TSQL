@@ -36,7 +36,30 @@ namespace TSQL
 
         public class Select : Stmt
         {
-            public Cte CteStmt { get; set; }
+            private Cte _cteStmt;
+            public Cte CteStmt
+            {
+                get => _cteStmt;
+                set
+                {
+                    _cteStmt = value;
+
+                    // When a CTE is attached programmatically, the query's SELECT keyword
+                    // needs a leading space to separate from the CTE's closing paren.
+                    // Without this: "WITH cte AS (SELECT 1)SELECT * FROM cte"
+                    // With this:    "WITH cte AS (SELECT 1) SELECT * FROM cte"
+                    // Parsed tokens already carry whitespace from source, so the
+                    // LeadingTrivia check avoids double-adding in the parser path.
+                    if (value != null && _query != null)
+                    {
+                        Token queryFirst = FirstTokenOf(_query);
+                        if (queryFirst != null && queryFirst.LeadingTrivia.Count == 0)
+                        {
+                            queryFirst.AddLeadingTrivia(Whitespace.Space);
+                        }
+                    }
+                }
+            }
             private QueryExpression _query;
             public QueryExpression Query
             {
@@ -317,6 +340,17 @@ namespace TSQL
         public SyntaxElementList<CteDefinition> Ctes { get; set; } = new SyntaxElementList<CteDefinition>();
 
         internal Token _withToken;
+
+        public Cte()
+        {
+            _withToken = new ConcreteToken(TokenType.WITH, "WITH", null);
+        }
+
+        internal Cte(Token withToken)
+        {
+            _withToken = withToken;
+        }
+
         public override IEnumerable<Token> DescendantTokens()
         {
             yield return _withToken;

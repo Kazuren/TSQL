@@ -656,7 +656,19 @@ namespace TSQL
         public SetQuantifier Quantifier { get; set; }
         public TopClause Top { get; set; }
         public SyntaxElementList<SelectItem> Columns { get; set; }
-        public Expr.ObjectIdentifier Into { get; set; }
+        private Expr.ObjectIdentifier _into;
+        public Expr.ObjectIdentifier Into
+        {
+            get => _into;
+            set
+            {
+                _into = value;
+                if (value != null && _intoKeyword == null)
+                {
+                    _intoKeyword = ConcreteToken.WithLeadingSpace(TokenType.INTO, "INTO");
+                }
+            }
+        }
         internal Token _intoKeyword;
         public FromClause From { get; set; }
         private AST.Predicate _where;

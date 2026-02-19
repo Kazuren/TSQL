@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace TSQL.StandardLibrary.Visitors
 {
@@ -101,8 +100,8 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Phase 3: Capture original sources BEFORE mutation
-            var regularInfo = new Dictionary<string, (string FullName, string ObjectName)>(StringComparer.OrdinalIgnoreCase);
+            // Phase 3: Capture original ObjectIdentifiers BEFORE mutation
+            var regularInfo = new Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName)>(StringComparer.OrdinalIgnoreCase);
             var regularOrder = new List<string>();
 
             foreach (TableReference tableRef in regularMatches)
@@ -111,20 +110,14 @@ namespace TSQL.StandardLibrary.Visitors
                 string key = objName.ToUpperInvariant();
                 if (!regularInfo.ContainsKey(key))
                 {
-                    regularInfo[key] = (tableRef.TableName.ToSource().TrimStart(), objName);
+                    regularInfo[key] = (tableRef.TableName, objName);
                     regularOrder.Add(key);
                 }
             }
 
-            // Mutate all matched table references
-            foreach (TableReference tableRef in collector.MatchedTables)
-            {
-                string objName = tableRef.TableName.ObjectName.Name;
-                tableRef.TableName = new Expr.ObjectIdentifier(new ObjectName("#" + objName));
-            }
-
-            // Generate CTE SELECT INTOs BEFORE removing CTE definitions
-            var cteSelectIntos = new List<string>();
+            // Build CTE SELECT INTO ASTs BEFORE mutation
+            // (so we capture CteDefinition references while they're still in the original list)
+            var cteSelectIntos = new List<Stmt>();
             if (selectStmt?.CteStmt != null && cteMatchedNames.Count > 0)
             {
                 for (int i = 0; i < selectStmt.CteStmt.Ctes.Count; i++)
@@ -135,23 +128,30 @@ namespace TSQL.StandardLibrary.Visitors
                         continue;
                     }
 
-                    StringBuilder cteSb = new StringBuilder("WITH");
+                    var cte = new Cte();
                     for (int j = 0; j <= i; j++)
                     {
-                        if (j > 0)
-                        {
-                            cteSb.Append(",");
-                        }
-                        cteSb.Append(selectStmt.CteStmt.Ctes[j].ToSource());
+                        cte.Ctes.Add(selectStmt.CteStmt.Ctes[j]);
                     }
-                    cteSb.Append(" SELECT * INTO #");
-                    cteSb.Append(cteDef.Name);
-                    cteSb.Append(" FROM ");
-                    cteSb.Append(cteDef.Name);
-                    cteSb.Append(";\n");
 
-                    cteSelectIntos.Add(cteSb.ToString());
+                    var selectExpr = new SelectExpression();
+                    selectExpr.Columns.Add(new Expr.Wildcard());
+                    selectExpr.Into = new Expr.ObjectIdentifier(new ObjectName("#" + cteDef.Name));
+                    selectExpr.From = new FromClause();
+                    selectExpr.From.TableSources.Add(
+                        new TableReference(new Expr.ObjectIdentifier(new ObjectName(cteDef.Name))));
+
+                    var cteSelect = new Stmt.Select(selectExpr);
+                    cteSelect.CteStmt = cte;
+                    cteSelectIntos.Add(cteSelect);
                 }
+            }
+
+            // Mutate all matched table references
+            foreach (TableReference tableRef in collector.MatchedTables)
+            {
+                string objName = tableRef.TableName.ObjectName.Name;
+                tableRef.TableName = new Expr.ObjectIdentifier(new ObjectName("#" + objName));
             }
 
             // Remove matched CTE definitions from the final query
@@ -191,39 +191,36 @@ namespace TSQL.StandardLibrary.Visitors
             // Regular table SELECT INTOs
             foreach (string key in regularOrder)
             {
-                var (fullName, objectName) = regularInfo[key];
+                var (originalTableName, objectName) = regularInfo[key];
                 bool useStar = collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
 
-                StringBuilder sb = new StringBuilder();
+                var selectExpr = new SelectExpression();
+
                 if (useStar)
                 {
-                    sb.Append("SELECT * INTO #");
+                    selectExpr.Columns.Add(new Expr.Wildcard());
                 }
                 else
                 {
-                    sb.Append("SELECT ");
                     List<string> columns = tableColumnList[key];
                     for (int i = 0; i < columns.Count; i++)
                     {
-                        if (i > 0)
-                        {
-                            sb.Append(", ");
-                        }
-                        sb.Append(columns[i]);
+                        selectExpr.Columns.Add(new SelectColumn(
+                            new Expr.ColumnIdentifier(new ColumnName(columns[i])), null));
                     }
-                    sb.Append(" INTO #");
                 }
-                sb.Append(objectName);
-                sb.Append(" FROM ");
-                sb.Append(fullName);
 
-                allStatements.Add(Stmt.Parse(sb.ToString()));
+                selectExpr.Into = new Expr.ObjectIdentifier(new ObjectName("#" + objectName));
+                selectExpr.From = new FromClause();
+                selectExpr.From.TableSources.Add(new TableReference(originalTableName));
+
+                allStatements.Add(new Stmt.Select(selectExpr));
             }
 
             // CTE SELECT INTOs
-            foreach (string cteSelectInto in cteSelectIntos)
+            foreach (Stmt cteSelectInto in cteSelectIntos)
             {
-                allStatements.Add(Stmt.Parse(cteSelectInto.TrimEnd(';', '\n')));
+                allStatements.Add(cteSelectInto);
             }
 
             // Modified query

@@ -2567,8 +2567,7 @@ namespace TSQL
         /// </summary>
         private Cte ParseCte()
         {
-            Cte cte = new Cte();
-            cte._withToken = Consume(TokenType.WITH, "Expected WITH");
+            Cte cte = new Cte(Consume(TokenType.WITH, "Expected WITH"));
 
             cte.Ctes.Add(ParseCteDefinition());
 
