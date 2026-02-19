@@ -1,9 +1,11 @@
+using TSQL.AST;
+
 namespace TSQL.Tests
 {
     public class ParserTests
     {
         #region Helper Methods
-      
+
         private static SelectExpression SelectExpressionOf(Stmt.Select stmt)
         {
             return Assert.IsType<SelectExpression>(stmt.Query);
@@ -65,12 +67,12 @@ namespace TSQL.Tests
         public void Parse_SingleColumn_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T");
 
             // Assert
             Assert.Single(SelectExpressionOf(select).Columns);
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
             Assert.Equal("a", columnId.ColumnName.Name);
             Assert.Null(item.Alias);
         }
@@ -79,12 +81,12 @@ namespace TSQL.Tests
         public void Parse_Variable_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT @P0 FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT @P0 FROM T");
 
             // Assert
             Assert.Single(SelectExpressionOf(select).Columns);
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var columnVariable = Assert.IsType<Expr.Variable>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.Variable columnVariable = Assert.IsType<Expr.Variable>(item.Expression);
             Assert.Equal("@P0", columnVariable.Name);
             Assert.Null(item.Alias);
         }
@@ -93,7 +95,7 @@ namespace TSQL.Tests
         public void Parse_MultipleColumns_HasCorrectCount()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a, b, c FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a, b, c FROM T");
 
             // Assert
             Assert.Equal(3, SelectExpressionOf(select).Columns.Count);
@@ -104,7 +106,7 @@ namespace TSQL.Tests
         public void Parse_Wildcard_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT * FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT * FROM T");
 
             // Assert
             Assert.Single(SelectExpressionOf(select).Columns);
@@ -115,11 +117,11 @@ namespace TSQL.Tests
         public void Parse_QualifiedWildcard_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT t.* FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT t.* FROM T");
 
             // Assert
             Assert.Single(SelectExpressionOf(select).Columns);
-            var wildcard = Assert.IsType<Expr.QualifiedWildcard>(SelectExpressionOf(select).Columns[0]);
+            Expr.QualifiedWildcard wildcard = Assert.IsType<Expr.QualifiedWildcard>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(wildcard.ObjectName);
             Assert.Equal("t", wildcard.ObjectName.Name);
         }
@@ -128,11 +130,11 @@ namespace TSQL.Tests
         public void Parse_FullyQualifiedColumn_HasAllParts()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT d.s.o.c FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT d.s.o.c FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
 
             Assert.NotNull(columnId.DatabaseName);
             Assert.Equal("d", columnId.DatabaseName.Name);
@@ -154,10 +156,10 @@ namespace TSQL.Tests
         public void Parse_SuffixAliasWithAs_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a AS alias FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a AS alias FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
             Assert.Equal("alias", item.Alias.Name);
         }
@@ -166,10 +168,10 @@ namespace TSQL.Tests
         public void Parse_SuffixAliasWithoutAs_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a alias FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a alias FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
             Assert.Equal("alias", item.Alias.Name);
         }
@@ -178,10 +180,10 @@ namespace TSQL.Tests
         public void Parse_PrefixAlias_HasCorrectAliasType()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT alias = a FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT alias = a FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
             Assert.IsType<PrefixAlias>(item.Alias);
             Assert.Equal("alias", item.Alias.Name);
@@ -195,11 +197,11 @@ namespace TSQL.Tests
         public void Parse_BinaryAddition_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a + b FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a + b FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var binary = Assert.IsType<Expr.Binary>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.Binary binary = Assert.IsType<Expr.Binary>(item.Expression);
 
             Assert.IsType<Expr.ColumnIdentifier>(binary.Left);
             Assert.Equal(Expr.ArithmeticOperator.Add, binary.Operator);
@@ -210,17 +212,17 @@ namespace TSQL.Tests
         public void Parse_BinaryMultiplication_HasHigherPrecedenceThanAddition()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a + b * c FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a + b * c FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var binary = Assert.IsType<Expr.Binary>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.Binary binary = Assert.IsType<Expr.Binary>(item.Expression);
 
             // a + (b * c) - multiplication should be on the right
             Assert.Equal(Expr.ArithmeticOperator.Add, binary.Operator);
             Assert.IsType<Expr.ColumnIdentifier>(binary.Left);
 
-            var rightBinary = Assert.IsType<Expr.Binary>(binary.Right);
+            Expr.Binary rightBinary = Assert.IsType<Expr.Binary>(binary.Right);
             Assert.Equal(Expr.ArithmeticOperator.Multiply, rightBinary.Operator);
         }
 
@@ -228,11 +230,11 @@ namespace TSQL.Tests
         public void Parse_UnaryMinus_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT -a FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT -a FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var unary = Assert.IsType<Expr.Unary>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.Unary unary = Assert.IsType<Expr.Unary>(item.Expression);
             Assert.Equal(Expr.UnaryOperator.Negate, unary.Operator);
             Assert.IsType<Expr.ColumnIdentifier>(unary.Right);
         }
@@ -241,17 +243,17 @@ namespace TSQL.Tests
         public void Parse_GroupedExpression_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT (a + b) * c FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT (a + b) * c FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var binary = Assert.IsType<Expr.Binary>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.Binary binary = Assert.IsType<Expr.Binary>(item.Expression);
 
             // (a + b) * c - grouped addition should be on the left
             Assert.Equal(Expr.ArithmeticOperator.Multiply, binary.Operator);
 
-            var grouping = Assert.IsType<Expr.Grouping>(binary.Left);
-            var innerBinary = Assert.IsType<Expr.Binary>(grouping.Expression);
+            Expr.Grouping grouping = Assert.IsType<Expr.Grouping>(binary.Left);
+            Expr.Binary innerBinary = Assert.IsType<Expr.Binary>(grouping.Expression);
             Assert.Equal(Expr.ArithmeticOperator.Add, innerBinary.Operator);
         }
 
@@ -259,11 +261,11 @@ namespace TSQL.Tests
         public void Parse_LiteralNumber_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT 42 FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT 42 FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var literal = Assert.IsType<Expr.IntLiteral>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.IntLiteral literal = Assert.IsType<Expr.IntLiteral>(item.Expression);
             Assert.Equal(42, literal.Value);
         }
 
@@ -271,11 +273,11 @@ namespace TSQL.Tests
         public void Parse_LiteralString_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT 'hello' FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT 'hello' FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var literal = Assert.IsType<Expr.StringLiteral>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.StringLiteral literal = Assert.IsType<Expr.StringLiteral>(item.Expression);
             Assert.Contains("hello", literal.Value);
         }
 
@@ -287,11 +289,11 @@ namespace TSQL.Tests
         public void Parse_FunctionCallNoArgs_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT GETDATE() FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT GETDATE() FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var func = Assert.IsType<Expr.FunctionCall>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.FunctionCall func = Assert.IsType<Expr.FunctionCall>(item.Expression);
             Assert.Equal("GETDATE", func.Callee.ObjectName.Name);
             Assert.Empty(func.Arguments);
         }
@@ -300,11 +302,11 @@ namespace TSQL.Tests
         public void Parse_FunctionCallWithArgs_HasCorrectArgumentCount()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT COALESCE(a, b, c) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT COALESCE(a, b, c) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var func = Assert.IsType<Expr.FunctionCall>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.FunctionCall func = Assert.IsType<Expr.FunctionCall>(item.Expression);
             Assert.Equal("COALESCE", func.Callee.ObjectName.Name);
             Assert.Equal(3, func.Arguments.Count);
         }
@@ -317,12 +319,12 @@ namespace TSQL.Tests
         public void Parse_SimpleFrom_HasTableSource()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a FROM MyTable");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM MyTable");
 
             // Assert
             Assert.NotNull(SelectExpressionOf(select).From);
             Assert.Equal(1, SelectExpressionOf(select).From.TableSources.Count);
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
         }
 
@@ -330,11 +332,11 @@ namespace TSQL.Tests
         public void Parse_FromWithAlias_HasAliasSet()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a FROM MyTable AS t");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM MyTable AS t");
 
             // Assert
             Assert.NotNull(SelectExpressionOf(select).From);
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.Alias);
             Assert.Equal("t", tableRef.Alias.Name);
         }
@@ -342,9 +344,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromQualifiedName_TwoPart()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM dbo.MyTable");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM dbo.MyTable");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
             Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
         }
@@ -352,9 +354,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromQualifiedName_ThreePart()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM MyDb.dbo.MyTable");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM MyDb.dbo.MyTable");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("MyDb", tableRef.TableName.DatabaseName.Name);
             Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
             Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
@@ -363,9 +365,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromQualifiedName_FourPart()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM Server1.MyDb.dbo.MyTable");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM Server1.MyDb.dbo.MyTable");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("Server1", tableRef.TableName.ServerName.Name);
             Assert.Equal("MyDb", tableRef.TableName.DatabaseName.Name);
             Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
@@ -375,12 +377,12 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromCommaSeparated_HasMultipleSources()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1, T2, T3");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1, T2, T3");
 
             Assert.Equal(3, SelectExpressionOf(select).From.TableSources.Count);
-            var t1 = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
-            var t2 = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[1]);
-            var t3 = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[2]);
+            TableReference t1 = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference t2 = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[1]);
+            TableReference t3 = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[2]);
             Assert.Equal("T1", t1.TableName.ObjectName.Name);
             Assert.Equal("T2", t2.TableName.ObjectName.Name);
             Assert.Equal("T3", t3.TableName.ObjectName.Name);
@@ -389,9 +391,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromSubquery_HasSubqueryReference()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM (SELECT b FROM T) AS sub");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM (SELECT b FROM T) AS sub");
 
-            var subRef = Assert.IsType<SubqueryReference>(SelectExpressionOf(select).From.TableSources[0]);
+            SubqueryReference subRef = Assert.IsType<SubqueryReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(subRef.Subquery);
             Assert.NotNull(subRef.Alias);
             Assert.Equal("sub", subRef.Alias.Name);
@@ -400,18 +402,18 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromTableVariable_HasVariableReference()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM @TempTable");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM @TempTable");
 
-            var varRef = Assert.IsType<TableVariableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableVariableReference varRef = Assert.IsType<TableVariableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("@TempTable", varRef.VariableName);
         }
 
         [Fact]
         public void Parse_FromTableVariableWithAlias_HasAliasSet()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM @TempTable AS t");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM @TempTable AS t");
 
-            var varRef = Assert.IsType<TableVariableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableVariableReference varRef = Assert.IsType<TableVariableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("@TempTable", varRef.VariableName);
             Assert.NotNull(varRef.Alias);
             Assert.Equal("t", varRef.Alias.Name);
@@ -420,9 +422,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_FromAliasWithoutAs_HasAliasSet()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM MyTable t");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM MyTable t");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.Alias);
             Assert.Equal("t", tableRef.Alias.Name);
         }
@@ -430,12 +432,12 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_InnerJoin_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinType.Inner, join.JoinType);
-            var left = Assert.IsType<TableReference>(join.Left);
-            var right = Assert.IsType<TableReference>(join.Right);
+            TableReference left = Assert.IsType<TableReference>(join.Left);
+            TableReference right = Assert.IsType<TableReference>(join.Right);
             Assert.Equal("T1", left.TableName.ObjectName.Name);
             Assert.Equal("T2", right.TableName.ObjectName.Name);
             Assert.NotNull(join.OnCondition);
@@ -444,56 +446,56 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_LeftJoin_HasCorrectJoinType()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 LEFT JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 LEFT JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinType.LeftOuter, join.JoinType);
         }
 
         [Fact]
         public void Parse_LeftOuterJoin_HasCorrectJoinType()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 LEFT OUTER JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 LEFT OUTER JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinType.LeftOuter, join.JoinType);
         }
 
         [Fact]
         public void Parse_RightJoin_HasCorrectJoinType()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 RIGHT JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 RIGHT JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinType.RightOuter, join.JoinType);
         }
 
         [Fact]
         public void Parse_FullOuterJoin_HasCorrectJoinType()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 FULL OUTER JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 FULL OUTER JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinType.FullOuter, join.JoinType);
         }
 
         [Fact]
         public void Parse_BareJoin_DefaultsToInner()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinType.Inner, join.JoinType);
         }
 
         [Fact]
         public void Parse_CrossJoin_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 CROSS JOIN T2");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 CROSS JOIN T2");
 
-            var join = Assert.IsType<CrossJoin>(SelectExpressionOf(select).From.TableSources[0]);
-            var left = Assert.IsType<TableReference>(join.Left);
-            var right = Assert.IsType<TableReference>(join.Right);
+            CrossJoin join = Assert.IsType<CrossJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference left = Assert.IsType<TableReference>(join.Left);
+            TableReference right = Assert.IsType<TableReference>(join.Right);
             Assert.Equal("T1", left.TableName.ObjectName.Name);
             Assert.Equal("T2", right.TableName.ObjectName.Name);
         }
@@ -501,36 +503,36 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_CrossApply_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 CROSS APPLY (SELECT b FROM T2) AS sub");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 CROSS APPLY (SELECT b FROM T2) AS sub");
 
-            var join = Assert.IsType<ApplyJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            ApplyJoin join = Assert.IsType<ApplyJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(ApplyType.Cross, join.ApplyType);
-            var left = Assert.IsType<TableReference>(join.Left);
+            TableReference left = Assert.IsType<TableReference>(join.Left);
             Assert.Equal("T1", left.TableName.ObjectName.Name);
-            var right = Assert.IsType<SubqueryReference>(join.Right);
+            SubqueryReference right = Assert.IsType<SubqueryReference>(join.Right);
             Assert.NotNull(right.Alias);
         }
 
         [Fact]
         public void Parse_OuterApply_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 OUTER APPLY (SELECT b FROM T2) AS sub");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 OUTER APPLY (SELECT b FROM T2) AS sub");
 
-            var join = Assert.IsType<ApplyJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            ApplyJoin join = Assert.IsType<ApplyJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(ApplyType.Outer, join.ApplyType);
         }
 
         [Fact]
         public void Parse_MultiJoinChain_IsLeftAssociative()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id INNER JOIN T3 ON T2.id = T3.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 INNER JOIN T2 ON T1.id = T2.id INNER JOIN T3 ON T2.id = T3.id");
 
             // Should be: (T1 JOIN T2) JOIN T3
-            var outerJoin = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
-            var innerJoin = Assert.IsType<QualifiedJoin>(outerJoin.Left);
-            var t3 = Assert.IsType<TableReference>(outerJoin.Right);
-            var t1 = Assert.IsType<TableReference>(innerJoin.Left);
-            var t2 = Assert.IsType<TableReference>(innerJoin.Right);
+            QualifiedJoin outerJoin = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin innerJoin = Assert.IsType<QualifiedJoin>(outerJoin.Left);
+            TableReference t3 = Assert.IsType<TableReference>(outerJoin.Right);
+            TableReference t1 = Assert.IsType<TableReference>(innerJoin.Left);
+            TableReference t2 = Assert.IsType<TableReference>(innerJoin.Right);
             Assert.Equal("T1", t1.TableName.ObjectName.Name);
             Assert.Equal("T2", t2.TableName.ObjectName.Name);
             Assert.Equal("T3", t3.TableName.ObjectName.Name);
@@ -540,10 +542,10 @@ namespace TSQL.Tests
         public void Parse_LoopJoinWithoutType_TreatsLoopAsAlias()
         {
             // Without an explicit join type, LOOP is treated as an alias
-            var select = Stmt.ParseSelect("SELECT a FROM T1 LOOP JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 LOOP JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
-            var left = Assert.IsType<TableReference>(join.Left);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference left = Assert.IsType<TableReference>(join.Left);
             Assert.Equal("LOOP", left.Alias.Name);
             Assert.Null(join.JoinHint);
             Assert.Equal(JoinType.Inner, join.JoinType);
@@ -552,9 +554,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_JoinHint_InnerHashJoin()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 INNER HASH JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 INNER HASH JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinHint.Hash, join.JoinHint);
             Assert.Equal(JoinType.Inner, join.JoinType);
         }
@@ -562,9 +564,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_JoinHint_LeftMergeJoin()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T1 LEFT MERGE JOIN T2 ON T1.id = T2.id");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T1 LEFT MERGE JOIN T2 ON T1.id = T2.id");
 
-            var join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(JoinHint.Merge, join.JoinHint);
             Assert.Equal(JoinType.LeftOuter, join.JoinType);
         }
@@ -572,9 +574,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_ForSystemTimeAsOf_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T FOR SYSTEM_TIME AS OF '2020-01-01'");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T FOR SYSTEM_TIME AS OF '2020-01-01'");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.ForSystemTime);
             Assert.Equal(SystemTimeType.AsOf, tableRef.ForSystemTime.TimeType);
         }
@@ -582,9 +584,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_ForSystemTimeAll_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T FOR SYSTEM_TIME ALL");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T FOR SYSTEM_TIME ALL");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.ForSystemTime);
             Assert.Equal(SystemTimeType.All, tableRef.ForSystemTime.TimeType);
         }
@@ -592,9 +594,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_ForSystemTimeBetweenAnd_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T FOR SYSTEM_TIME BETWEEN '2020-01-01' AND '2021-01-01'");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T FOR SYSTEM_TIME BETWEEN '2020-01-01' AND '2021-01-01'");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.ForSystemTime);
             Assert.Equal(SystemTimeType.BetweenAnd, tableRef.ForSystemTime.TimeType);
         }
@@ -602,9 +604,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_TablesamplePercent_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T AS t TABLESAMPLE (10 PERCENT)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T AS t TABLESAMPLE (10 PERCENT)");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.Tablesample);
             Assert.Equal(TableSampleUnit.Percent, tableRef.Tablesample.Unit);
         }
@@ -612,9 +614,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_TablesampleWithRepeatable_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T TABLESAMPLE SYSTEM (100 ROWS) REPEATABLE (42)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T TABLESAMPLE SYSTEM (100 ROWS) REPEATABLE (42)");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.Tablesample);
             Assert.Equal(TableSampleUnit.Rows, tableRef.Tablesample.Unit);
             Assert.NotNull(tableRef.Tablesample.RepeatSeed);
@@ -623,9 +625,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_TableHintNolock_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WITH (NOLOCK)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WITH (NOLOCK)");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.TableHints);
             Assert.Equal(1, tableRef.TableHints.Hints.Count);
             Assert.Equal(TableHintType.NoLock, tableRef.TableHints.Hints[0].HintType);
@@ -634,9 +636,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_TableHintMultiple_HasCorrectCount()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WITH (NOLOCK, NOWAIT)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WITH (NOLOCK, NOWAIT)");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.NotNull(tableRef.TableHints);
             Assert.Equal(2, tableRef.TableHints.Hints.Count);
             Assert.Equal(TableHintType.NoLock, tableRef.TableHints.Hints[0].HintType);
@@ -646,9 +648,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_TableHintIndex_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WITH (INDEX(1))");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WITH (INDEX(1))");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(TableHintType.Index, tableRef.TableHints.Hints[0].HintType);
             Assert.Equal(1, tableRef.TableHints.Hints[0].IndexValues.Count);
         }
@@ -656,19 +658,19 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_TableHintHoldLock_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WITH (HOLDLOCK)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WITH (HOLDLOCK)");
 
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal(TableHintType.HoldLock, tableRef.TableHints.Hints[0].HintType);
         }
 
         [Fact]
         public void Parse_ParenthesizedJoin_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM (T1 INNER JOIN T2 ON T1.id = T2.id)");
 
-            var paren = Assert.IsType<ParenthesizedTableSource>(SelectExpressionOf(select).From.TableSources[0]);
-            var join = Assert.IsType<QualifiedJoin>(paren.Inner);
+            ParenthesizedTableSource paren = Assert.IsType<ParenthesizedTableSource>(SelectExpressionOf(select).From.TableSources[0]);
+            QualifiedJoin join = Assert.IsType<QualifiedJoin>(paren.Inner);
             Assert.Equal(JoinType.Inner, join.JoinType);
         }
 
@@ -768,11 +770,11 @@ namespace TSQL.Tests
         public void Parse_RowNumber_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT ROW_NUMBER() OVER (ORDER BY id) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT ROW_NUMBER() OVER (ORDER BY id) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("ROW_NUMBER", windowFunc.Function.Callee.ObjectName.Name);
             Assert.NotNull(windowFunc.Over);
             Assert.NotNull(windowFunc.Over.OrderBy);
@@ -783,11 +785,11 @@ namespace TSQL.Tests
         public void Parse_RankWithPartition_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT RANK() OVER (PARTITION BY dept ORDER BY salary DESC) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT RANK() OVER (PARTITION BY dept ORDER BY salary DESC) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("RANK", windowFunc.Function.Callee.ObjectName.Name);
             Assert.NotNull(windowFunc.Over.PartitionBy);
             Assert.Single(windowFunc.Over.PartitionBy);
@@ -800,11 +802,11 @@ namespace TSQL.Tests
         public void Parse_DenseRank_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT DENSE_RANK() OVER (ORDER BY score) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT DENSE_RANK() OVER (ORDER BY score) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("DENSE_RANK", windowFunc.Function.Callee.ObjectName.Name);
         }
 
@@ -812,14 +814,14 @@ namespace TSQL.Tests
         public void Parse_Ntile_HasCorrectArgument()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT NTILE(4) OVER (ORDER BY val) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT NTILE(4) OVER (ORDER BY val) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("NTILE", windowFunc.Function.Callee.ObjectName.Name);
             Assert.Single(windowFunc.Function.Arguments);
-            var arg = Assert.IsType<Expr.IntLiteral>(windowFunc.Function.Arguments[0]);
+            Expr.IntLiteral arg = Assert.IsType<Expr.IntLiteral>(windowFunc.Function.Arguments[0]);
             Assert.Equal(4, arg.Value);
         }
 
@@ -829,11 +831,11 @@ namespace TSQL.Tests
         public void Parse_SumWithOver_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT SUM(amount) OVER (PARTITION BY customer_id) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT SUM(amount) OVER (PARTITION BY customer_id) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("SUM", windowFunc.Function.Callee.ObjectName.Name);
             Assert.NotNull(windowFunc.Over.PartitionBy);
             Assert.Null(windowFunc.Over.OrderBy);
@@ -843,11 +845,11 @@ namespace TSQL.Tests
         public void Parse_AggregateWithEmptyOver_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT AVG(price) OVER () FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT AVG(price) OVER () FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal("AVG", windowFunc.Function.Callee.ObjectName.Name);
             Assert.Null(windowFunc.Over.PartitionBy);
             Assert.Null(windowFunc.Over.OrderBy);
@@ -860,11 +862,11 @@ namespace TSQL.Tests
         public void Parse_RowsUnboundedPreceding_HasCorrectFrame()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS UNBOUNDED PRECEDING) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS UNBOUNDED PRECEDING) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.NotNull(windowFunc.Over.Frame);
             Assert.Equal(WindowFrameType.Rows, windowFunc.Over.Frame.FrameType);
             Assert.Equal(WindowFrameBoundType.UnboundedPreceding, windowFunc.Over.Frame.Start.BoundType);
@@ -875,15 +877,15 @@ namespace TSQL.Tests
         public void Parse_RowsNPreceding_HasCorrectFrame()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS 3 PRECEDING) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS 3 PRECEDING) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.NotNull(windowFunc.Over.Frame);
             Assert.Equal(WindowFrameType.Rows, windowFunc.Over.Frame.FrameType);
             Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
-            var offset = Assert.IsType<Expr.IntLiteral>(windowFunc.Over.Frame.Start.Offset);
+            Expr.IntLiteral offset = Assert.IsType<Expr.IntLiteral>(windowFunc.Over.Frame.Start.Offset);
             Assert.Equal(3, offset.Value);
         }
 
@@ -891,14 +893,14 @@ namespace TSQL.Tests
         public void Parse_RowsBetween_HasCorrectFrame()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.NotNull(windowFunc.Over.Frame);
             Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
-            var offset = Assert.IsType<Expr.IntLiteral>(windowFunc.Over.Frame.Start.Offset);
+            Expr.IntLiteral offset = Assert.IsType<Expr.IntLiteral>(windowFunc.Over.Frame.Start.Offset);
             Assert.Equal(2, offset.Value);
             Assert.Equal(WindowFrameBoundType.CurrentRow, windowFunc.Over.Frame.End.BoundType);
         }
@@ -907,11 +909,11 @@ namespace TSQL.Tests
         public void Parse_RangeBetween_HasCorrectFrame()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal(WindowFrameType.Range, windowFunc.Over.Frame.FrameType);
             Assert.Equal(WindowFrameBoundType.CurrentRow, windowFunc.Over.Frame.Start.BoundType);
             Assert.Equal(WindowFrameBoundType.UnboundedFollowing, windowFunc.Over.Frame.End.BoundType);
@@ -921,11 +923,11 @@ namespace TSQL.Tests
         public void Parse_RowsBetweenNPrecedingAndNFollowing_HasCorrectFrame()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT SUM(x) OVER (ORDER BY y ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.WindowFunction windowFunc = Assert.IsType<Expr.WindowFunction>(item.Expression);
             Assert.Equal(WindowFrameBoundType.Preceding, windowFunc.Over.Frame.Start.BoundType);
             Assert.Equal(WindowFrameBoundType.Following, windowFunc.Over.Frame.End.BoundType);
         }
@@ -936,10 +938,10 @@ namespace TSQL.Tests
         public void Parse_RowsAsColumnAlias_ParsesAsIdentifier()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT 1 AS ROWS FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT 1 AS ROWS FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
             Assert.NotNull(item.Alias);
             Assert.Equal("ROWS", item.Alias.Name);
         }
@@ -948,11 +950,11 @@ namespace TSQL.Tests
         public void Parse_RankAsColumnName_ParsesAsIdentifier()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT RANK FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT RANK FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
             Assert.Equal("RANK", columnId.ColumnName.Name);
         }
 
@@ -960,11 +962,11 @@ namespace TSQL.Tests
         public void Parse_PartitionAsColumnName_ParsesAsIdentifier()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT PARTITION FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT PARTITION FROM T");
 
             // Assert
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
             Assert.Equal("PARTITION", columnId.ColumnName.Name);
         }
 
@@ -972,7 +974,7 @@ namespace TSQL.Tests
         public void Parse_MultipleContextualKeywordsAsColumns_ParsesCorrectly()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT PARTITION, ROWS, PRECEDING FROM T");
+            Stmt.Select select = Stmt.ParseSelect("SELECT PARTITION, ROWS, PRECEDING FROM T");
 
             // Assert
             Assert.Equal(3, SelectExpressionOf(select).Columns.Count);
@@ -1045,11 +1047,11 @@ namespace TSQL.Tests
         public void Parse_WhereComparison_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a = 1");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a = 1");
 
             // Assert
             Assert.NotNull(SelectExpressionOf(select).Where);
-            var comparison = Assert.IsType<AST.Predicate.Comparison>(SelectExpressionOf(select).Where);
+            Predicate.Comparison comparison = Assert.IsType<AST.Predicate.Comparison>(SelectExpressionOf(select).Where);
             Assert.IsType<Expr.ColumnIdentifier>(comparison.Left);
             Assert.Equal(AST.ComparisonOperator.Equal, comparison.Operator);
             Assert.IsType<Expr.IntLiteral>(comparison.Right);
@@ -1059,10 +1061,10 @@ namespace TSQL.Tests
         public void Parse_WhereIsNull_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a IS NULL");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a IS NULL");
 
             // Assert
-            var nullPred = Assert.IsType<AST.Predicate.Null>(SelectExpressionOf(select).Where);
+            Predicate.Null nullPred = Assert.IsType<AST.Predicate.Null>(SelectExpressionOf(select).Where);
             Assert.Equal(AST.Negation.NotNegated, nullPred.Negated);
         }
 
@@ -1070,10 +1072,10 @@ namespace TSQL.Tests
         public void Parse_WhereIsNotNull_HasCorrectStructure()
         {
             // Arrange & Act
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a IS NOT NULL");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a IS NOT NULL");
 
             // Assert
-            var nullPred = Assert.IsType<AST.Predicate.Null>(SelectExpressionOf(select).Where);
+            Predicate.Null nullPred = Assert.IsType<AST.Predicate.Null>(SelectExpressionOf(select).Where);
             Assert.Equal(AST.Negation.Negated, nullPred.Negated);
         }
 
@@ -1081,9 +1083,9 @@ namespace TSQL.Tests
         public void Parse_WhereAndOr_HasCorrectPrecedence()
         {
             // a = 1 AND b = 2 OR c = 3 should be (a=1 AND b=2) OR c=3
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a = 1 AND b = 2 OR c = 3");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a = 1 AND b = 2 OR c = 3");
 
-            var orPred = Assert.IsType<AST.Predicate.Or>(SelectExpressionOf(select).Where);
+            Predicate.Or orPred = Assert.IsType<AST.Predicate.Or>(SelectExpressionOf(select).Where);
             Assert.IsType<AST.Predicate.And>(orPred.Left);
             Assert.IsType<AST.Predicate.Comparison>(orPred.Right);
         }
@@ -1091,18 +1093,18 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_WhereNot_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE NOT a = 1");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE NOT a = 1");
 
-            var notPred = Assert.IsType<AST.Predicate.Not>(SelectExpressionOf(select).Where);
+            Predicate.Not notPred = Assert.IsType<AST.Predicate.Not>(SelectExpressionOf(select).Where);
             Assert.IsType<AST.Predicate.Comparison>(notPred.Predicate);
         }
 
         [Fact]
         public void Parse_WhereLike_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a LIKE '%test%'");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a LIKE '%test%'");
 
-            var likePred = Assert.IsType<AST.Predicate.Like>(SelectExpressionOf(select).Where);
+            Predicate.Like likePred = Assert.IsType<AST.Predicate.Like>(SelectExpressionOf(select).Where);
             Assert.Equal(AST.Negation.NotNegated, likePred.Negated);
             Assert.IsType<Expr.ColumnIdentifier>(likePred.Left);
             Assert.IsType<Expr.StringLiteral>(likePred.Pattern);
@@ -1111,18 +1113,18 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_WhereBetween_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a BETWEEN 1 AND 10");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a BETWEEN 1 AND 10");
 
-            var between = Assert.IsType<AST.Predicate.Between>(SelectExpressionOf(select).Where);
+            Predicate.Between between = Assert.IsType<AST.Predicate.Between>(SelectExpressionOf(select).Where);
             Assert.Equal(AST.Negation.NotNegated, between.Negated);
         }
 
         [Fact]
         public void Parse_WhereInList_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE a IN (1, 2, 3)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE a IN (1, 2, 3)");
 
-            var inPred = Assert.IsType<AST.Predicate.In>(SelectExpressionOf(select).Where);
+            Predicate.In inPred = Assert.IsType<AST.Predicate.In>(SelectExpressionOf(select).Where);
             Assert.Equal(AST.Negation.NotNegated, inPred.Negated);
             Assert.NotNull(inPred.ValueList);
             Assert.Equal(3, inPred.ValueList.Count);
@@ -1131,9 +1133,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_WhereExists_HasCorrectStructure()
         {
-            var select = Stmt.ParseSelect("SELECT a FROM T WHERE EXISTS (SELECT 1 FROM T2)");
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE EXISTS (SELECT 1 FROM T2)");
 
-            var exists = Assert.IsType<AST.Predicate.Exists>(SelectExpressionOf(select).Where);
+            Predicate.Exists exists = Assert.IsType<AST.Predicate.Exists>(SelectExpressionOf(select).Where);
             Assert.NotNull(exists.Subquery);
         }
 
@@ -1480,7 +1482,7 @@ namespace TSQL.Tests
         {
             Stmt.Select select = Stmt.ParseSelect("SELECT a FROM T WHERE (a = 1)");
 
-            var grouping = Assert.IsType<AST.Predicate.Grouping>(SelectExpressionOf(select).Where);
+            Predicate.Grouping grouping = Assert.IsType<AST.Predicate.Grouping>(SelectExpressionOf(select).Where);
             Assert.IsType<AST.Predicate.Comparison>(grouping.Predicate);
         }
 
@@ -1519,9 +1521,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_CountStar_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT COUNT(*) FROM T");
-            var selectColumn = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
-            var funcCall = Assert.IsType<Expr.FunctionCall>(selectColumn.Expression);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT COUNT(*) FROM T");
+            SelectColumn selectColumn = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
+            Expr.FunctionCall funcCall = Assert.IsType<Expr.FunctionCall>(selectColumn.Expression);
             Assert.Equal(1, funcCall.Arguments.Count);
             Assert.IsType<Expr.Wildcard>(funcCall.Arguments[0]);
         }
@@ -1552,8 +1554,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_GroupBy_SimpleStructure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a");
-            var groupBy = SelectExpressionOf(stmt).GroupBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a");
+            GroupByClause groupBy = SelectExpressionOf(stmt).GroupBy;
 
             Assert.NotNull(groupBy);
             Assert.Equal(1, groupBy.Items.Count);
@@ -1563,36 +1565,36 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_GroupBy_RollupStructure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY ROLLUP(a, b)");
-            var groupBy = SelectExpressionOf(stmt).GroupBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY ROLLUP(a, b)");
+            GroupByClause groupBy = SelectExpressionOf(stmt).GroupBy;
 
             Assert.NotNull(groupBy);
             Assert.Equal(1, groupBy.Items.Count);
-            var rollup = Assert.IsType<GroupByRollup>(groupBy.Items[0]);
+            GroupByRollup rollup = Assert.IsType<GroupByRollup>(groupBy.Items[0]);
             Assert.Equal(2, rollup.Items.Count);
         }
 
         [Fact]
         public void Parse_GroupBy_CubeStructure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY CUBE(a, b)");
-            var groupBy = SelectExpressionOf(stmt).GroupBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY CUBE(a, b)");
+            GroupByClause groupBy = SelectExpressionOf(stmt).GroupBy;
 
             Assert.NotNull(groupBy);
             Assert.Equal(1, groupBy.Items.Count);
-            var cube = Assert.IsType<GroupByCube>(groupBy.Items[0]);
+            GroupByCube cube = Assert.IsType<GroupByCube>(groupBy.Items[0]);
             Assert.Equal(2, cube.Items.Count);
         }
 
         [Fact]
         public void Parse_GroupBy_GroupingSetsStructure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS((a, b), a, ())");
-            var groupBy = SelectExpressionOf(stmt).GroupBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY GROUPING SETS((a, b), a, ())");
+            GroupByClause groupBy = SelectExpressionOf(stmt).GroupBy;
 
             Assert.NotNull(groupBy);
             Assert.Equal(1, groupBy.Items.Count);
-            var gs = Assert.IsType<GroupByGroupingSets>(groupBy.Items[0]);
+            GroupByGroupingSets gs = Assert.IsType<GroupByGroupingSets>(groupBy.Items[0]);
             Assert.Equal(3, gs.Items.Count);
             Assert.IsType<GroupByComposite>(gs.Items[0]);
             Assert.IsType<GroupByExpression>(gs.Items[1]);
@@ -1602,11 +1604,11 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_GroupBy_CompositeInRollup()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, b, c, SUM(d) FROM T GROUP BY ROLLUP((a, b), c)");
-            var rollup = Assert.IsType<GroupByRollup>(SelectExpressionOf(stmt).GroupBy.Items[0]);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, c, SUM(d) FROM T GROUP BY ROLLUP((a, b), c)");
+            GroupByRollup rollup = Assert.IsType<GroupByRollup>(SelectExpressionOf(stmt).GroupBy.Items[0]);
 
             Assert.Equal(2, rollup.Items.Count);
-            var composite = Assert.IsType<GroupByComposite>(rollup.Items[0]);
+            GroupByComposite composite = Assert.IsType<GroupByComposite>(rollup.Items[0]);
             Assert.Equal(2, composite.Expressions.Count);
             Assert.IsType<GroupByExpression>(rollup.Items[1]);
         }
@@ -1614,8 +1616,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_GroupBy_MixedItems()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY a, ROLLUP(b)");
-            var groupBy = SelectExpressionOf(stmt).GroupBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, SUM(c) FROM T GROUP BY a, ROLLUP(b)");
+            GroupByClause groupBy = SelectExpressionOf(stmt).GroupBy;
 
             Assert.Equal(2, groupBy.Items.Count);
             Assert.IsType<GroupByExpression>(groupBy.Items[0]);
@@ -1625,7 +1627,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_GroupBy_NoGroupBy_ReturnsNull()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T");
             Assert.Null(SelectExpressionOf(stmt).GroupBy);
         }
 
@@ -1645,7 +1647,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_Having_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a HAVING SUM(b) > 10");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a HAVING SUM(b) > 10");
             Assert.NotNull(SelectExpressionOf(stmt).GroupBy);
             Assert.NotNull(SelectExpressionOf(stmt).Having);
         }
@@ -1653,7 +1655,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_Having_NoHaving_ReturnsNull()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, SUM(b) FROM T GROUP BY a");
             Assert.Null(SelectExpressionOf(stmt).Having);
         }
 
@@ -1676,8 +1678,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_OrderBy_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a, b FROM T ORDER BY a ASC, b DESC");
-            var orderBy = stmt.Query.OrderBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b FROM T ORDER BY a ASC, b DESC");
+            OrderByClause orderBy = stmt.Query.OrderBy;
 
             Assert.NotNull(orderBy);
             Assert.Equal(2, orderBy.Items.Count);
@@ -1688,7 +1690,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_OrderBy_NoOrderBy_IsNull()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T");
             Assert.Null(stmt.Query.OrderBy);
         }
 
@@ -1712,8 +1714,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_OffsetOnly_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a OFFSET 10 ROWS");
-            var orderBy = stmt.Query.OrderBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a OFFSET 10 ROWS");
+            OrderByClause orderBy = stmt.Query.OrderBy;
 
             Assert.NotNull(orderBy);
             Assert.Equal(1, orderBy.Items.Count);
@@ -1724,8 +1726,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_OffsetFetch_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY");
-            var orderBy = stmt.Query.OrderBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY");
+            OrderByClause orderBy = stmt.Query.OrderBy;
 
             Assert.NotNull(orderBy);
             Assert.IsType<Expr.IntLiteral>(orderBy.OffsetCount);
@@ -1735,8 +1737,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_OffsetFetch_NoOffset_IsNull()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a");
-            var orderBy = stmt.Query.OrderBy;
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a");
+            OrderByClause orderBy = stmt.Query.OrderBy;
 
             Assert.NotNull(orderBy);
             Assert.Null(orderBy.OffsetCount);
@@ -1749,8 +1751,8 @@ namespace TSQL.Tests
             string source = "SELECT a FROM T1 UNION ALL SELECT b FROM T2 ORDER BY a OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY";
             Assert.Equal(source, RoundTrip(source));
 
-            var stmt = Stmt.ParseSelect(source);
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect(source);
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.NotNull(setOp.OrderBy);
             Assert.IsType<Expr.IntLiteral>(setOp.OrderBy.OffsetCount);
             Assert.IsType<Expr.IntLiteral>(setOp.OrderBy.FetchCount);
@@ -1787,7 +1789,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_Cte_SimpleStructure()
         {
-            var stmt = Stmt.ParseSelect("WITH cte AS (SELECT a FROM T) SELECT a FROM cte");
+            Stmt.Select stmt = Stmt.ParseSelect("WITH cte AS (SELECT a FROM T) SELECT a FROM cte");
             Assert.NotNull(stmt.CteStmt);
             Assert.Equal(1, stmt.CteStmt.Ctes.Count);
             Assert.Equal("cte", stmt.CteStmt.Ctes[0].Name);
@@ -1797,8 +1799,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_Cte_WithColumnNames()
         {
-            var stmt = Stmt.ParseSelect("WITH cte(x, y) AS (SELECT a, b FROM T) SELECT x, y FROM cte");
-            var def = stmt.CteStmt.Ctes[0];
+            Stmt.Select stmt = Stmt.ParseSelect("WITH cte(x, y) AS (SELECT a, b FROM T) SELECT x, y FROM cte");
+            CteDefinition def = stmt.CteStmt.Ctes[0];
             Assert.NotNull(def.ColumnNames);
             Assert.Equal(2, def.ColumnNames.ColumnNames.Count);
         }
@@ -1806,7 +1808,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_Cte_MultipleCtes()
         {
-            var stmt = Stmt.ParseSelect("WITH c1 AS (SELECT a FROM T), c2 AS (SELECT b FROM U) SELECT a, b FROM c1, c2");
+            Stmt.Select stmt = Stmt.ParseSelect("WITH c1 AS (SELECT a FROM T), c2 AS (SELECT b FROM U) SELECT a, b FROM c1, c2");
             Assert.Equal(2, stmt.CteStmt.Ctes.Count);
             Assert.Equal("c1", stmt.CteStmt.Ctes[0].Name);
             Assert.Equal("c2", stmt.CteStmt.Ctes[1].Name);
@@ -1815,7 +1817,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_NoCte_ReturnsNull()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T");
             Assert.Null(stmt.CteStmt);
         }
 
@@ -2704,8 +2706,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_UnionAll_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION ALL SELECT b FROM T2");
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION ALL SELECT b FROM T2");
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.UnionAll, setOp.OperationType);
             Assert.IsType<SelectExpression>(setOp.Left);
             Assert.IsType<SelectExpression>(setOp.Right);
@@ -2714,24 +2716,24 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_Union_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2");
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2");
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.Union, setOp.OperationType);
         }
 
         [Fact]
         public void Parse_Intersect_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 INTERSECT SELECT b FROM T2");
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 INTERSECT SELECT b FROM T2");
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.Intersect, setOp.OperationType);
         }
 
         [Fact]
         public void Parse_Except_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 EXCEPT SELECT b FROM T2");
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 EXCEPT SELECT b FROM T2");
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.Except, setOp.OperationType);
         }
 
@@ -2739,12 +2741,12 @@ namespace TSQL.Tests
         public void Parse_ChainedUnion_IsLeftAssociative()
         {
             // A UNION B UNION C => (A UNION B) UNION C
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 UNION SELECT c FROM T3");
-            var outerOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 UNION SELECT c FROM T3");
+            SetOperation outerOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.Union, outerOp.OperationType);
             Assert.IsType<SelectExpression>(outerOp.Right);
 
-            var innerOp = Assert.IsType<SetOperation>(outerOp.Left);
+            SetOperation innerOp = Assert.IsType<SetOperation>(outerOp.Left);
             Assert.Equal(SetOperationType.Union, innerOp.OperationType);
             Assert.IsType<SelectExpression>(innerOp.Left);
             Assert.IsType<SelectExpression>(innerOp.Right);
@@ -2754,12 +2756,12 @@ namespace TSQL.Tests
         public void Parse_IntersectBindsTighterThanUnion()
         {
             // A UNION B INTERSECT C => A UNION (B INTERSECT C)
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 INTERSECT SELECT c FROM T3");
-            var outerOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 INTERSECT SELECT c FROM T3");
+            SetOperation outerOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.Union, outerOp.OperationType);
             Assert.IsType<SelectExpression>(outerOp.Left);
 
-            var innerOp = Assert.IsType<SetOperation>(outerOp.Right);
+            SetOperation innerOp = Assert.IsType<SetOperation>(outerOp.Right);
             Assert.Equal(SetOperationType.Intersect, innerOp.OperationType);
         }
 
@@ -2767,28 +2769,28 @@ namespace TSQL.Tests
         public void Parse_IntersectBindsTighterThanExcept()
         {
             // A EXCEPT B INTERSECT C => A EXCEPT (B INTERSECT C)
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 EXCEPT SELECT b FROM T2 INTERSECT SELECT c FROM T3");
-            var outerOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 EXCEPT SELECT b FROM T2 INTERSECT SELECT c FROM T3");
+            SetOperation outerOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(SetOperationType.Except, outerOp.OperationType);
             Assert.IsType<SelectExpression>(outerOp.Left);
 
-            var innerOp = Assert.IsType<SetOperation>(outerOp.Right);
+            SetOperation innerOp = Assert.IsType<SetOperation>(outerOp.Right);
             Assert.Equal(SetOperationType.Intersect, innerOp.OperationType);
         }
 
         [Fact]
         public void Parse_SetOperationWithOrderBy_OrderByOnOutermost()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 ORDER BY a");
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 ORDER BY a");
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(1, setOp.OrderBy.Items.Count);
         }
 
         [Fact]
         public void Parse_SetOperationWithOption_OptionOnStatement()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 ORDER BY a OPTION (RECOMPILE)");
-            var setOp = Assert.IsType<SetOperation>(stmt.Query);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2 ORDER BY a OPTION (RECOMPILE)");
+            SetOperation setOp = Assert.IsType<SetOperation>(stmt.Query);
             Assert.Equal(1, setOp.OrderBy.Items.Count);
             Assert.NotNull(stmt.Option);
             Assert.Equal(QueryHintType.Recompile, stmt.Option.Hints[0].HintType);
@@ -2825,7 +2827,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_SimpleSelect_StillReturnsSelectExpression()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a");
             Assert.IsType<SelectExpression>(stmt.Query);
             Assert.Equal(1, stmt.Query.OrderBy.Items.Count);
         }
@@ -2921,8 +2923,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_ForXml_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T FOR XML RAW('row'), ROOT('data'), ELEMENTS XSINIL, TYPE");
-            var forXml = Assert.IsType<ForXmlClause>(stmt.Query.For);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T FOR XML RAW('row'), ROOT('data'), ELEMENTS XSINIL, TYPE");
+            ForXmlClause forXml = Assert.IsType<ForXmlClause>(stmt.Query.For);
 
             Assert.Equal(ForXmlMode.Raw, forXml.Mode);
             Assert.Equal(3, forXml.Directives.Count);
@@ -2934,8 +2936,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_ForJson_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T FOR JSON PATH, ROOT('result'), INCLUDE_NULL_VALUES");
-            var forJson = Assert.IsType<ForJsonClause>(stmt.Query.For);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T FOR JSON PATH, ROOT('result'), INCLUDE_NULL_VALUES");
+            ForJsonClause forJson = Assert.IsType<ForJsonClause>(stmt.Query.For);
 
             Assert.Equal(ForJsonMode.Path, forJson.Mode);
             Assert.Equal(2, forJson.Directives.Count);
@@ -2946,14 +2948,14 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_ForBrowse_Structure()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T FOR BROWSE");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T FOR BROWSE");
             Assert.IsType<ForBrowseClause>(stmt.Query.For);
         }
 
         [Fact]
         public void Parse_NoForClause_IsNull()
         {
-            var stmt = Stmt.ParseSelect("SELECT a FROM T");
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T");
             Assert.Null(stmt.Query.For);
         }
 
@@ -3067,15 +3069,15 @@ namespace TSQL.Tests
         public void ParseSelectInto_BasicTempTable_RoundTrips()
         {
             string source = "SELECT col1, col2 INTO #Temp FROM T";
-            var stmt = Stmt.ParseSelect(source);
+            Stmt.Select stmt = Stmt.ParseSelect(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
         [Fact]
         public void ParseSelectInto_ParsesIntoTarget()
         {
-            var stmt = Stmt.ParseSelect("SELECT col1 INTO #Temp FROM T");
-            var selectExpr = SelectExpressionOf(stmt);
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT col1 INTO #Temp FROM T");
+            SelectExpression selectExpr = SelectExpressionOf(stmt);
             Assert.NotNull(selectExpr.Into);
             Assert.Equal("#Temp", selectExpr.Into.ObjectName.Name);
         }
@@ -3084,7 +3086,7 @@ namespace TSQL.Tests
         public void ParseSelectInto_GlobalTempTable_RoundTrips()
         {
             string source = "SELECT * INTO ##GlobalTemp FROM T";
-            var stmt = Stmt.ParseSelect(source);
+            Stmt.Select stmt = Stmt.ParseSelect(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3092,7 +3094,7 @@ namespace TSQL.Tests
         public void ParseSelectInto_SchemaQualifiedTarget_RoundTrips()
         {
             string source = "SELECT a, b INTO dbo.NewTable FROM T";
-            var stmt = Stmt.ParseSelect(source);
+            Stmt.Select stmt = Stmt.ParseSelect(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3100,7 +3102,7 @@ namespace TSQL.Tests
         public void ParseSelectInto_WithWhere_RoundTrips()
         {
             string source = "SELECT col1 INTO #Temp FROM T WHERE col1 > 10";
-            var stmt = Stmt.ParseSelect(source);
+            Stmt.Select stmt = Stmt.ParseSelect(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3112,7 +3114,7 @@ namespace TSQL.Tests
         public void ParseInsert_SelectSource_RoundTrips()
         {
             string source = "INSERT INTO #Temp SELECT col1, col2 FROM T";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3120,7 +3122,7 @@ namespace TSQL.Tests
         public void ParseInsert_WithoutInto_RoundTrips()
         {
             string source = "INSERT #Temp SELECT col1 FROM T";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3128,7 +3130,7 @@ namespace TSQL.Tests
         public void ParseInsert_WithColumnList_RoundTrips()
         {
             string source = "INSERT INTO #Temp (col1, col2) SELECT a, b FROM T";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3136,7 +3138,7 @@ namespace TSQL.Tests
         public void ParseInsert_Values_RoundTrips()
         {
             string source = "INSERT INTO T (col1, col2) VALUES (1, 'hello')";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3144,7 +3146,7 @@ namespace TSQL.Tests
         public void ParseInsert_MultipleValueRows_RoundTrips()
         {
             string source = "INSERT INTO T VALUES (1, 'a'), (2, 'b'), (3, 'c')";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3152,7 +3154,7 @@ namespace TSQL.Tests
         public void ParseInsert_DefaultValues_RoundTrips()
         {
             string source = "INSERT INTO T DEFAULT VALUES";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3160,7 +3162,7 @@ namespace TSQL.Tests
         public void ParseInsert_ExecSource_RoundTrips()
         {
             string source = "INSERT INTO #Temp EXEC sp_GetData";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3168,7 +3170,7 @@ namespace TSQL.Tests
         public void ParseInsert_ExecWithArgs_RoundTrips()
         {
             string source = "INSERT INTO #Temp EXEC sp_GetData @Param1, @Param2";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3176,7 +3178,7 @@ namespace TSQL.Tests
         public void ParseInsert_TableVariable_RoundTrips()
         {
             string source = "INSERT INTO @TableVar SELECT col1 FROM T";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3192,36 +3194,36 @@ namespace TSQL.Tests
         [Fact]
         public void ParseInsert_SelectSource_HasCorrectSourceType()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO T SELECT 1");
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO T SELECT 1");
             Assert.IsType<SelectSource>(stmt.Source);
         }
 
         [Fact]
         public void ParseInsert_ValuesSource_HasCorrectSourceType()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO T VALUES (1)");
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO T VALUES (1)");
             Assert.IsType<ValuesSource>(stmt.Source);
         }
 
         [Fact]
         public void ParseInsert_DefaultValuesSource_HasCorrectSourceType()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO T DEFAULT VALUES");
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO T DEFAULT VALUES");
             Assert.IsType<DefaultValuesSource>(stmt.Source);
         }
 
         [Fact]
         public void ParseInsert_ExecSource_HasCorrectSourceType()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO T EXEC sp_Proc");
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO T EXEC sp_Proc");
             Assert.IsType<ExecSource>(stmt.Source);
         }
 
         [Fact]
         public void ParseInsert_TargetIsObjectIdentifier()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO dbo.T VALUES (1)");
-            var target = Assert.IsType<Expr.ObjectIdentifier>(stmt.Target);
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO dbo.T VALUES (1)");
+            Expr.ObjectIdentifier target = Assert.IsType<Expr.ObjectIdentifier>(stmt.Target);
             Assert.Equal("T", target.ObjectName.Name);
             Assert.Equal("dbo", target.SchemaName.Name);
         }
@@ -3229,14 +3231,14 @@ namespace TSQL.Tests
         [Fact]
         public void ParseInsert_TargetIsVariable()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO @TableVar VALUES (1)");
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO @TableVar VALUES (1)");
             Assert.IsType<Expr.Variable>(stmt.Target);
         }
 
         [Fact]
         public void ParseInsert_ColumnListParsed()
         {
-            var stmt = Stmt.ParseInsert("INSERT INTO T (a, b, c) VALUES (1, 2, 3)");
+            Stmt.Insert stmt = Stmt.ParseInsert("INSERT INTO T (a, b, c) VALUES (1, 2, 3)");
             Assert.NotNull(stmt.ColumnList);
             Assert.Equal(3, stmt.ColumnList.Columns.Count);
             Assert.Equal("a", stmt.ColumnList.Columns[0].Name);
@@ -3248,7 +3250,7 @@ namespace TSQL.Tests
         public void ParseInsert_SchemaQualifiedTable_RoundTrips()
         {
             string source = "INSERT INTO dbo.MyTable (col1) VALUES (1)";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3256,7 +3258,7 @@ namespace TSQL.Tests
         public void ParseInsert_Execute_RoundTrips()
         {
             string source = "INSERT INTO #Temp EXECUTE sp_GetData";
-            var stmt = Stmt.ParseInsert(source);
+            Stmt.Insert stmt = Stmt.ParseInsert(source);
             Assert.Equal(source, stmt.ToSource());
         }
 
@@ -3373,16 +3375,16 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_BracketedTableName_NameIsNormalized()
         {
-            var select = Stmt.ParseSelect("SELECT * FROM [users]");
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Stmt.Select select = Stmt.ParseSelect("SELECT * FROM [users]");
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("users", tableRef.TableName.ObjectName.Name);
         }
 
         [Fact]
         public void Parse_BracketedTableName_LexemePreservesBrackets()
         {
-            var select = Stmt.ParseSelect("SELECT * FROM [users]");
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Stmt.Select select = Stmt.ParseSelect("SELECT * FROM [users]");
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("[users]", tableRef.TableName.ObjectName.Lexeme);
         }
 
@@ -3396,8 +3398,8 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_BracketedSchemaAndTable_NamesAreNormalized()
         {
-            var select = Stmt.ParseSelect("SELECT * FROM [dbo].[MyTable]");
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Stmt.Select select = Stmt.ParseSelect("SELECT * FROM [dbo].[MyTable]");
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
             Assert.Equal("MyTable", tableRef.TableName.ObjectName.Name);
         }
@@ -3412,9 +3414,9 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_BracketedColumnName_NameIsNormalized()
         {
-            var select = Stmt.ParseSelect("SELECT [Col] FROM T");
-            var item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            var columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
+            Stmt.Select select = Stmt.ParseSelect("SELECT [Col] FROM T");
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
             Assert.Equal("Col", columnId.ColumnName.Name);
         }
 
@@ -3428,16 +3430,16 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_BracketedAlias_NameIsNormalized()
         {
-            var select = Stmt.ParseSelect("SELECT * FROM T1 AS [A]");
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Stmt.Select select = Stmt.ParseSelect("SELECT * FROM T1 AS [A]");
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("A", tableRef.Alias.Name);
         }
 
         [Fact]
         public void Parse_BracketedAlias_LexemePreservesBrackets()
         {
-            var select = Stmt.ParseSelect("SELECT * FROM T1 AS [A]");
-            var tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
+            Stmt.Select select = Stmt.ParseSelect("SELECT * FROM T1 AS [A]");
+            TableReference tableRef = Assert.IsType<TableReference>(SelectExpressionOf(select).From.TableSources[0]);
             Assert.Equal("[A]", tableRef.Alias.Lexeme);
         }
 
@@ -3451,7 +3453,7 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_BracketedCteName_NameIsNormalized()
         {
-            var stmt = Stmt.ParseSelect("WITH [MyCTE] AS (SELECT a FROM T) SELECT a FROM MyCTE");
+            Stmt.Select stmt = Stmt.ParseSelect("WITH [MyCTE] AS (SELECT a FROM T) SELECT a FROM MyCTE");
             Assert.Equal("MyCTE", stmt.CteStmt.Ctes[0].Name);
         }
 
@@ -3465,18 +3467,18 @@ namespace TSQL.Tests
         [Fact]
         public void Parse_MixedBracketedAndUnbracketed_AllNamesNormalized()
         {
-            var select = Stmt.ParseSelect("SELECT [a], b FROM [dbo].[T1]");
-            var expr = SelectExpressionOf(select);
+            Stmt.Select select = Stmt.ParseSelect("SELECT [a], b FROM [dbo].[T1]");
+            SelectExpression expr = SelectExpressionOf(select);
 
-            var col0 = Assert.IsType<SelectColumn>(expr.Columns[0]);
-            var colId0 = Assert.IsType<Expr.ColumnIdentifier>(col0.Expression);
+            SelectColumn col0 = Assert.IsType<SelectColumn>(expr.Columns[0]);
+            Expr.ColumnIdentifier colId0 = Assert.IsType<Expr.ColumnIdentifier>(col0.Expression);
             Assert.Equal("a", colId0.ColumnName.Name);
 
-            var col1 = Assert.IsType<SelectColumn>(expr.Columns[1]);
-            var colId1 = Assert.IsType<Expr.ColumnIdentifier>(col1.Expression);
+            SelectColumn col1 = Assert.IsType<SelectColumn>(expr.Columns[1]);
+            Expr.ColumnIdentifier colId1 = Assert.IsType<Expr.ColumnIdentifier>(col1.Expression);
             Assert.Equal("b", colId1.ColumnName.Name);
 
-            var tableRef = Assert.IsType<TableReference>(expr.From.TableSources[0]);
+            TableReference tableRef = Assert.IsType<TableReference>(expr.From.TableSources[0]);
             Assert.Equal("dbo", tableRef.TableName.SchemaName.Name);
             Assert.Equal("T1", tableRef.TableName.ObjectName.Name);
         }

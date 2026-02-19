@@ -230,7 +230,7 @@ namespace TSQL
         public string SqlText { get; }
 
         /// <param name="message">A description of the parse error.</param>
-        public ParseError(string message) : base(message)
+        internal ParseError(string message) : base(message)
         {
         }
 
@@ -238,7 +238,7 @@ namespace TSQL
         /// <param name="line">1-based line number where the error occurred.</param>
         /// <param name="column">0-based column offset within the line.</param>
         /// <param name="sqlText">The original SQL text being parsed.</param>
-        public ParseError(string message, int line, int column, string sqlText)
+        internal ParseError(string message, int line, int column, string sqlText)
             : this(message, line, column, sqlText, null)
         {
         }
@@ -248,7 +248,7 @@ namespace TSQL
         /// <param name="column">0-based column offset within the line.</param>
         /// <param name="sqlText">The original SQL text being parsed.</param>
         /// <param name="innerException">The exception that caused this parse error, if any.</param>
-        public ParseError(string message, int line, int column, string sqlText, Exception innerException)
+        internal ParseError(string message, int line, int column, string sqlText, Exception innerException)
             : base(message, innerException)
         {
             Line = line;
