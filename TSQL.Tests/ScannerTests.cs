@@ -261,6 +261,68 @@
             Assert.Equal(TokenType.IDENTIFIER, tokens[3].Type);
             Assert.Equal("#Temp", tokens[3].Lexeme);
         }
+
+        // === Error Cases ===
+
+        [Fact]
+        public void ScanTokens_UnterminatedString_ThrowsParseError()
+        {
+            string sql = "SELECT 'unterminated";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal(1, ex.Line);
+            Assert.NotNull(ex.Position);
+            Assert.Equal(sql, ex.SqlText);
+        }
+
+        [Fact]
+        public void ScanTokens_UnexpectedCharacter_ThrowsParseError()
+        {
+            string sql = "SELECT `bad";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal(1, ex.Line);
+            Assert.NotNull(ex.Position);
+            Assert.Equal(sql, ex.SqlText);
+            Assert.Contains("`", ex.Message);
+        }
+
+        [Fact]
+        public void ScanTokens_UnterminatedComment_ThrowsParseError()
+        {
+            string sql = "SELECT /* unterminated";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal(1, ex.Line);
+            Assert.NotNull(ex.Position);
+            Assert.Equal(sql, ex.SqlText);
+        }
+
+        [Fact]
+        public void ScanTokens_OverflowInteger_ThrowsParseError()
+        {
+            string sql = "SELECT 99999999999999999999";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal(1, ex.Line);
+            Assert.NotNull(ex.Position);
+            Assert.Equal(sql, ex.SqlText);
+            Assert.IsType<OverflowException>(ex.InnerException);
+        }
+
+        [Fact]
+        public void ScanTokens_ErrorOnSecondLine_ReportsCorrectLine()
+        {
+            string sql = "SELECT\n'unterminated";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal(2, ex.Line);
+        }
     }
 
     public record ExpectedToken(TokenType Type, string Lexeme, object? Literal = null);

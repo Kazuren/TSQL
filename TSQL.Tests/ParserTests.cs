@@ -992,6 +992,17 @@ namespace TSQL.Tests
             Assert.ThrowsAny<ParseError>(() => Stmt.Parse("SELECT SUM(x) OVER (ROWS UNBOUNDED PRECEDING) FROM T"));
         }
 
+        [Fact]
+        public void Parse_Error_PopulatesStructuredProperties()
+        {
+            string sql = "SELECT FROM";
+            ParseError ex = Assert.Throws<ParseError>(() => Stmt.Parse(sql));
+
+            Assert.NotNull(ex.Line);
+            Assert.NotNull(ex.Position);
+            Assert.Equal(sql, ex.SqlText);
+        }
+
         // === Round-Trip Tests ===
 
         [Theory]

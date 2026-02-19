@@ -220,9 +220,33 @@ namespace TSQL
 
     public class ParseError : Exception
     {
+        /// <summary>1-based line number where the error occurred, or null if unavailable.</summary>
+        public int? Line { get; }
+
+        /// <summary>0-based character offset from the start of the source where the error occurred, or null if unavailable.</summary>
+        public int? Position { get; }
+
+        /// <summary>The original SQL text being parsed.</summary>
+        public string SqlText { get; }
+
         public ParseError(string message) : base(message)
         {
+        }
 
+        public ParseError(string message, int line, int position, string sqlText)
+            : base(message)
+        {
+            Line = line;
+            Position = position;
+            SqlText = sqlText;
+        }
+
+        public ParseError(string message, int line, int position, string sqlText, Exception innerException)
+            : base(message, innerException)
+        {
+            Line = line;
+            Position = position;
+            SqlText = sqlText;
         }
     }
 
@@ -3864,7 +3888,7 @@ namespace TSQL
                 int columnStart = sourceToken.StartPosition;
                 int columnEnd = sourceToken.EndPosition;
                 string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {columnStart}:{columnEnd}. Token: {sourceToken.Type}";
-                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}");
+                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}", line, columnStart, sourceToken.Source);
             }
             else
             {

@@ -25,6 +25,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
         public static Stmt AddCondition(this Stmt stmt, string condition,
             out IReadOnlyDictionary<string, object> parameters,
             IEnumerable<object> values,
@@ -75,6 +76,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
         public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
             ColumnExistenceChecker columnExists,
             out IReadOnlyDictionary<string, object> parameters,
