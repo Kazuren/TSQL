@@ -1105,7 +1105,7 @@ namespace TSQL.Tests
             string result = stmt.ReplaceWithTempTables("TableValuedFunction").ToSource();
 
             Assert.Equal(
-                "SELECT * INTO #TableValuedFunction FROM TableValuedFunction(1, 2);\n" +
+                "SELECT Val, Id INTO #TableValuedFunction FROM TableValuedFunction(1, 2);\n" +
                 "SELECT f.Val FROM Users u INNER JOIN #TableValuedFunction AS f ON u.Id = f.Id",
                 result);
         }
@@ -1129,7 +1129,7 @@ namespace TSQL.Tests
             string result = stmt.ReplaceWithTempTables("MyFunction").ToSource();
 
             Assert.Equal(
-                "SELECT * INTO #MyFunction FROM dbo.MyFunction(1, 2);\n" +
+                "SELECT Val INTO #MyFunction FROM dbo.MyFunction(1, 2);\n" +
                 "SELECT f.Val FROM #MyFunction AS f",
                 result);
         }
@@ -1143,8 +1143,20 @@ namespace TSQL.Tests
 
             Assert.Equal(
                 "SELECT Name, Id INTO #Users FROM Users;\n" +
-                "SELECT * INTO #GetDetails FROM GetDetails(u.Id);\n" +
+                "SELECT Val, Id INTO #GetDetails FROM GetDetails(u.Id);\n" +
                 "SELECT u.Name, f.Val FROM #Users u INNER JOIN #GetDetails AS f ON u.Id = f.Id",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_TvfQualifiedWildcard_SelectStarFallback()
+        {
+            var stmt = Stmt.Parse("SELECT f.* FROM GetDetails(1) AS f");
+            string result = stmt.ReplaceWithTempTables("GetDetails").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #GetDetails FROM GetDetails(1);\n" +
+                "SELECT f.* FROM #GetDetails AS f",
                 result);
         }
 

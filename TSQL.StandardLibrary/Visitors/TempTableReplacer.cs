@@ -112,6 +112,18 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
+            // Also map TVF aliases so column narrowing applies to table-valued functions.
+            // Only for function-name matches (not alias-matched rowset functions like OPENQUERY).
+            foreach (RowsetFunctionReference rowsetRef in collector.MatchedRowsetFunctions)
+            {
+                string functionName = rowsetRef.FunctionCall.Callee.ObjectName.Name;
+                if (targetSet.Contains(functionName) && rowsetRef.Alias != null)
+                {
+                    string key = functionName.ToUpperInvariant();
+                    qualifierToTable[rowsetRef.Alias.Name] = key;
+                }
+            }
+
             var starTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var tableColumnList = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var tableColumnDedup = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
@@ -243,27 +255,8 @@ namespace TSQL.StandardLibrary.Visitors
                 var (originalTableName, objectName) = regularInfo[key];
                 bool useStar = collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
 
-                var selectExpr = new SelectExpression();
-
-                if (useStar)
-                {
-                    selectExpr.Columns.Add(new Expr.Wildcard());
-                }
-                else
-                {
-                    List<string> columns = tableColumnList[key];
-                    for (int i = 0; i < columns.Count; i++)
-                    {
-                        selectExpr.Columns.Add(new SelectColumn(
-                            new Expr.ColumnIdentifier(new ColumnName(columns[i])), null));
-                    }
-                }
-
-                selectExpr.Into = TempTableIdentifier(objectName);
-                selectExpr.From = new FromClause();
-                selectExpr.From.TableSources.Add(new TableReference(originalTableName));
-
-                allStatements.Add(new Stmt.Select(selectExpr));
+                allStatements.Add(BuildSelectInto(objectName,
+                    new TableReference(originalTableName), useStar, useStar ? null : tableColumnList[key]));
             }
 
             // 4b. CTEs: WITH ... SELECT * INTO #cte FROM cte
@@ -321,7 +314,10 @@ namespace TSQL.StandardLibrary.Visitors
                 }
 
                 rowsetRef.Alias = null;
-                allStatements.Add(SelectStarInto(tempName, rowsetRef));
+
+                string key = tempName.ToUpperInvariant();
+                bool useStar = !matchedByFunctionName || collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
+                allStatements.Add(BuildSelectInto(tempName, rowsetRef, useStar, useStar ? null : tableColumnList[key]));
 
                 if (outerSelect?.From != null)
                 {
@@ -342,8 +338,26 @@ namespace TSQL.StandardLibrary.Visitors
 
         private static Stmt.Select SelectStarInto(string tempName, TableSource source)
         {
+            return BuildSelectInto(tempName, source, useStar: true, columns: null);
+        }
+
+        private static Stmt.Select BuildSelectInto(string tempName, TableSource source, bool useStar, List<string> columns)
+        {
             var selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new Expr.Wildcard());
+
+            if (useStar)
+            {
+                selectExpr.Columns.Add(new Expr.Wildcard());
+            }
+            else
+            {
+                for (int i = 0; i < columns.Count; i++)
+                {
+                    selectExpr.Columns.Add(new SelectColumn(
+                        new Expr.ColumnIdentifier(new ColumnName(columns[i])), null));
+                }
+            }
+
             selectExpr.Into = TempTableIdentifier(tempName);
             selectExpr.From = new FromClause();
             selectExpr.From.TableSources.Add(source);
