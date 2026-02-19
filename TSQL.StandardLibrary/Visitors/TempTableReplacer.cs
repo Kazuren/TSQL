@@ -351,6 +351,26 @@ namespace TSQL.StandardLibrary.Visitors
             return false;
         }
 
+        // The FROM clause is a tree of TableSource nodes. Joins form interior nodes
+        // with Left/Right children; leaf nodes are TableReference, SubqueryReference, etc.
+        //
+        // Example: "FROM Users u INNER JOIN Orders o ON ... CROSS APPLY (SELECT ...) d"
+        //
+        //   FromClause.TableSources[0]
+        //       └─ ApplyJoin
+        //            ├─ Left:  QualifiedJoin
+        //            │           ├─ Left:  TableReference("Users")   ← leaf
+        //            │           └─ Right: TableReference("Orders")  ← leaf
+        //            └─ Right: SubqueryReference(...)                 ← leaf
+        //
+        // To replace a leaf (e.g., swap SubqueryReference for TableReference("#T")),
+        // we walk this tree looking for the target by reference equality, then assign
+        // the replacement into the parent's Left, Right, or Inner property.
+        //
+        // ReplaceInNode dispatches on the node type. For join nodes (QualifiedJoin,
+        // CrossJoin, ApplyJoin), it delegates to ReplaceInBinaryJoin which checks
+        // both children and recurses. The setter delegates (v => qj.Left = v) let
+        // ReplaceInBinaryJoin write back into the parent without knowing its concrete type.
         private static bool ReplaceInNode(TableSource node, TableSource target, TableSource replacement)
         {
             switch (node)
