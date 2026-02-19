@@ -5,6 +5,35 @@ namespace TSQL.StandardLibrary.Visitors
 {
     internal static class TempTableReplacer
     {
+        /// <summary>
+        /// Transforms a SELECT statement by materializing named table sources into temp tables.
+        ///
+        /// Given:  SELECT u.Name FROM (SELECT Id, Name FROM Users) AS T
+        /// With:   ReplaceWithTempTables("T")
+        /// Output: SELECT Id, Name INTO #T FROM Users;
+        ///         SELECT u.Name FROM #T
+        ///
+        /// The algorithm works in four phases:
+        ///
+        /// 1. COLLECT  — Walk the AST to find all table sources whose name matches a target.
+        ///               Matches fall into three categories: regular tables, CTEs, and
+        ///               derived tables / rowset functions (matched by alias).
+        ///
+        /// 2. COLUMNS  — For regular tables, determine which columns to include in the
+        ///               SELECT INTO. Scans column references and wildcards to build
+        ///               a per-table column list (or falls back to SELECT *).
+        ///
+        /// 3. SNAPSHOT  — Capture original table name identifiers and build CTE SELECT INTO
+        ///               statements BEFORE mutating the AST. This is necessary because
+        ///               mutation rewrites table names to #temp, and the SELECT INTO
+        ///               statements need the original names.
+        ///
+        /// 4. EMIT     — Assemble the output Script in order:
+        ///               a) SELECT INTO for each regular table (with column narrowing)
+        ///               b) SELECT * INTO for each matched CTE (with its prerequisite CTEs)
+        ///               c) SELECT INTO for each derived table / rowset function
+        ///               d) The original query, now referencing #temp tables
+        /// </summary>
         public static Script Replace(Stmt stmt, string[] tableNames)
         {
             if (tableNames == null || tableNames.Length == 0)
@@ -18,7 +47,8 @@ namespace TSQL.StandardLibrary.Visitors
                 targetSet.Add(name);
             }
 
-            // Record CTE names and indices before walking
+            // Index CTE names so we can distinguish CTE references from regular tables
+            // when they share a name with a target.
             var cteNameToIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             Stmt.Select selectStmt = stmt as Stmt.Select;
             if (selectStmt?.CteStmt != null)
@@ -29,7 +59,12 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Phase 1: Walk the AST to collect references
+            // ── Phase 1: COLLECT ──────────────────────────────────────────────
+            // Walk the entire AST once to find:
+            //   - TableReferences whose object name matches a target
+            //   - SubqueryReferences (derived tables) whose alias matches a target
+            //   - RowsetFunctionReferences whose alias matches a target
+            //   - All column identifiers, wildcards, and qualified wildcards (for phase 2)
             var collector = new Collector(targetSet);
             collector.Walk(stmt);
 
@@ -38,7 +73,8 @@ namespace TSQL.StandardLibrary.Visitors
                 return new Script(new[] { stmt });
             }
 
-            // Classify matches into CTE vs regular table
+            // Classify TableReference matches: if the name appears in the CTE list,
+            // it's a CTE reference; otherwise it's a regular table.
             var regularMatches = new List<TableReference>();
             var cteMatchedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -55,7 +91,15 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Phase 2: Column mapping for regular tables
+            // ── Phase 2: COLUMNS ──────────────────────────────────────────────
+            // For each regular table, figure out which columns the query actually uses
+            // so the SELECT INTO can be narrowed (e.g., "SELECT Name, Id INTO #Users"
+            // instead of "SELECT * INTO #Users"). This maps both table names and aliases
+            // to a canonical key, then collects every column reference qualified with
+            // that key. Falls back to SELECT * if:
+            //   - The query uses a bare * (SELECT *)
+            //   - The query uses a qualified wildcard (SELECT u.*)
+            //   - No qualified column references were found for that table
             var qualifierToTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (TableReference tableRef in regularMatches)
             {
@@ -100,7 +144,10 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Phase 3: Capture original ObjectIdentifiers BEFORE mutation
+            // ── Phase 3: SNAPSHOT ─────────────────────────────────────────────
+            // Save original table name identifiers before mutation rewrites them.
+            // The SELECT INTO statements need "FROM Users" (original), but after
+            // mutation the AST will say "FROM #Users".
             var regularInfo = new Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName)>(StringComparer.OrdinalIgnoreCase);
             var regularOrder = new List<string>();
 
@@ -115,8 +162,10 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Build CTE SELECT INTO ASTs BEFORE mutation
-            // (so we capture CteDefinition references while they're still in the original list)
+            // Build CTE SELECT INTO statements before mutation for the same reason:
+            // each CTE's materialization query includes the CTE definitions up to and
+            // including itself (e.g., "WITH A AS (...), B AS (...) SELECT * INTO #B FROM B").
+            // These definitions reference the original CTE list which mutation will modify.
             var cteSelectIntos = new List<Stmt>();
             if (selectStmt?.CteStmt != null && cteMatchedNames.Count > 0)
             {
@@ -141,14 +190,17 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Mutate all matched table references
+            // ── MUTATE ────────────────────────────────────────────────────────
+            // Rewrite all matched TableReference nodes in-place: "Users" → "#Users".
+            // This modifies the original AST so the final query references temp tables.
             foreach (TableReference tableRef in collector.MatchedTables)
             {
                 string objName = tableRef.TableName.ObjectName.Name;
                 tableRef.TableName = TempTableIdentifier(objName);
             }
 
-            // Remove matched CTE definitions from the final query
+            // Remove materialized CTE definitions from the final query's WITH clause.
+            // If all CTEs were materialized, drop the WITH clause entirely.
             if (selectStmt?.CteStmt != null && cteMatchedNames.Count > 0)
             {
                 bool allMatched = true;
@@ -179,10 +231,13 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Phase 4: Build output as list of statements
+            // ── Phase 4: EMIT ─────────────────────────────────────────────────
+            // Assemble the output Script. Statement order matters — each SELECT INTO
+            // must appear before any query that references its temp table.
             var allStatements = new List<Stmt>();
 
-            // Regular table SELECT INTOs
+            // 4a. Regular tables: SELECT [columns] INTO #Table FROM Table
+            //     Uses the narrowed column list from phase 2 when possible.
             foreach (string key in regularOrder)
             {
                 var (originalTableName, objectName) = regularInfo[key];
@@ -211,9 +266,14 @@ namespace TSQL.StandardLibrary.Visitors
                 allStatements.Add(new Stmt.Select(selectExpr));
             }
 
+            // 4b. CTEs: WITH ... SELECT * INTO #cte FROM cte
             allStatements.AddRange(cteSelectIntos);
 
-            // Derived table (SubqueryReference) SELECT INTOs
+            // 4c. Derived tables: materialize the subquery, then swap the
+            //     SubqueryReference node in the outer FROM with a TableReference to #alias.
+            //     For simple SELECTs, we extract the inner query and add INTO directly.
+            //     For set operations (UNION etc.), we wrap the subquery in a new
+            //     SELECT * INTO #alias FROM (subquery) statement.
             SelectExpression outerSelect = selectStmt?.Query as SelectExpression;
             foreach (SubqueryReference subqRef in collector.MatchedSubqueries)
             {
@@ -237,7 +297,9 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Rowset function SELECT INTOs
+            // 4d. Rowset functions (e.g., OPENQUERY): materialize via
+            //     SELECT * INTO #alias FROM OPENQUERY(...), then swap the node in the
+            //     outer FROM with a TableReference to #alias.
             foreach (RowsetFunctionReference rowsetRef in collector.MatchedRowsetFunctions)
             {
                 string aliasName = rowsetRef.Alias.Name;
@@ -251,7 +313,7 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // Modified query
+            // 4e. The original query, now referencing #temp tables
             allStatements.Add(stmt);
 
             return new Script(allStatements);
