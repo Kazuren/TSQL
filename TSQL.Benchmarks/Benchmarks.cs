@@ -970,5 +970,48 @@ namespace TSQL.Benchmarks
         }
     }
 
+    /// <summary>
+    /// Benchmarks for ReplaceWithTempTables (AST mutation + predicate pushdown + script assembly)
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("StandardLibrary")]
+    public class ReplaceWithTempTablesBenchmarks
+    {
+        private const string SimpleQuery =
+            "SELECT u.Id, u.Name FROM Users u";
+
+        private const string MediumQuery =
+            "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 AND o.Total > 100";
+
+        private const string ComplexQuery =
+            "WITH cte AS (SELECT t.Id, t.Value FROM Totals t) " +
+            "SELECT u.Name, o.Total, c.Value FROM Users u " +
+            "INNER JOIN Orders o ON u.Id = o.UserId " +
+            "INNER JOIN cte c ON o.Id = c.Id " +
+            "WHERE u.Active = 1 AND u.Id = o.UserId AND o.Status = 'shipped'";
+
+        [Benchmark(Description = "Single table, column narrowing")]
+        public Script Simple()
+        {
+            var stmt = Stmt.Parse(SimpleQuery);
+            return stmt.ReplaceWithTempTables("Users");
+        }
+
+        [Benchmark(Description = "Two-table JOIN with predicate pushdown")]
+        public Script Medium()
+        {
+            var stmt = Stmt.Parse(MediumQuery);
+            return stmt.ReplaceWithTempTables("Users", "Orders");
+        }
+
+        [Benchmark(Description = "CTE + JOIN + mixed predicates")]
+        public Script Complex()
+        {
+            var stmt = Stmt.Parse(ComplexQuery);
+            return stmt.ReplaceWithTempTables("Users", "Orders", "cte");
+        }
+    }
+
     #endregion
 }

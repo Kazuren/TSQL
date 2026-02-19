@@ -38,6 +38,10 @@ namespace TSQL.StandardLibrary.Visitors
         ///               b) SELECT * INTO for each matched CTE (with its prerequisite CTEs)
         ///               c) SELECT INTO for each derived table / rowset function
         ///               d) The original query, now referencing #temp tables
+        ///
+        /// Complexity (N = AST nodes, T = targets, C = column references, K = CTEs):
+        ///   Time:   O(N + K²) — one full walk + per-conjunct sub-walks + CTE prerequisite copies
+        ///   Memory: O(C + T + K²) — column refs, per-table maps, CTE prerequisite lists
         /// </summary>
         public static Script Replace(Stmt stmt, string[] tableNames)
         {
