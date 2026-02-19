@@ -154,8 +154,8 @@ With parameterized values:
 ```csharp
 stmt.AddCondition(
     "TenantId = @TenantId",
-    out IReadOnlyDictionary<string, object> parameters,
-    new object[] { ("@TenantId", 42) });
+    new object[] { ("@TenantId", 42) },
+    out IReadOnlyDictionary<string, object> parameters);
 // parameters["@TenantId"] == 42
 ```
 

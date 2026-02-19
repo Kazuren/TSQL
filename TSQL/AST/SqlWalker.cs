@@ -16,21 +16,29 @@ namespace TSQL
     {
         #region Public Entry Points
 
+        /// <summary>Walks the AST rooted at the given statement.</summary>
+        /// <param name="stmt">The statement to traverse.</param>
         public void Walk(Stmt stmt)
         {
             stmt.Accept((Stmt.Visitor<object>)this);
         }
 
+        /// <summary>Walks the AST rooted at the given expression.</summary>
+        /// <param name="expr">The expression to traverse.</param>
         public void Walk(Expr expr)
         {
             expr.Accept((Expr.Visitor<object>)this);
         }
 
+        /// <summary>Walks the AST rooted at the given predicate.</summary>
+        /// <param name="predicate">The predicate to traverse.</param>
         public void Walk(Predicate predicate)
         {
             predicate.Accept((Predicate.Visitor<object>)this);
         }
 
+        /// <summary>Walks the AST rooted at the given table source.</summary>
+        /// <param name="tableSource">The table source to traverse.</param>
         public void Walk(TableSource tableSource)
         {
             tableSource.Accept((TableSource.Visitor<object>)this);

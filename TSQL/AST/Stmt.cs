@@ -7,6 +7,7 @@ namespace TSQL
     public abstract class Stmt : SyntaxElement
     {
         /// <summary>Parses a SQL statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse.</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Stmt Parse(string sql)
         {
@@ -14,6 +15,7 @@ namespace TSQL
         }
 
         /// <summary>Parses a SQL SELECT statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be a SELECT statement.</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Select ParseSelect(string sql)
         {
@@ -21,6 +23,7 @@ namespace TSQL
         }
 
         /// <summary>Parses a SQL INSERT statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be an INSERT statement.</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Insert ParseInsert(string sql)
         {
@@ -275,6 +278,7 @@ namespace TSQL
         internal readonly List<Token> _semicolons;
 
         /// <summary>Parses a SQL script containing one or more statements.</summary>
+        /// <param name="sql">The SQL text to parse. May contain multiple semicolon-separated statements.</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Script Parse(string sql)
         {

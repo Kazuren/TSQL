@@ -764,7 +764,7 @@ namespace TSQL.Benchmarks
             var tokens = scanner.ScanTokens();
             Parser parser = new Parser(tokens);
             Stmt stmt = parser.Parse();
-            stmt.AddCondition("Active = @Active", out _, SimpleValues);
+            stmt.AddCondition("Active = @Active", SimpleValues, out _);
             return stmt.ToSource();
         }
 
@@ -775,7 +775,7 @@ namespace TSQL.Benchmarks
             var tokens = scanner.ScanTokens();
             Parser parser = new Parser(tokens);
             Stmt stmt = parser.Parse();
-            stmt.AddCondition("Active = @P0 AND Age > @P1", out _, MediumValues);
+            stmt.AddCondition("Active = @P0 AND Age > @P1", MediumValues, out _);
             return stmt.ToSource();
         }
 
@@ -786,8 +786,8 @@ namespace TSQL.Benchmarks
             var tokens = scanner.ScanTokens();
             Parser parser = new Parser(tokens);
             Stmt stmt = parser.Parse();
-            stmt.AddCondition("Active = @P0", out _, ComplexValues1);
-            stmt.AddCondition("Region = @P0", out _, ComplexValues2);
+            stmt.AddCondition("Active = @P0", ComplexValues1, out _);
+            stmt.AddCondition("Region = @P0", ComplexValues2, out _);
             return stmt.ToSource();
         }
     }

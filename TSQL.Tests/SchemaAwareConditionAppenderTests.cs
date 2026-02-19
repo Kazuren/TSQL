@@ -600,8 +600,8 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
-                out IReadOnlyDictionary<string, object>? parameters, new object[] { 42 });
+            stmt.AddSchemaAwareCondition("I_ID = @P0",
+                new object[] { 42 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -614,8 +614,8 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @TenantId", CreateChecker(schema),
-                out IReadOnlyDictionary<string, object>? parameters, new object[] { ("@TenantId", 99) });
+            stmt.AddSchemaAwareCondition("I_ID = @TenantId",
+                new object[] { ("@TenantId", 99) }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @TenantId", stmt.ToSource());
             Assert.Single(parameters);
@@ -628,8 +628,8 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.NAME = @P0");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
-                out IReadOnlyDictionary<string, object>? parameters, new object[] { 7 });
+            stmt.AddSchemaAwareCondition("I_ID = @P0",
+                new object[] { 7 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.NAME = @P0 AND T1.I_ID = @P0_1", stmt.ToSource());
             Assert.Single(parameters);
@@ -644,8 +644,8 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @Filter", CreateChecker(schema),
-                out IReadOnlyDictionary<string, object>? parameters, new object[] { ("@Filter", 5) });
+            stmt.AddSchemaAwareCondition("I_ID = @Filter",
+                new object[] { ("@Filter", 5) }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = @Filter AND T2.I_ID = @Filter",
@@ -660,10 +660,10 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @P0", CreateChecker(schema),
-                out IReadOnlyDictionary<string, object>? p1, new object[] { 1 });
-            stmt.AddSchemaAwareCondition("STATUS = @P0", CreateChecker(schema),
-                out IReadOnlyDictionary<string, object>? p2, new object[] { 2 });
+            stmt.AddSchemaAwareCondition("I_ID = @P0",
+                new object[] { 1 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? p1);
+            stmt.AddSchemaAwareCondition("STATUS = @P0",
+                new object[] { 2 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? p2);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0 AND T1.STATUS = @P0_1", stmt.ToSource());
             Assert.Single(p1);

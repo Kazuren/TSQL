@@ -398,7 +398,7 @@ namespace TSQL.Tests
         public void AddConditionParameterized_UnnamedNoCollision()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters, new object[] { 1 });
+            stmt.AddCondition("Active = @P0", new object[] { 1 }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE Active = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -409,8 +409,8 @@ namespace TSQL.Tests
         public void AddConditionParameterized_NamedValueTuple_NoCollision()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("TenantId = @TenantId", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { ("@TenantId", 42) });
+            stmt.AddCondition("TenantId = @TenantId",
+                new object[] { ("@TenantId", 42) }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE TenantId = @TenantId", stmt.ToSource());
             Assert.Single(parameters);
@@ -421,8 +421,8 @@ namespace TSQL.Tests
         public void AddConditionParameterized_NamedKeyValuePair()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Status = @Status", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { new KeyValuePair<string, object>("@Status", "active") });
+            stmt.AddCondition("Status = @Status",
+                new object[] { new KeyValuePair<string, object>("@Status", "active") }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE Status = @Status", stmt.ToSource());
             Assert.Single(parameters);
@@ -433,7 +433,7 @@ namespace TSQL.Tests
         public void AddConditionParameterized_CollisionWithExisting()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
-            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters, new object[] { 1 });
+            stmt.AddCondition("Active = @P0", new object[] { 1 }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND Active = @P0_1", stmt.ToSource());
             Assert.Single(parameters);
@@ -444,8 +444,8 @@ namespace TSQL.Tests
         public void AddConditionParameterized_MultipleParams_MixedCollisions()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
-            stmt.AddCondition("a = @P0 AND b = @P1", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { ("@P0", 10), ("@P1", 20) });
+            stmt.AddCondition("a = @P0 AND b = @P1",
+                new object[] { ("@P0", 10), ("@P1", 20) }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND a = @P0_1 AND b = @P1", stmt.ToSource());
             Assert.Equal(2, parameters.Count);
@@ -458,8 +458,8 @@ namespace TSQL.Tests
         {
             Stmt stmt = Stmt.Parse(
                 "SELECT * FROM T UNION ALL SELECT * FROM S");
-            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { 1 }, WhereClauseTarget.All);
+            stmt.AddCondition("Active = @P0",
+                new object[] { 1 }, WhereClauseTarget.All, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Contains("T WHERE Active = @P0", stmt.ToSource());
             Assert.Contains("S WHERE Active = @P0", stmt.ToSource());
@@ -471,8 +471,8 @@ namespace TSQL.Tests
         public void AddConditionParameterized_SameVariableTwiceInCondition()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
-            stmt.AddCondition("a = @P0 OR b = @P0", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { ("@P0", 99) });
+            stmt.AddCondition("a = @P0 OR b = @P0",
+                new object[] { ("@P0", 99) }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND (a = @P0_1 OR b = @P0_1)", stmt.ToSource());
             Assert.Single(parameters);
@@ -483,8 +483,8 @@ namespace TSQL.Tests
         public void AddConditionParameterized_ConditionVarNotInValues()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @Existing");
-            stmt.AddCondition("a = @Existing AND b = @New", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { ("@New", 5) });
+            stmt.AddCondition("a = @Existing AND b = @New",
+                new object[] { ("@New", 5) }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @Existing AND a = @Existing AND b = @New", stmt.ToSource());
             Assert.Single(parameters);
@@ -495,7 +495,7 @@ namespace TSQL.Tests
         public void AddConditionParameterized_EmptyValuesArray()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Active = 1", out IReadOnlyDictionary<string, object>? parameters, Array.Empty<object>());
+            stmt.AddCondition("Active = 1", Array.Empty<object>(), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE Active = 1", stmt.ToSource());
             Assert.Empty(parameters);
@@ -505,8 +505,8 @@ namespace TSQL.Tests
         public void AddConditionParameterized_ChainThenParameterize()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
-                .AddCondition("TenantId = @TenantId", out IReadOnlyDictionary<string, object>? p1,
-                    new object[] { ("@TenantId", 42) })
+                .AddCondition("TenantId = @TenantId",
+                    new object[] { ("@TenantId", 42) }, out IReadOnlyDictionary<string, object>? p1)
                 .Parameterize(out IReadOnlyDictionary<string, object>? p2);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND TenantId = @TenantId", stmt.ToSource());
@@ -520,10 +520,10 @@ namespace TSQL.Tests
         public void AddConditionParameterized_ChainTwoAddConditions()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T")
-                .AddCondition("TenantId = @TenantId", out IReadOnlyDictionary<string, object>? p1,
-                    new object[] { ("@TenantId", 1) })
-                .AddCondition("Active = @Active", out IReadOnlyDictionary<string, object>? p2,
-                    new object[] { ("@Active", true) });
+                .AddCondition("TenantId = @TenantId",
+                    new object[] { ("@TenantId", 1) }, out IReadOnlyDictionary<string, object>? p1)
+                .AddCondition("Active = @Active",
+                    new object[] { ("@Active", true) }, out IReadOnlyDictionary<string, object>? p2);
 
             Assert.Equal("SELECT * FROM T WHERE TenantId = @TenantId AND Active = @Active", stmt.ToSource());
             Assert.Single(p1);
@@ -537,15 +537,15 @@ namespace TSQL.Tests
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
             Assert.Throws<ArgumentException>(() =>
-                stmt.AddCondition("x = @P0", out _, new object[] { ("P0", 1) }));
+                stmt.AddCondition("x = @P0", new object[] { ("P0", 1) }, out _));
         }
 
         [Fact]
         public void AddConditionParameterized_ParamNotInCondition_SilentlyIgnored()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters,
-                new object[] { ("@P0", 1), ("@Extra", 99) });
+            stmt.AddCondition("Active = @P0",
+                new object[] { ("@P0", 1), ("@Extra", 99) }, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE Active = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -557,15 +557,15 @@ namespace TSQL.Tests
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
             Assert.Throws<ArgumentException>(() =>
-                stmt.AddCondition("x = @P0", out _,
-                    new object[] { ("@P0", 1), ("@P0", 2) }));
+                stmt.AddCondition("x = @P0",
+                    new object[] { ("@P0", 1), ("@P0", 2) }, out _));
         }
 
         [Fact]
         public void AddConditionParameterized_ReturnsSameInstance()
         {
             Stmt stmt = Stmt.Parse("SELECT * FROM T");
-            Stmt returned = stmt.AddCondition("Active = @P0", out _, new object[] { 1 });
+            Stmt returned = stmt.AddCondition("Active = @P0", new object[] { 1 }, out _);
 
             Assert.Same(stmt, returned);
         }

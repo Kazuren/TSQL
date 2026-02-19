@@ -9,6 +9,7 @@ namespace TSQL.AST
     public abstract class Predicate : SyntaxElement
     {
         /// <summary>Parses a SQL predicate (search condition) from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be a boolean expression (e.g. <c>Active = 1 AND TenantId = 42</c>).</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Predicate ParsePredicate(string sql)
         {
