@@ -33,7 +33,9 @@ namespace TSQL.StandardLibrary.Visitors
             var collector = new Collector(targetSet);
             collector.Walk(stmt);
 
-            if (collector.MatchedTables.Count == 0)
+            if (collector.MatchedTables.Count == 0
+                && collector.MatchedSubqueries.Count == 0
+                && collector.MatchedRowsetFunctions.Count == 0)
             {
                 return new Script(new[] { stmt });
             }
@@ -223,10 +225,148 @@ namespace TSQL.StandardLibrary.Visitors
                 allStatements.Add(cteSelectInto);
             }
 
+            // Derived table (SubqueryReference) SELECT INTOs
+            SelectExpression outerSelect = (selectStmt?.Query as SelectExpression);
+            foreach (SubqueryReference subqRef in collector.MatchedSubqueries)
+            {
+                string aliasName = subqRef.Alias.Name;
+
+                if (subqRef.Subquery.Query is SelectExpression innerSelect)
+                {
+                    // Simple derived table: extract the inner SELECT, add INTO #alias
+                    innerSelect.Into = new Expr.ObjectIdentifier(new ObjectName("#" + aliasName));
+                    allStatements.Add(new Stmt.Select(innerSelect));
+                }
+                else
+                {
+                    // Set operation (UNION etc.): wrap as SELECT * INTO #alias FROM (subquery)
+                    subqRef.Alias = null;
+                    var wrapSelect = new SelectExpression();
+                    wrapSelect.Columns.Add(new Expr.Wildcard());
+                    wrapSelect.Into = new Expr.ObjectIdentifier(new ObjectName("#" + aliasName));
+                    wrapSelect.From = new FromClause();
+                    wrapSelect.From.TableSources.Add(subqRef);
+                    allStatements.Add(new Stmt.Select(wrapSelect));
+                }
+
+                // Replace the SubqueryReference in the outer FROM with a TableReference to #alias
+                var tempRef = new TableReference(new Expr.ObjectIdentifier(new ObjectName("#" + aliasName)));
+                if (outerSelect?.From != null)
+                {
+                    ReplaceTableSource(outerSelect.From, subqRef, tempRef);
+                }
+            }
+
+            // Rowset function (RowsetFunctionReference) SELECT INTOs
+            foreach (RowsetFunctionReference rowsetRef in collector.MatchedRowsetFunctions)
+            {
+                string aliasName = rowsetRef.Alias.Name;
+
+                // Strip alias from the original node for the materialization query
+                rowsetRef.Alias = null;
+
+                var wrapSelect = new SelectExpression();
+                wrapSelect.Columns.Add(new Expr.Wildcard());
+                wrapSelect.Into = new Expr.ObjectIdentifier(new ObjectName("#" + aliasName));
+                wrapSelect.From = new FromClause();
+                wrapSelect.From.TableSources.Add(rowsetRef);
+                allStatements.Add(new Stmt.Select(wrapSelect));
+
+                // Replace the RowsetFunctionReference in the outer FROM with a TableReference to #alias
+                var tempRef = new TableReference(new Expr.ObjectIdentifier(new ObjectName("#" + aliasName)));
+                if (outerSelect?.From != null)
+                {
+                    ReplaceTableSource(outerSelect.From, rowsetRef, tempRef);
+                }
+            }
+
             // Modified query
             allStatements.Add(stmt);
 
             return new Script(allStatements);
+        }
+
+        /// <summary>
+        /// Finds <paramref name="target"/> by reference equality in the FROM clause tree
+        /// and replaces it with <paramref name="replacement"/>.
+        /// </summary>
+        private static bool ReplaceTableSource(FromClause from, TableSource target, TableSource replacement)
+        {
+            for (int i = 0; i < from.TableSources.Count; i++)
+            {
+                if (ReferenceEquals(from.TableSources[i], target))
+                {
+                    from.TableSources[i] = replacement;
+                    return true;
+                }
+
+                if (ReplaceInNode(from.TableSources[i], target, replacement))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ReplaceInNode(TableSource node, TableSource target, TableSource replacement)
+        {
+            if (node is QualifiedJoin qj)
+            {
+                if (ReferenceEquals(qj.Left, target))
+                {
+                    qj.Left = replacement;
+                    return true;
+                }
+                if (ReferenceEquals(qj.Right, target))
+                {
+                    qj.Right = replacement;
+                    return true;
+                }
+                return ReplaceInNode(qj.Left, target, replacement)
+                    || ReplaceInNode(qj.Right, target, replacement);
+            }
+            else if (node is CrossJoin cj)
+            {
+                if (ReferenceEquals(cj.Left, target))
+                {
+                    cj.Left = replacement;
+                    return true;
+                }
+                if (ReferenceEquals(cj.Right, target))
+                {
+                    cj.Right = replacement;
+                    return true;
+                }
+                return ReplaceInNode(cj.Left, target, replacement)
+                    || ReplaceInNode(cj.Right, target, replacement);
+            }
+            else if (node is ApplyJoin aj)
+            {
+                if (ReferenceEquals(aj.Left, target))
+                {
+                    aj.Left = replacement;
+                    return true;
+                }
+                if (ReferenceEquals(aj.Right, target))
+                {
+                    aj.Right = replacement;
+                    return true;
+                }
+                return ReplaceInNode(aj.Left, target, replacement)
+                    || ReplaceInNode(aj.Right, target, replacement);
+            }
+            else if (node is ParenthesizedTableSource pts)
+            {
+                if (ReferenceEquals(pts.Inner, target))
+                {
+                    pts.Inner = replacement;
+                    return true;
+                }
+                return ReplaceInNode(pts.Inner, target, replacement);
+            }
+
+            return false;
         }
 
         private class Collector : SqlWalker
@@ -234,6 +374,8 @@ namespace TSQL.StandardLibrary.Visitors
             private readonly HashSet<string> _targetNames;
 
             public List<TableReference> MatchedTables { get; } = new List<TableReference>();
+            public List<SubqueryReference> MatchedSubqueries { get; } = new List<SubqueryReference>();
+            public List<RowsetFunctionReference> MatchedRowsetFunctions { get; } = new List<RowsetFunctionReference>();
             public List<Expr.ColumnIdentifier> ColumnIdentifiers { get; } = new List<Expr.ColumnIdentifier>();
             public List<Expr.QualifiedWildcard> QualifiedWildcards { get; } = new List<Expr.QualifiedWildcard>();
             public bool HasBareStar { get; private set; }
@@ -249,6 +391,24 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     MatchedTables.Add(source);
                 }
+            }
+
+            protected override void VisitSubqueryReference(SubqueryReference source)
+            {
+                if (source.Alias != null && _targetNames.Contains(source.Alias.Name))
+                {
+                    MatchedSubqueries.Add(source);
+                }
+                base.VisitSubqueryReference(source);
+            }
+
+            protected override void VisitRowsetFunctionReference(RowsetFunctionReference source)
+            {
+                if (source.Alias != null && _targetNames.Contains(source.Alias.Name))
+                {
+                    MatchedRowsetFunctions.Add(source);
+                }
+                base.VisitRowsetFunctionReference(source);
             }
 
             protected override void VisitColumnIdentifier(Expr.ColumnIdentifier expr)

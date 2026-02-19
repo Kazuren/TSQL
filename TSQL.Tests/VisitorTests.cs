@@ -1035,6 +1035,68 @@ namespace TSQL.Tests
                 result);
         }
 
+        [Fact]
+        public void TempTableReplacer_DerivedTableAlias_MaterializedAndReplaced()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM (SELECT Id, Name FROM Users) AS T");
+            string result = stmt.ReplaceWithTempTables("T").ToSource();
+
+            Assert.Equal(
+                "SELECT Id, Name INTO #T FROM Users;\n" +
+                "SELECT * FROM #T",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_DerivedTableUnion_WrappedWithSelectInto()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM (SELECT 1 AS x UNION SELECT 2 AS x) AS T");
+            string result = stmt.ReplaceWithTempTables("T").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #T FROM (SELECT 1 AS x UNION SELECT 2 AS x);\n" +
+                "SELECT * FROM #T",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_RowsetFunctionAlias_MaterializedAndReplaced()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM OPENQUERY(LinkedServer, 'SELECT 1') AS T");
+            string result = stmt.ReplaceWithTempTables("T").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #T FROM OPENQUERY(LinkedServer, 'SELECT 1');\n" +
+                "SELECT * FROM #T",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_CrossApplySubquery_OnlyRegularTableReplaced()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, d.Detail FROM Users u CROSS APPLY (SELECT TOP 1 Detail FROM Details WHERE Details.UserId = u.Id) d");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT u.Name, d.Detail FROM #Users u CROSS APPLY (SELECT TOP 1 Detail FROM Details WHERE Details.UserId = u.Id) d",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_RowsetFunctionWithRegularTable_ColumnsStaySeparate()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, oq.Val FROM Users u INNER JOIN OPENQUERY(LinkedServer, 'SELECT Val FROM T') AS oq ON u.Id = oq.Id");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT u.Name, oq.Val FROM #Users u INNER JOIN OPENQUERY(LinkedServer, 'SELECT Val FROM T') AS oq ON u.Id = oq.Id",
+                result);
+        }
+
         #endregion
     }
 }
