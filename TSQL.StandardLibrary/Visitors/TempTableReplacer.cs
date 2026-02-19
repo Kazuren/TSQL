@@ -23,6 +23,11 @@ namespace TSQL.StandardLibrary.Visitors
         ///               SELECT INTO. Scans column references and wildcards to build
         ///               a per-table column list (or falls back to SELECT *).
         ///
+        /// 2b. PREDICATES — Push WHERE conjuncts into SELECT INTO statements when safe.
+        ///                  A conjunct is pushable when all column references are qualified,
+        ///                  resolve to a single non-self-joined target table, and don't
+        ///                  reference subquery scopes.
+        ///
         /// 3. SNAPSHOT  — Capture original table name identifiers and build CTE SELECT INTO
         ///               statements BEFORE mutating the AST. This is necessary because
         ///               mutation rewrites table names to #temp, and the SELECT INTO
@@ -156,11 +161,106 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
+            // ── Phase 2b: PREDICATES ────────────────────────────────────────────
+            // Push WHERE conjuncts into individual SELECT INTO statements when safe.
+            // A conjunct is pushable to table T when all its column references are
+            // qualified, resolve to T via qualifierToTable, and T is not self-joined.
+            SelectExpression outerSelect = selectStmt?.Query as SelectExpression;
+
+            var pushedPredicates = new Dictionary<string, List<AST.Predicate>>(StringComparer.OrdinalIgnoreCase);
+            var remainingPredicates = new List<AST.Predicate>();
+
+            if (outerSelect?.Where != null && regularMatches.Count > 0)
+            {
+                // Detect self-joined tables (same base table appearing multiple times).
+                // Different aliases may need different row subsets, so pushing predicates
+                // would incorrectly filter both aliases with one predicate.
+                var selfJoinedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var keyCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (TableReference tableRef in regularMatches)
+                {
+                    string key = tableRef.TableName.ObjectName.Name.ToUpperInvariant();
+                    if (keyCounts.ContainsKey(key))
+                    {
+                        keyCounts[key]++;
+                    }
+                    else
+                    {
+                        keyCounts[key] = 1;
+                    }
+                }
+                foreach (var kvp in keyCounts)
+                {
+                    if (kvp.Value > 1)
+                    {
+                        selfJoinedKeys.Add(kvp.Key);
+                    }
+                }
+
+                List<AST.Predicate> conjuncts = FlattenAndConjuncts(outerSelect.Where);
+
+                foreach (AST.Predicate conjunct in conjuncts)
+                {
+                    var predCollector = new PredicateColumnCollector();
+                    predCollector.Walk(conjunct);
+
+                    string targetKey = null;
+                    bool canPush = predCollector.Columns.Count > 0;
+
+                    foreach (Expr.ColumnIdentifier col in predCollector.Columns)
+                    {
+                        // Unqualified column — can't determine which table it belongs to
+                        if (col.ObjectName == null)
+                        {
+                            canPush = false;
+                            break;
+                        }
+
+                        // Qualifier not in our map (e.g., references a subquery alias)
+                        if (!qualifierToTable.TryGetValue(col.ObjectName.Name, out string key))
+                        {
+                            canPush = false;
+                            break;
+                        }
+
+                        // All columns must resolve to the same single table
+                        if (targetKey == null)
+                        {
+                            targetKey = key;
+                        }
+                        else if (!string.Equals(targetKey, key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            canPush = false;
+                            break;
+                        }
+                    }
+
+                    if (canPush && selfJoinedKeys.Contains(targetKey))
+                    {
+                        canPush = false;
+                    }
+
+                    if (canPush)
+                    {
+                        if (!pushedPredicates.TryGetValue(targetKey, out var list))
+                        {
+                            list = new List<AST.Predicate>();
+                            pushedPredicates[targetKey] = list;
+                        }
+                        list.Add(conjunct);
+                    }
+                    else
+                    {
+                        remainingPredicates.Add(conjunct);
+                    }
+                }
+            }
+
             // ── Phase 3: SNAPSHOT ─────────────────────────────────────────────
             // Save original table name identifiers before mutation rewrites them.
             // The SELECT INTO statements need "FROM Users" (original), but after
             // mutation the AST will say "FROM #Users".
-            var regularInfo = new Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName)>(StringComparer.OrdinalIgnoreCase);
+            var regularInfo = new Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName, Alias Alias)>(StringComparer.OrdinalIgnoreCase);
             var regularOrder = new List<string>();
 
             foreach (TableReference tableRef in regularMatches)
@@ -169,7 +269,7 @@ namespace TSQL.StandardLibrary.Visitors
                 string key = objName.ToUpperInvariant();
                 if (!regularInfo.ContainsKey(key))
                 {
-                    regularInfo[key] = (tableRef.TableName, objName);
+                    regularInfo[key] = (tableRef.TableName, objName, tableRef.Alias);
                     regularOrder.Add(key);
                 }
             }
@@ -243,6 +343,17 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
+            // Remove pushed predicates from the original WHERE clause.
+            // Rebuild it from only the remaining (non-pushed) conjuncts.
+            if (pushedPredicates.Count > 0)
+            {
+                outerSelect.Where = null;
+                foreach (AST.Predicate remaining in remainingPredicates)
+                {
+                    outerSelect.AddWhere(remaining);
+                }
+            }
+
             // ── Phase 4: EMIT ─────────────────────────────────────────────────
             // Assemble the output Script. Statement order matters — each SELECT INTO
             // must appear before any query that references its temp table.
@@ -250,19 +361,41 @@ namespace TSQL.StandardLibrary.Visitors
 
             // 4a. Regular tables: SELECT [columns] INTO #Table FROM Table
             //     Uses the narrowed column list from phase 2 when possible.
+            //     Attaches pushed WHERE predicates and the table alias when needed.
             foreach (string key in regularOrder)
             {
-                var (originalTableName, objectName) = regularInfo[key];
-                bool useStar = collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
+                var (originalTableName, objectName, alias) = regularInfo[key];
+                var tableRef = new TableReference(originalTableName);
 
+                // Add alias so pushed predicate column references resolve
+                // (e.g., "FROM Users u WHERE u.Active = 1" needs the "u" alias).
+                // Create a fresh SuffixAlias to avoid sharing AST nodes across statements.
+                if (pushedPredicates.ContainsKey(key) && alias != null)
+                {
+                    tableRef.Alias = new SuffixAlias(alias.Name, useAs: false);
+                }
+
+                bool useStar = collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
+                Stmt.Select selectIntoStmt;
                 if (useStar)
                 {
-                    allStatements.Add(SelectStarInto(objectName, new TableReference(originalTableName)));
+                    selectIntoStmt = SelectStarInto(objectName, tableRef);
                 }
                 else
                 {
-                    allStatements.Add(SelectColumnsInto(objectName, new TableReference(originalTableName), tableColumnList[key]));
+                    selectIntoStmt = SelectColumnsInto(objectName, tableRef, tableColumnList[key]);
                 }
+
+                if (pushedPredicates.TryGetValue(key, out var predicatesToPush))
+                {
+                    SelectExpression selectIntoExpr = (SelectExpression)selectIntoStmt.Query;
+                    foreach (AST.Predicate pred in predicatesToPush)
+                    {
+                        selectIntoExpr.AddWhere(pred);
+                    }
+                }
+
+                allStatements.Add(selectIntoStmt);
             }
 
             // 4b. CTEs: WITH ... SELECT * INTO #cte FROM cte
@@ -273,7 +406,6 @@ namespace TSQL.StandardLibrary.Visitors
             //     For simple SELECTs, we extract the inner query and add INTO directly.
             //     For set operations (UNION etc.), we wrap the subquery in a new
             //     SELECT * INTO #alias FROM (subquery) statement.
-            SelectExpression outerSelect = selectStmt?.Query as SelectExpression;
             foreach (SubqueryReference subqRef in collector.MatchedSubqueries)
             {
                 string aliasName = subqRef.Alias.Name;
@@ -319,18 +451,35 @@ namespace TSQL.StandardLibrary.Visitors
                     preservedAlias = null;
                 }
 
-                rowsetRef.Alias = null;
-
+                // Keep alias on the rowset function when there are pushed predicates
+                // that reference it; otherwise clear it as before.
                 string key = tempName.ToUpperInvariant();
+                if (!pushedPredicates.ContainsKey(key))
+                {
+                    rowsetRef.Alias = null;
+                }
+
                 bool useStar = !matchedByFunctionName || collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
+                Stmt.Select tvfSelectInto;
                 if (useStar)
                 {
-                    allStatements.Add(SelectStarInto(tempName, rowsetRef));
+                    tvfSelectInto = SelectStarInto(tempName, rowsetRef);
                 }
                 else
                 {
-                    allStatements.Add(SelectColumnsInto(tempName, rowsetRef, tableColumnList[key]));
+                    tvfSelectInto = SelectColumnsInto(tempName, rowsetRef, tableColumnList[key]);
                 }
+
+                if (pushedPredicates.TryGetValue(key, out var tvfPredicatesToPush))
+                {
+                    SelectExpression tvfSelectExpr = (SelectExpression)tvfSelectInto.Query;
+                    foreach (AST.Predicate pred in tvfPredicatesToPush)
+                    {
+                        tvfSelectExpr.AddWhere(pred);
+                    }
+                }
+
+                allStatements.Add(tvfSelectInto);
 
                 if (outerSelect?.From != null)
                 {
@@ -453,6 +602,41 @@ namespace TSQL.StandardLibrary.Visitors
             }
             return ReplaceInNode(left, target, replacement)
                 || ReplaceInNode(right, target, replacement);
+        }
+
+        // Flattens a top-level AND tree into its individual conditions (conjuncts).
+        // Given "A AND B AND C", returns [A, B, C]. Non-AND predicates (OR, comparisons,
+        // etc.) are returned as a single-element list.
+        private static List<AST.Predicate> FlattenAndConjuncts(AST.Predicate predicate)
+        {
+            var result = new List<AST.Predicate>();
+            var stack = new Stack<AST.Predicate>();
+            stack.Push(predicate);
+            while (stack.Count > 0)
+            {
+                AST.Predicate current = stack.Pop();
+                if (current is AST.Predicate.And and)
+                {
+                    // Push right first so left is processed first (preserves order)
+                    stack.Push(and.Right);
+                    stack.Push(and.Left);
+                }
+                else
+                {
+                    result.Add(current);
+                }
+            }
+            return result;
+        }
+
+        private class PredicateColumnCollector : SqlWalker
+        {
+            public List<Expr.ColumnIdentifier> Columns { get; } = new List<Expr.ColumnIdentifier>();
+
+            protected override void VisitColumnIdentifier(Expr.ColumnIdentifier expr)
+            {
+                Columns.Add(expr);
+            }
         }
 
         private class Collector : SqlWalker

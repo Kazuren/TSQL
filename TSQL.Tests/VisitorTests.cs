@@ -820,8 +820,8 @@ namespace TSQL.Tests
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
-                "SELECT Name, Email, Age INTO #Users FROM dbo.Users;\n" +
-                "SELECT u.Name, u.Email FROM #Users u WHERE u.Age > 25",
+                "SELECT Name, Email, Age INTO #Users FROM dbo.Users u WHERE u.Age > 25;\n" +
+                "SELECT u.Name, u.Email FROM #Users u",
                 result);
         }
 
@@ -920,8 +920,8 @@ namespace TSQL.Tests
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
-                "SELECT Name, Age, CreatedAt INTO #Users FROM Users;\n" +
-                "SELECT u.Name FROM #Users u WHERE u.Age > 25 ORDER BY u.CreatedAt",
+                "SELECT Name, Age, CreatedAt INTO #Users FROM Users u WHERE u.Age > 25;\n" +
+                "SELECT u.Name FROM #Users u ORDER BY u.CreatedAt",
                 result);
         }
 
@@ -1030,8 +1030,8 @@ namespace TSQL.Tests
 
             Assert.Equal(
                 "SELECT Name, Id INTO #Users FROM Users;\n" +
-                "SELECT UserId, Total INTO #Orders FROM Orders;\n" +
-                "SELECT u.Name FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId WHERE o.Total > 100",
+                "SELECT UserId, Total INTO #Orders FROM Orders o WHERE o.Total > 100;\n" +
+                "SELECT u.Name FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId",
                 result);
         }
 
@@ -1157,6 +1157,124 @@ namespace TSQL.Tests
             Assert.Equal(
                 "SELECT * INTO #GetDetails FROM GetDetails(1);\n" +
                 "SELECT f.* FROM #GetDetails AS f",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_SingleConjunct_PushedToSelectInto()
+        {
+            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE u.Active = 1");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Active INTO #Users FROM Users u WHERE u.Active = 1;\n" +
+                "SELECT u.Name FROM #Users u",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_MultipleConjuncts_AllPushedToSameTable()
+        {
+            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE u.Active = 1 AND u.Age > 18");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Active, Age INTO #Users FROM Users u WHERE u.Active = 1 AND u.Age > 18;\n" +
+                "SELECT u.Name FROM #Users u",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_MultiTable_EachTableGetsOwnPredicates()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 AND o.Total > 100");
+            string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id, Active INTO #Users FROM Users u WHERE u.Active = 1;\n" +
+                "SELECT Total, UserId INTO #Orders FROM Orders o WHERE o.Total > 100;\n" +
+                "SELECT u.Name, o.Total FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_CrossTableConjunct_StaysOnOriginal()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Id = o.UserId");
+            string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT UserId INTO #Orders FROM Orders;\n" +
+                "SELECT u.Name FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId WHERE u.Id = o.UserId",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_MixedPushedAndRemaining()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 AND u.Id = o.UserId AND o.Total > 50");
+            string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id, Active INTO #Users FROM Users u WHERE u.Active = 1;\n" +
+                "SELECT Total, UserId INTO #Orders FROM Orders o WHERE o.Total > 50;\n" +
+                "SELECT u.Name, o.Total FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId WHERE u.Id = o.UserId",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_SelfJoin_NoPushdown()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT a.Name FROM Users a INNER JOIN Users b ON a.Id = b.ParentId WHERE a.Active = 1");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id, ParentId, Active INTO #Users FROM Users;\n" +
+                "SELECT a.Name FROM #Users a INNER JOIN #Users b ON a.Id = b.ParentId WHERE a.Active = 1",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_OrSpanningTables_NotPushed()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 OR o.Total > 100");
+            string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id, Active INTO #Users FROM Users;\n" +
+                "SELECT Total, UserId INTO #Orders FROM Orders;\n" +
+                "SELECT u.Name, o.Total FROM #Users u INNER JOIN #Orders o ON u.Id = o.UserId WHERE u.Active = 1 OR o.Total > 100",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_UnqualifiedColumns_NotPushed()
+        {
+            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE Active = 1");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name INTO #Users FROM Users;\n" +
+                "SELECT u.Name FROM #Users u WHERE Active = 1",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_SubqueryInPredicate_NotPushed()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name FROM Users u WHERE u.Id IN (SELECT x.UserId FROM Logins x)");
+            string result = stmt.ReplaceWithTempTables("Users").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT u.Name FROM #Users u WHERE u.Id IN (SELECT x.UserId FROM Logins x)",
                 result);
         }
 
