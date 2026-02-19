@@ -1,5 +1,10 @@
 <Solution>
   <Project Path="TSQL/TSQL.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="CLAUDE.md" />
+    <File Path="README.md" />
+  </Folder>
   <Project Path="TSQL.Benchmarks/TSQL.Benchmarks.csproj" Id="27f1e608-ae02-412e-82b2-0ccff157aeb9" />
   <Project Path="TSQL.Generators/TSQL.Generators.csproj" />
   <Project Path="TSQL.StandardLibrary/TSQL.StandardLibrary.csproj" Id="17354766-55a7-45a9-a0b0-2bc96af3c82b" />
