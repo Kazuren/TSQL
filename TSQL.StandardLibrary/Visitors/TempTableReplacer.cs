@@ -255,8 +255,14 @@ namespace TSQL.StandardLibrary.Visitors
                 var (originalTableName, objectName) = regularInfo[key];
                 bool useStar = collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
 
-                allStatements.Add(BuildSelectInto(objectName,
-                    new TableReference(originalTableName), useStar, useStar ? null : tableColumnList[key]));
+                if (useStar)
+                {
+                    allStatements.Add(SelectStarInto(objectName, new TableReference(originalTableName)));
+                }
+                else
+                {
+                    allStatements.Add(SelectColumnsInto(objectName, new TableReference(originalTableName), tableColumnList[key]));
+                }
             }
 
             // 4b. CTEs: WITH ... SELECT * INTO #cte FROM cte
@@ -317,7 +323,14 @@ namespace TSQL.StandardLibrary.Visitors
 
                 string key = tempName.ToUpperInvariant();
                 bool useStar = !matchedByFunctionName || collector.HasBareStar || starTables.Contains(key) || !tableColumnList.ContainsKey(key);
-                allStatements.Add(BuildSelectInto(tempName, rowsetRef, useStar, useStar ? null : tableColumnList[key]));
+                if (useStar)
+                {
+                    allStatements.Add(SelectStarInto(tempName, rowsetRef));
+                }
+                else
+                {
+                    allStatements.Add(SelectColumnsInto(tempName, rowsetRef, tableColumnList[key]));
+                }
 
                 if (outerSelect?.From != null)
                 {
@@ -336,28 +349,26 @@ namespace TSQL.StandardLibrary.Visitors
         private static Expr.ObjectIdentifier TempTableIdentifier(string name) =>
             new Expr.ObjectIdentifier(new ObjectName("#" + name));
 
+        // Builds: SELECT * INTO #tempName FROM source
         private static Stmt.Select SelectStarInto(string tempName, TableSource source)
         {
-            return BuildSelectInto(tempName, source, useStar: true, columns: null);
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new Expr.Wildcard());
+            selectExpr.Into = TempTableIdentifier(tempName);
+            selectExpr.From = new FromClause();
+            selectExpr.From.TableSources.Add(source);
+            return new Stmt.Select(selectExpr);
         }
 
-        private static Stmt.Select BuildSelectInto(string tempName, TableSource source, bool useStar, List<string> columns)
+        // Builds: SELECT col1, col2, ... INTO #tempName FROM source
+        private static Stmt.Select SelectColumnsInto(string tempName, TableSource source, List<string> columns)
         {
             var selectExpr = new SelectExpression();
-
-            if (useStar)
+            for (int i = 0; i < columns.Count; i++)
             {
-                selectExpr.Columns.Add(new Expr.Wildcard());
+                selectExpr.Columns.Add(new SelectColumn(
+                    new Expr.ColumnIdentifier(new ColumnName(columns[i])), null));
             }
-            else
-            {
-                for (int i = 0; i < columns.Count; i++)
-                {
-                    selectExpr.Columns.Add(new SelectColumn(
-                        new Expr.ColumnIdentifier(new ColumnName(columns[i])), null));
-                }
-            }
-
             selectExpr.Into = TempTableIdentifier(tempName);
             selectExpr.From = new FromClause();
             selectExpr.From.TableSources.Add(source);
