@@ -33,9 +33,7 @@ namespace TSQL.StandardLibrary.Visitors
             var collector = new Collector(targetSet);
             collector.Walk(stmt);
 
-            if (collector.MatchedTables.Count == 0
-                && collector.MatchedSubqueries.Count == 0
-                && collector.MatchedRowsetFunctions.Count == 0)
+            if (!collector.HasMatches)
             {
                 return new Script(new[] { stmt });
             }
@@ -136,14 +134,8 @@ namespace TSQL.StandardLibrary.Visitors
                         cte.Ctes.Add(selectStmt.CteStmt.Ctes[j]);
                     }
 
-                    var selectExpr = new SelectExpression();
-                    selectExpr.Columns.Add(new Expr.Wildcard());
-                    selectExpr.Into = new Expr.ObjectIdentifier(new ObjectName("#" + cteDef.Name));
-                    selectExpr.From = new FromClause();
-                    selectExpr.From.TableSources.Add(
+                    var cteSelect = SelectStarInto(cteDef.Name,
                         new TableReference(new Expr.ObjectIdentifier(new ObjectName(cteDef.Name))));
-
-                    var cteSelect = new Stmt.Select(selectExpr);
                     cteSelect.CteStmt = cte;
                     cteSelectIntos.Add(cteSelect);
                 }
@@ -153,7 +145,7 @@ namespace TSQL.StandardLibrary.Visitors
             foreach (TableReference tableRef in collector.MatchedTables)
             {
                 string objName = tableRef.TableName.ObjectName.Name;
-                tableRef.TableName = new Expr.ObjectIdentifier(new ObjectName("#" + objName));
+                tableRef.TableName = TempTableIdentifier(objName);
             }
 
             // Remove matched CTE definitions from the final query
@@ -212,70 +204,49 @@ namespace TSQL.StandardLibrary.Visitors
                     }
                 }
 
-                selectExpr.Into = new Expr.ObjectIdentifier(new ObjectName("#" + objectName));
+                selectExpr.Into = TempTableIdentifier(objectName);
                 selectExpr.From = new FromClause();
                 selectExpr.From.TableSources.Add(new TableReference(originalTableName));
 
                 allStatements.Add(new Stmt.Select(selectExpr));
             }
 
-            // CTE SELECT INTOs
-            foreach (Stmt cteSelectInto in cteSelectIntos)
-            {
-                allStatements.Add(cteSelectInto);
-            }
+            allStatements.AddRange(cteSelectIntos);
 
             // Derived table (SubqueryReference) SELECT INTOs
-            SelectExpression outerSelect = (selectStmt?.Query as SelectExpression);
+            SelectExpression outerSelect = selectStmt?.Query as SelectExpression;
             foreach (SubqueryReference subqRef in collector.MatchedSubqueries)
             {
                 string aliasName = subqRef.Alias.Name;
 
                 if (subqRef.Subquery.Query is SelectExpression innerSelect)
                 {
-                    // Simple derived table: extract the inner SELECT, add INTO #alias
-                    innerSelect.Into = new Expr.ObjectIdentifier(new ObjectName("#" + aliasName));
+                    innerSelect.Into = TempTableIdentifier(aliasName);
                     allStatements.Add(new Stmt.Select(innerSelect));
                 }
                 else
                 {
-                    // Set operation (UNION etc.): wrap as SELECT * INTO #alias FROM (subquery)
                     subqRef.Alias = null;
-                    var wrapSelect = new SelectExpression();
-                    wrapSelect.Columns.Add(new Expr.Wildcard());
-                    wrapSelect.Into = new Expr.ObjectIdentifier(new ObjectName("#" + aliasName));
-                    wrapSelect.From = new FromClause();
-                    wrapSelect.From.TableSources.Add(subqRef);
-                    allStatements.Add(new Stmt.Select(wrapSelect));
+                    allStatements.Add(SelectStarInto(aliasName, subqRef));
                 }
 
-                // Replace the SubqueryReference in the outer FROM with a TableReference to #alias
-                var tempRef = new TableReference(new Expr.ObjectIdentifier(new ObjectName("#" + aliasName)));
                 if (outerSelect?.From != null)
                 {
+                    var tempRef = new TableReference(TempTableIdentifier(aliasName));
                     ReplaceTableSource(outerSelect.From, subqRef, tempRef);
                 }
             }
 
-            // Rowset function (RowsetFunctionReference) SELECT INTOs
+            // Rowset function SELECT INTOs
             foreach (RowsetFunctionReference rowsetRef in collector.MatchedRowsetFunctions)
             {
                 string aliasName = rowsetRef.Alias.Name;
-
-                // Strip alias from the original node for the materialization query
                 rowsetRef.Alias = null;
+                allStatements.Add(SelectStarInto(aliasName, rowsetRef));
 
-                var wrapSelect = new SelectExpression();
-                wrapSelect.Columns.Add(new Expr.Wildcard());
-                wrapSelect.Into = new Expr.ObjectIdentifier(new ObjectName("#" + aliasName));
-                wrapSelect.From = new FromClause();
-                wrapSelect.From.TableSources.Add(rowsetRef);
-                allStatements.Add(new Stmt.Select(wrapSelect));
-
-                // Replace the RowsetFunctionReference in the outer FROM with a TableReference to #alias
-                var tempRef = new TableReference(new Expr.ObjectIdentifier(new ObjectName("#" + aliasName)));
                 if (outerSelect?.From != null)
                 {
+                    var tempRef = new TableReference(TempTableIdentifier(aliasName));
                     ReplaceTableSource(outerSelect.From, rowsetRef, tempRef);
                 }
             }
@@ -286,10 +257,19 @@ namespace TSQL.StandardLibrary.Visitors
             return new Script(allStatements);
         }
 
-        /// <summary>
-        /// Finds <paramref name="target"/> by reference equality in the FROM clause tree
-        /// and replaces it with <paramref name="replacement"/>.
-        /// </summary>
+        private static Expr.ObjectIdentifier TempTableIdentifier(string name) =>
+            new Expr.ObjectIdentifier(new ObjectName("#" + name));
+
+        private static Stmt.Select SelectStarInto(string tempName, TableSource source)
+        {
+            var selectExpr = new SelectExpression();
+            selectExpr.Columns.Add(new Expr.Wildcard());
+            selectExpr.Into = TempTableIdentifier(tempName);
+            selectExpr.From = new FromClause();
+            selectExpr.From.TableSources.Add(source);
+            return new Stmt.Select(selectExpr);
+        }
+
         private static bool ReplaceTableSource(FromClause from, TableSource target, TableSource replacement)
         {
             for (int i = 0; i < from.TableSources.Count; i++)
@@ -311,62 +291,43 @@ namespace TSQL.StandardLibrary.Visitors
 
         private static bool ReplaceInNode(TableSource node, TableSource target, TableSource replacement)
         {
-            if (node is QualifiedJoin qj)
+            switch (node)
             {
-                if (ReferenceEquals(qj.Left, target))
-                {
-                    qj.Left = replacement;
-                    return true;
-                }
-                if (ReferenceEquals(qj.Right, target))
-                {
-                    qj.Right = replacement;
-                    return true;
-                }
-                return ReplaceInNode(qj.Left, target, replacement)
-                    || ReplaceInNode(qj.Right, target, replacement);
+                case QualifiedJoin qj:
+                    return ReplaceInBinaryJoin(qj.Left, qj.Right, v => qj.Left = v, v => qj.Right = v, target, replacement);
+                case CrossJoin cj:
+                    return ReplaceInBinaryJoin(cj.Left, cj.Right, v => cj.Left = v, v => cj.Right = v, target, replacement);
+                case ApplyJoin aj:
+                    return ReplaceInBinaryJoin(aj.Left, aj.Right, v => aj.Left = v, v => aj.Right = v, target, replacement);
+                case ParenthesizedTableSource pts:
+                    if (ReferenceEquals(pts.Inner, target))
+                    {
+                        pts.Inner = replacement;
+                        return true;
+                    }
+                    return ReplaceInNode(pts.Inner, target, replacement);
+                default:
+                    return false;
             }
-            else if (node is CrossJoin cj)
-            {
-                if (ReferenceEquals(cj.Left, target))
-                {
-                    cj.Left = replacement;
-                    return true;
-                }
-                if (ReferenceEquals(cj.Right, target))
-                {
-                    cj.Right = replacement;
-                    return true;
-                }
-                return ReplaceInNode(cj.Left, target, replacement)
-                    || ReplaceInNode(cj.Right, target, replacement);
-            }
-            else if (node is ApplyJoin aj)
-            {
-                if (ReferenceEquals(aj.Left, target))
-                {
-                    aj.Left = replacement;
-                    return true;
-                }
-                if (ReferenceEquals(aj.Right, target))
-                {
-                    aj.Right = replacement;
-                    return true;
-                }
-                return ReplaceInNode(aj.Left, target, replacement)
-                    || ReplaceInNode(aj.Right, target, replacement);
-            }
-            else if (node is ParenthesizedTableSource pts)
-            {
-                if (ReferenceEquals(pts.Inner, target))
-                {
-                    pts.Inner = replacement;
-                    return true;
-                }
-                return ReplaceInNode(pts.Inner, target, replacement);
-            }
+        }
 
-            return false;
+        private static bool ReplaceInBinaryJoin(
+            TableSource left, TableSource right,
+            Action<TableSource> setLeft, Action<TableSource> setRight,
+            TableSource target, TableSource replacement)
+        {
+            if (ReferenceEquals(left, target))
+            {
+                setLeft(replacement);
+                return true;
+            }
+            if (ReferenceEquals(right, target))
+            {
+                setRight(replacement);
+                return true;
+            }
+            return ReplaceInNode(left, target, replacement)
+                || ReplaceInNode(right, target, replacement);
         }
 
         private class Collector : SqlWalker
@@ -376,6 +337,12 @@ namespace TSQL.StandardLibrary.Visitors
             public List<TableReference> MatchedTables { get; } = new List<TableReference>();
             public List<SubqueryReference> MatchedSubqueries { get; } = new List<SubqueryReference>();
             public List<RowsetFunctionReference> MatchedRowsetFunctions { get; } = new List<RowsetFunctionReference>();
+
+            public bool HasMatches =>
+                MatchedTables.Count > 0
+                || MatchedSubqueries.Count > 0
+                || MatchedRowsetFunctions.Count > 0;
+
             public List<Expr.ColumnIdentifier> ColumnIdentifiers { get; } = new List<Expr.ColumnIdentifier>();
             public List<Expr.QualifiedWildcard> QualifiedWildcards { get; } = new List<Expr.QualifiedWildcard>();
             public bool HasBareStar { get; private set; }
