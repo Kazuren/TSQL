@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using TSQL.AST;
 using TSQL.StandardLibrary.Visitors;
 
@@ -22,9 +21,9 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnIdentifier_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT a FROM T");
-            var col = (SelectColumn)((SelectExpression)stmt.Query).Columns[0];
-            var visitor = new ExprTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T");
+            SelectColumn col = (SelectColumn)((SelectExpression)stmt.Query).Columns[0];
+            ExprTypeRecorder visitor = new ExprTypeRecorder();
             col.Expression.Accept(visitor);
             Assert.Equal("ColumnIdentifier", visitor.LastType);
         }
@@ -32,9 +31,9 @@ namespace TSQL.Tests
         [Fact]
         public void ObjectIdentifier_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT * FROM T");
-            var tableRef = (TableReference)((SelectExpression)stmt.Query).From.TableSources[0];
-            var visitor = new ExprTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T");
+            TableReference tableRef = (TableReference)((SelectExpression)stmt.Query).From.TableSources[0];
+            ExprTypeRecorder visitor = new ExprTypeRecorder();
             tableRef.TableName.Accept(visitor);
             Assert.Equal("ObjectIdentifier", visitor.LastType);
         }
@@ -42,9 +41,9 @@ namespace TSQL.Tests
         [Fact]
         public void Wildcard_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT * FROM T");
-            var wildcard = (Expr.Wildcard)((SelectExpression)stmt.Query).Columns[0];
-            var visitor = new ExprTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T");
+            Expr.Wildcard wildcard = (Expr.Wildcard)((SelectExpression)stmt.Query).Columns[0];
+            ExprTypeRecorder visitor = new ExprTypeRecorder();
             wildcard.Accept(visitor);
             Assert.Equal("Wildcard", visitor.LastType);
         }
@@ -52,9 +51,9 @@ namespace TSQL.Tests
         [Fact]
         public void QualifiedWildcard_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT T.* FROM T");
-            var qualWildcard = (Expr.QualifiedWildcard)((SelectExpression)stmt.Query).Columns[0];
-            var visitor = new ExprTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT T.* FROM T");
+            Expr.QualifiedWildcard qualWildcard = (Expr.QualifiedWildcard)((SelectExpression)stmt.Query).Columns[0];
+            ExprTypeRecorder visitor = new ExprTypeRecorder();
             qualWildcard.Accept(visitor);
             Assert.Equal("QualifiedWildcard", visitor.LastType);
         }
@@ -94,9 +93,9 @@ namespace TSQL.Tests
         [Fact]
         public void TableReference_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT * FROM T");
-            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
-            var visitor = new TableSourceTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T");
+            TableSource tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
+            TableSourceTypeRecorder visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("TableReference", visitor.LastType);
         }
@@ -104,9 +103,9 @@ namespace TSQL.Tests
         [Fact]
         public void QualifiedJoin_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT * FROM A INNER JOIN B ON A.id = B.id");
-            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
-            var visitor = new TableSourceTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM A INNER JOIN B ON A.id = B.id");
+            TableSource tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
+            TableSourceTypeRecorder visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("QualifiedJoin", visitor.LastType);
         }
@@ -114,9 +113,9 @@ namespace TSQL.Tests
         [Fact]
         public void CrossJoin_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT * FROM A CROSS JOIN B");
-            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
-            var visitor = new TableSourceTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM A CROSS JOIN B");
+            TableSource tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
+            TableSourceTypeRecorder visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("CrossJoin", visitor.LastType);
         }
@@ -124,9 +123,9 @@ namespace TSQL.Tests
         [Fact]
         public void SubqueryReference_Accept_DispatchesCorrectly()
         {
-            var stmt = ParseSelect("SELECT * FROM (SELECT 1 AS x) AS sub");
-            var tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
-            var visitor = new TableSourceTypeRecorder();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM (SELECT 1 AS x) AS sub");
+            TableSource tableSource = ((SelectExpression)stmt.Query).From.TableSources[0];
+            TableSourceTypeRecorder visitor = new TableSourceTypeRecorder();
             tableSource.Accept(visitor);
             Assert.Equal("SubqueryReference", visitor.LastType);
         }
@@ -154,9 +153,9 @@ namespace TSQL.Tests
         [Fact]
         public void SqlWalker_VisitsAllNodeTypes_InComplexQuery()
         {
-            var stmt = ParseSelect(
+            Stmt.Select stmt = ParseSelect(
                 "SELECT a, COUNT(b) FROM T1 INNER JOIN T2 ON T1.id = T2.id WHERE x = 42 AND y LIKE '%test%'");
-            var counter = new NodeCounter();
+            NodeCounter counter = new NodeCounter();
             counter.Walk(stmt);
 
             Assert.True(counter.ColumnIdentifierCount > 0, "Should visit column identifiers");
@@ -170,8 +169,8 @@ namespace TSQL.Tests
         [Fact]
         public void SqlWalker_VisitsSubqueryExpressions()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
-            var counter = new NodeCounter();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
+            NodeCounter counter = new NodeCounter();
             counter.Walk(stmt);
 
             Assert.True(counter.TableReferenceCount >= 2, "Should visit tables in both outer and subquery");
@@ -204,8 +203,8 @@ namespace TSQL.Tests
         [Fact]
         public void Mutability_ReplaceLiteralWithVariable_UpdatesToSource()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
-            var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
+            Predicate.Comparison where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
             Assert.IsType<Expr.IntLiteral>(where.Right);
             where.Right = new Expr.Variable("@P0");
@@ -216,8 +215,8 @@ namespace TSQL.Tests
         [Fact]
         public void Mutability_ReplaceStringLiteralWithVariable_UpdatesToSource()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
-            var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
+            Predicate.Comparison where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
             Assert.IsType<Expr.StringLiteral>(where.Right);
             Assert.Equal("hello", ((Expr.StringLiteral)where.Right).Value);
@@ -230,8 +229,8 @@ namespace TSQL.Tests
         [Fact]
         public void Mutability_NewLiteral_ProducesValidSource()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x = 1");
-            var where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 1");
+            Predicate.Comparison where = (Predicate.Comparison)((SelectExpression)stmt.Query).Where;
 
             where.Right = new Expr.IntLiteral(99);
 
@@ -245,8 +244,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_ParameterizesIntLiteral()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 42");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -256,8 +255,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_ParameterizesStringLiteral()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE name = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -267,8 +266,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_ParameterizesMultipleLiterals()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x = 42 AND y = 'hello'");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 42 AND y = 'hello'");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
             Assert.Equal(2, parameters.Count);
@@ -279,8 +278,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_SkipsNullLiteral()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x IS NULL");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x IS NULL");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x IS NULL", stmt.ToSource());
             Assert.Empty(parameters);
@@ -289,8 +288,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_AvoidsConflictWithExistingVariables()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x = @P0 AND y = 42");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = @P0 AND y = 42");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
             Assert.Single(parameters);
@@ -300,8 +299,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_ParameterizesLiteralsInFunctionArgs()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE LEN('test') > 0");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE LEN('test') > 0");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE LEN(@P0) > @P1", stmt.ToSource());
             Assert.Equal(2, parameters.Count);
@@ -312,8 +311,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_ParameterizesLiteralsInBetween()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x BETWEEN 10 AND 20");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x BETWEEN 10 AND 20");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x BETWEEN @P0 AND @P1", stmt.ToSource());
             Assert.Equal(2, parameters.Count);
@@ -324,8 +323,8 @@ namespace TSQL.Tests
         [Fact]
         public void LiteralParameterizer_ParameterizesLiteralsInInList()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x IN (1, 2, 3)");
-            stmt.Parameterize(out var parameters);
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x IN (1, 2, 3)");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x IN (@P0, @P1, @P2)", stmt.ToSource());
             Assert.Equal(3, parameters.Count);
@@ -341,8 +340,8 @@ namespace TSQL.Tests
         [Fact]
         public void FluentApi_AddCondition_ReturnsSameInstance()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            var returned = stmt.AddCondition("Active = 1");
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            Stmt returned = stmt.AddCondition("Active = 1");
 
             Assert.Same(stmt, returned);
         }
@@ -350,8 +349,8 @@ namespace TSQL.Tests
         [Fact]
         public void FluentApi_Parameterize_ReturnsSameInstance()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1");
-            var returned = stmt.Parameterize(out _);
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1");
+            Stmt returned = stmt.Parameterize(out _);
 
             Assert.Same(stmt, returned);
         }
@@ -359,9 +358,9 @@ namespace TSQL.Tests
         [Fact]
         public void FluentApi_ChainAddConditionThenParameterize()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
                 .AddCondition("y = 2")
-                .Parameterize(out var parameters);
+                .Parameterize(out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
             Assert.Equal(2, parameters.Count);
@@ -383,7 +382,7 @@ namespace TSQL.Tests
         [Fact]
         public void FluentApi_TransformThenQuery()
         {
-            var tables = Stmt.Parse("SELECT * FROM T")
+            TableReferences tables = Stmt.Parse("SELECT * FROM T")
                 .AddCondition("Active = 1")
                 .CollectTableReferences();
 
@@ -398,8 +397,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_UnnamedNoCollision()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Active = @P0", out var parameters, new object[] { 1 });
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters, new object[] { 1 });
 
             Assert.Equal("SELECT * FROM T WHERE Active = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -409,8 +408,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_NamedValueTuple_NoCollision()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("TenantId = @TenantId", out var parameters,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("TenantId = @TenantId", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { ("@TenantId", 42) });
 
             Assert.Equal("SELECT * FROM T WHERE TenantId = @TenantId", stmt.ToSource());
@@ -421,8 +420,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_NamedKeyValuePair()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Status = @Status", out var parameters,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Status = @Status", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { new KeyValuePair<string, object>("@Status", "active") });
 
             Assert.Equal("SELECT * FROM T WHERE Status = @Status", stmt.ToSource());
@@ -433,8 +432,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_CollisionWithExisting()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
-            stmt.AddCondition("Active = @P0", out var parameters, new object[] { 1 });
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
+            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters, new object[] { 1 });
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND Active = @P0_1", stmt.ToSource());
             Assert.Single(parameters);
@@ -444,8 +443,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_MultipleParams_MixedCollisions()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
-            stmt.AddCondition("a = @P0 AND b = @P1", out var parameters,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
+            stmt.AddCondition("a = @P0 AND b = @P1", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { ("@P0", 10), ("@P1", 20) });
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND a = @P0_1 AND b = @P1", stmt.ToSource());
@@ -457,9 +456,9 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_WithWhereClauseTargetAll()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT * FROM T UNION ALL SELECT * FROM S");
-            stmt.AddCondition("Active = @P0", out var parameters,
+            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { 1 }, WhereClauseTarget.All);
 
             Assert.Contains("T WHERE Active = @P0", stmt.ToSource());
@@ -471,8 +470,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_SameVariableTwiceInCondition()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
-            stmt.AddCondition("a = @P0 OR b = @P0", out var parameters,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @P0");
+            stmt.AddCondition("a = @P0 OR b = @P0", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { ("@P0", 99) });
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND (a = @P0_1 OR b = @P0_1)", stmt.ToSource());
@@ -483,8 +482,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ConditionVarNotInValues()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = @Existing");
-            stmt.AddCondition("a = @Existing AND b = @New", out var parameters,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = @Existing");
+            stmt.AddCondition("a = @Existing AND b = @New", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { ("@New", 5) });
 
             Assert.Equal("SELECT * FROM T WHERE x = @Existing AND a = @Existing AND b = @New", stmt.ToSource());
@@ -495,8 +494,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_EmptyValuesArray()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Active = 1", out var parameters, Array.Empty<object>());
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Active = 1", out IReadOnlyDictionary<string, object>? parameters, Array.Empty<object>());
 
             Assert.Equal("SELECT * FROM T WHERE Active = 1", stmt.ToSource());
             Assert.Empty(parameters);
@@ -505,10 +504,10 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ChainThenParameterize()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
-                .AddCondition("TenantId = @TenantId", out var p1,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T WHERE x = 1")
+                .AddCondition("TenantId = @TenantId", out IReadOnlyDictionary<string, object>? p1,
                     new object[] { ("@TenantId", 42) })
-                .Parameterize(out var p2);
+                .Parameterize(out IReadOnlyDictionary<string, object>? p2);
 
             Assert.Equal("SELECT * FROM T WHERE x = @P0 AND TenantId = @TenantId", stmt.ToSource());
             Assert.Single(p1);
@@ -520,10 +519,10 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ChainTwoAddConditions()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T")
-                .AddCondition("TenantId = @TenantId", out var p1,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T")
+                .AddCondition("TenantId = @TenantId", out IReadOnlyDictionary<string, object>? p1,
                     new object[] { ("@TenantId", 1) })
-                .AddCondition("Active = @Active", out var p2,
+                .AddCondition("Active = @Active", out IReadOnlyDictionary<string, object>? p2,
                     new object[] { ("@Active", true) });
 
             Assert.Equal("SELECT * FROM T WHERE TenantId = @TenantId AND Active = @Active", stmt.ToSource());
@@ -536,7 +535,7 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ErrorMissingAtPrefix()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
             Assert.Throws<ArgumentException>(() =>
                 stmt.AddCondition("x = @P0", out _, new object[] { ("P0", 1) }));
         }
@@ -544,8 +543,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ParamNotInCondition_SilentlyIgnored()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            stmt.AddCondition("Active = @P0", out var parameters,
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            stmt.AddCondition("Active = @P0", out IReadOnlyDictionary<string, object>? parameters,
                 new object[] { ("@P0", 1), ("@Extra", 99) });
 
             Assert.Equal("SELECT * FROM T WHERE Active = @P0", stmt.ToSource());
@@ -556,7 +555,7 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ErrorDuplicateNames()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
             Assert.Throws<ArgumentException>(() =>
                 stmt.AddCondition("x = @P0", out _,
                     new object[] { ("@P0", 1), ("@P0", 2) }));
@@ -565,8 +564,8 @@ namespace TSQL.Tests
         [Fact]
         public void AddConditionParameterized_ReturnsSameInstance()
         {
-            var stmt = Stmt.Parse("SELECT * FROM T");
-            var returned = stmt.AddCondition("Active = @P0", out _, new object[] { 1 });
+            Stmt stmt = Stmt.Parse("SELECT * FROM T");
+            Stmt returned = stmt.AddCondition("Active = @P0", out _, new object[] { 1 });
 
             Assert.Same(stmt, returned);
         }
@@ -578,8 +577,8 @@ namespace TSQL.Tests
         [Fact]
         public void TableReferenceCollector_FindsSingleTable()
         {
-            var stmt = ParseSelect("SELECT * FROM Customers");
-            var refs = stmt.CollectTableReferences();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM Customers");
+            TableReferences refs = stmt.CollectTableReferences();
 
             Assert.Single(refs.Tables);
             Assert.Equal("Customers", refs.Tables[0].TableName.ObjectName.Name);
@@ -589,13 +588,13 @@ namespace TSQL.Tests
         [Fact]
         public void TableReferenceCollector_FindsMultipleTables_WithJoin()
         {
-            var stmt = ParseSelect("SELECT * FROM Orders INNER JOIN Customers ON Orders.CustId = Customers.Id");
-            var refs = stmt.CollectTableReferences();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM Orders INNER JOIN Customers ON Orders.CustId = Customers.Id");
+            TableReferences refs = stmt.CollectTableReferences();
 
             Assert.Equal(2, refs.Tables.Count);
             Assert.Single(refs.Joins);
 
-            var tableNames = refs.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
+            List<string> tableNames = refs.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
             Assert.Contains("Customers", tableNames);
             Assert.Contains("Orders", tableNames);
         }
@@ -603,9 +602,9 @@ namespace TSQL.Tests
         [Fact]
         public void TableReferenceCollector_FindsTablesInMultipleJoins()
         {
-            var stmt = ParseSelect(
+            Stmt.Select stmt = ParseSelect(
                 "SELECT * FROM A INNER JOIN B ON A.id = B.id LEFT JOIN C ON B.id = C.id");
-            var refs = stmt.CollectTableReferences();
+            TableReferences refs = stmt.CollectTableReferences();
 
             Assert.Equal(3, refs.Tables.Count);
             Assert.Equal(2, refs.Joins.Count);
@@ -614,11 +613,11 @@ namespace TSQL.Tests
         [Fact]
         public void TableReferenceCollector_FindsTablesInSubquery()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
-            var refs = stmt.CollectTableReferences();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
+            TableReferences refs = stmt.CollectTableReferences();
 
             Assert.Equal(2, refs.Tables.Count);
-            var tableNames = refs.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
+            List<string> tableNames = refs.Tables.Select(t => t.TableName.ObjectName.Name).OrderBy(n => n).ToList();
             Assert.Contains("S", tableNames);
             Assert.Contains("T", tableNames);
         }
@@ -630,8 +629,8 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_FindsSingleUnqualifiedColumn()
         {
-            var stmt = ParseSelect("SELECT a FROM T");
-            var refs = stmt.CollectColumnReferences();
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences();
 
             Assert.Single(refs);
             Assert.Equal("a", refs[0].ColumnName.Name);
@@ -640,8 +639,8 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_FindsMultipleQualifiedColumns()
         {
-            var stmt = ParseSelect("SELECT T.a, T.b FROM T");
-            var refs = stmt.CollectColumnReferences();
+            Stmt.Select stmt = ParseSelect("SELECT T.a, T.b FROM T");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences();
 
             Assert.Equal(2, refs.Count);
             Assert.All(refs, r => Assert.NotNull(r.ObjectName));
@@ -650,11 +649,11 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_FindsColumnsInAllClauses()
         {
-            var stmt = ParseSelect(
+            Stmt.Select stmt = ParseSelect(
                 "SELECT a FROM A INNER JOIN B ON A.id = B.id WHERE x = 1 ORDER BY a");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.All);
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.All);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("a", names);
             Assert.Contains("id", names);
             Assert.Contains("x", names);
@@ -664,12 +663,12 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_FindsColumnsInsideSubqueries()
         {
-            var stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
-            var refs = stmt.CollectColumnReferences(
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
                 scope: ColumnReferenceScope.All,
                 clauses: ColumnReferenceClause.All);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("x", names);
             Assert.Contains("id", names);
         }
@@ -677,8 +676,8 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_WildcardProducesNoColumnRefs()
         {
-            var stmt = ParseSelect("SELECT * FROM T");
-            var refs = stmt.CollectColumnReferences();
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences();
 
             Assert.Empty(refs);
         }
@@ -690,10 +689,10 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_DefaultScope_ExcludesSubqueries()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.All);
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.All);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("a", names);
             Assert.Contains("x", names);
             Assert.DoesNotContain("id", names);
@@ -702,12 +701,12 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_SubqueriesOnly_CollectsOnlySubqueryColumns()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
-            var refs = stmt.CollectColumnReferences(
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
                 scope: ColumnReferenceScope.Subqueries,
                 clauses: ColumnReferenceClause.All);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("id", names);
             Assert.DoesNotContain("a", names);
             Assert.DoesNotContain("x", names);
@@ -716,12 +715,12 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_CtesOnly_CollectsOnlyCteColumns()
         {
-            var stmt = ParseSelect("WITH cte AS (SELECT id FROM S) SELECT a FROM cte");
-            var refs = stmt.CollectColumnReferences(
+            Stmt.Select stmt = ParseSelect("WITH cte AS (SELECT id FROM S) SELECT a FROM cte");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
                 scope: ColumnReferenceScope.Ctes,
                 clauses: ColumnReferenceClause.All);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("id", names);
             Assert.DoesNotContain("a", names);
         }
@@ -729,8 +728,8 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_ScopeNone_ReturnsEmpty()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
-            var refs = stmt.CollectColumnReferences(
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
                 scope: ColumnReferenceScope.None,
                 clauses: ColumnReferenceClause.All);
 
@@ -744,10 +743,10 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_SelectClauseOnly()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.Select);
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.Select);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("a", names);
             Assert.DoesNotContain("x", names);
         }
@@ -755,10 +754,10 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_WhereClauseOnly()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.Where);
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.Where);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("x", names);
             Assert.DoesNotContain("a", names);
         }
@@ -766,10 +765,10 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_FromClauseOnly_IncludesJoinConditions()
         {
-            var stmt = ParseSelect("SELECT a FROM A INNER JOIN B ON A.id = B.id");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.From);
+            Stmt.Select stmt = ParseSelect("SELECT a FROM A INNER JOIN B ON A.id = B.id");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.From);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Equal(2, refs.Count);
             Assert.All(names, n => Assert.Equal("id", n));
             Assert.DoesNotContain("a", names);
@@ -778,10 +777,10 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_OrderByClauseOnly()
         {
-            var stmt = ParseSelect("SELECT a FROM T ORDER BY b");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.OrderBy);
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T ORDER BY b");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.OrderBy);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Single(refs);
             Assert.Contains("b", names);
             Assert.DoesNotContain("a", names);
@@ -790,11 +789,11 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_CombinedClauses()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1 ORDER BY b");
-            var refs = stmt.CollectColumnReferences(
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x = 1 ORDER BY b");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
                 clauses: ColumnReferenceClause.Select | ColumnReferenceClause.Where);
 
-            var names = refs.Select(r => r.ColumnName.Name).ToList();
+            List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
             Assert.Contains("a", names);
             Assert.Contains("x", names);
             Assert.DoesNotContain("b", names);
@@ -803,8 +802,8 @@ namespace TSQL.Tests
         [Fact]
         public void ColumnReferenceCollector_ClauseNone_ReturnsEmpty()
         {
-            var stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
-            var refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.None);
+            Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
+            IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(clauses: ColumnReferenceClause.None);
 
             Assert.Empty(refs);
         }
@@ -816,7 +815,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_QualifiedColumns_SpecificColumnsInSelectInto()
         {
-            var stmt = Stmt.Parse("SELECT u.Name, u.Email FROM dbo.Users u WHERE u.Age > 25");
+            Stmt stmt = Stmt.Parse("SELECT u.Name, u.Email FROM dbo.Users u WHERE u.Age > 25");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -828,7 +827,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_SchemaQualifiedTable_PreservesFullQualification()
         {
-            var stmt = Stmt.Parse("SELECT u.Id FROM dbo.Users u");
+            Stmt stmt = Stmt.Parse("SELECT u.Id FROM dbo.Users u");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -840,7 +839,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_BracketedIdentifiers_CaseInsensitiveMatch()
         {
-            var stmt = Stmt.Parse("SELECT u.Name FROM [dbo].[Users] u");
+            Stmt stmt = Stmt.Parse("SELECT u.Name FROM [dbo].[Users] u");
             string result = stmt.ReplaceWithTempTables("users").ToSource();
 
             Assert.Equal(
@@ -852,7 +851,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_JoinMultipleTables_EachGetsOwnSelectInto()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId");
             string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
 
@@ -866,7 +865,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_SelfJoin_OneSelectInto()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT a.Name, b.Name FROM Users a INNER JOIN Users b ON a.Id = b.ParentId");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
@@ -879,7 +878,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_BareStar_SelectStarInSelectInto()
         {
-            var stmt = Stmt.Parse("SELECT * FROM Users");
+            Stmt stmt = Stmt.Parse("SELECT * FROM Users");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -891,7 +890,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_QualifiedWildcard_SelectStarForThatTable()
         {
-            var stmt = Stmt.Parse("SELECT u.* FROM Users u");
+            Stmt stmt = Stmt.Parse("SELECT u.* FROM Users u");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -903,7 +902,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_UnqualifiedColumns_SelectStarFallback()
         {
-            var stmt = Stmt.Parse("SELECT Name, Email FROM Users");
+            Stmt stmt = Stmt.Parse("SELECT Name, Email FROM Users");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -915,7 +914,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_ColumnsFromAllClauses_IncludedInSelectInto()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name FROM Users u WHERE u.Age > 25 ORDER BY u.CreatedAt");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
@@ -928,7 +927,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_TableHints_PreservedOnTempTable()
         {
-            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WITH (NOLOCK)");
+            Stmt stmt = Stmt.Parse("SELECT u.Name FROM Users u WITH (NOLOCK)");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -940,7 +939,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_NoMatch_ReturnsOriginalSource()
         {
-            var stmt = Stmt.Parse("SELECT * FROM Users");
+            Stmt stmt = Stmt.Parse("SELECT * FROM Users");
             string result = stmt.ReplaceWithTempTables("Products").ToSource();
 
             Assert.Equal("SELECT * FROM Users", result);
@@ -949,7 +948,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_EmptyNames_ReturnsOriginalSource()
         {
-            var stmt = Stmt.Parse("SELECT * FROM Users");
+            Stmt stmt = Stmt.Parse("SELECT * FROM Users");
             string result = stmt.ReplaceWithTempTables().ToSource();
 
             Assert.Equal("SELECT * FROM Users", result);
@@ -958,7 +957,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_CteMatched_MaterializedAndRemoved()
         {
-            var stmt = Stmt.Parse("WITH cte AS (SELECT * FROM T) SELECT * FROM cte");
+            Stmt stmt = Stmt.Parse("WITH cte AS (SELECT * FROM T) SELECT * FROM cte");
             string result = stmt.ReplaceWithTempTables("cte").ToSource();
 
             Assert.Equal(
@@ -970,7 +969,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_CteWithPrerequisites_IncludesPrerequisitesInSelectInto()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A WHERE x > 1) SELECT * FROM B");
             string result = stmt.ReplaceWithTempTables("B").ToSource();
 
@@ -983,7 +982,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_MixedCteAndRegularTable()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "WITH cte AS (SELECT t.Id FROM TableA t) SELECT c.Id FROM cte c JOIN TableB b ON c.Id = b.CteId");
             string result = stmt.ReplaceWithTempTables("cte", "TableA").ToSource();
 
@@ -997,7 +996,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_AllCtesRemoved_NoWithClause()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A) SELECT * FROM B");
             string result = stmt.ReplaceWithTempTables("A", "B").ToSource();
 
@@ -1011,7 +1010,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_PartialCteRemoval_RemainingCtesKept()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "WITH A AS (SELECT * FROM T), B AS (SELECT * FROM A) SELECT * FROM A CROSS JOIN B");
             string result = stmt.ReplaceWithTempTables("B").ToSource();
 
@@ -1024,7 +1023,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_ColumnsFromJoinOn_IncludedInSelectInto()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE o.Total > 100");
             string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
 
@@ -1038,7 +1037,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_DerivedTableAlias_MaterializedAndReplaced()
         {
-            var stmt = Stmt.Parse("SELECT * FROM (SELECT Id, Name FROM Users) AS T");
+            Stmt stmt = Stmt.Parse("SELECT * FROM (SELECT Id, Name FROM Users) AS T");
             string result = stmt.ReplaceWithTempTables("T").ToSource();
 
             Assert.Equal(
@@ -1050,7 +1049,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_DerivedTableUnion_WrappedWithSelectInto()
         {
-            var stmt = Stmt.Parse("SELECT * FROM (SELECT 1 AS x UNION SELECT 2 AS x) AS T");
+            Stmt stmt = Stmt.Parse("SELECT * FROM (SELECT 1 AS x UNION SELECT 2 AS x) AS T");
             string result = stmt.ReplaceWithTempTables("T").ToSource();
 
             Assert.Equal(
@@ -1062,7 +1061,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_RowsetFunctionAlias_MaterializedAndReplaced()
         {
-            var stmt = Stmt.Parse("SELECT * FROM OPENQUERY(LinkedServer, 'SELECT 1') AS T");
+            Stmt stmt = Stmt.Parse("SELECT * FROM OPENQUERY(LinkedServer, 'SELECT 1') AS T");
             string result = stmt.ReplaceWithTempTables("T").ToSource();
 
             Assert.Equal(
@@ -1074,7 +1073,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_CrossApplySubquery_OnlyRegularTableReplaced()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, d.Detail FROM Users u CROSS APPLY (SELECT TOP 1 Detail FROM Details WHERE Details.UserId = u.Id) d");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
@@ -1087,7 +1086,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_RowsetFunctionWithRegularTable_ColumnsStaySeparate()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, oq.Val FROM Users u INNER JOIN OPENQUERY(LinkedServer, 'SELECT Val FROM T') AS oq ON u.Id = oq.Id");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
@@ -1100,7 +1099,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_TvfMatchedByFunctionName_MaterializedAndReplaced()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT f.Val FROM Users u INNER JOIN TableValuedFunction(1, 2) AS f ON u.Id = f.Id");
             string result = stmt.ReplaceWithTempTables("TableValuedFunction").ToSource();
 
@@ -1113,7 +1112,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_TvfWithoutAlias_MaterializedAndReplaced()
         {
-            var stmt = Stmt.Parse("SELECT * FROM TableValuedFunction(1, 2)");
+            Stmt stmt = Stmt.Parse("SELECT * FROM TableValuedFunction(1, 2)");
             string result = stmt.ReplaceWithTempTables("TableValuedFunction").ToSource();
 
             Assert.Equal(
@@ -1125,7 +1124,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_SchemaQualifiedTvf_MaterializedAndReplaced()
         {
-            var stmt = Stmt.Parse("SELECT f.Val FROM dbo.MyFunction(1, 2) AS f");
+            Stmt stmt = Stmt.Parse("SELECT f.Val FROM dbo.MyFunction(1, 2) AS f");
             string result = stmt.ReplaceWithTempTables("MyFunction").ToSource();
 
             Assert.Equal(
@@ -1137,7 +1136,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_TvfAndRegularTable_BothReplaced()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, f.Val FROM Users u INNER JOIN GetDetails(u.Id) AS f ON u.Id = f.Id");
             string result = stmt.ReplaceWithTempTables("Users", "GetDetails").ToSource();
 
@@ -1151,7 +1150,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_TvfQualifiedWildcard_SelectStarFallback()
         {
-            var stmt = Stmt.Parse("SELECT f.* FROM GetDetails(1) AS f");
+            Stmt stmt = Stmt.Parse("SELECT f.* FROM GetDetails(1) AS f");
             string result = stmt.ReplaceWithTempTables("GetDetails").ToSource();
 
             Assert.Equal(
@@ -1163,7 +1162,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_SingleConjunct_PushedToSelectInto()
         {
-            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE u.Active = 1");
+            Stmt stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE u.Active = 1");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -1175,7 +1174,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_MultipleConjuncts_AllPushedToSameTable()
         {
-            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE u.Active = 1 AND u.Age > 18");
+            Stmt stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE u.Active = 1 AND u.Age > 18");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -1187,7 +1186,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_MultiTable_EachTableGetsOwnPredicates()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 AND o.Total > 100");
             string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
 
@@ -1201,7 +1200,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_CrossTableConjunct_StaysOnOriginal()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Id = o.UserId");
             string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
 
@@ -1215,7 +1214,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_MixedPushedAndRemaining()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 AND u.Id = o.UserId AND o.Total > 50");
             string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
 
@@ -1229,7 +1228,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_SelfJoin_NoPushdown()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT a.Name FROM Users a INNER JOIN Users b ON a.Id = b.ParentId WHERE a.Active = 1");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
@@ -1242,7 +1241,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_OrSpanningTables_NotPushed()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name, o.Total FROM Users u INNER JOIN Orders o ON u.Id = o.UserId WHERE u.Active = 1 OR o.Total > 100");
             string result = stmt.ReplaceWithTempTables("Users", "Orders").ToSource();
 
@@ -1256,7 +1255,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_UnqualifiedColumns_NotPushed()
         {
-            var stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE Active = 1");
+            Stmt stmt = Stmt.Parse("SELECT u.Name FROM Users u WHERE Active = 1");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
             Assert.Equal(
@@ -1268,7 +1267,7 @@ namespace TSQL.Tests
         [Fact]
         public void TempTableReplacer_SubqueryInPredicate_NotPushed()
         {
-            var stmt = Stmt.Parse(
+            Stmt stmt = Stmt.Parse(
                 "SELECT u.Name FROM Users u WHERE u.Id IN (SELECT x.UserId FROM Logins x)");
             string result = stmt.ReplaceWithTempTables("Users").ToSource();
 
@@ -1278,6 +1277,44 @@ namespace TSQL.Tests
                 result);
         }
 
+        [Fact]
+        public void TempTableReplacer_NoAlias_ColumnQualifierRenamed()
+        {
+            Stmt stmt = Stmt.Parse(
+                "SELECT A.Col FROM A INNER JOIN B ON A.Id = B.Id");
+            string result = stmt.ReplaceWithTempTables("B").ToSource();
+
+            Assert.Equal(
+                "SELECT Id INTO #B FROM B;\n" +
+                "SELECT A.Col FROM A INNER JOIN #B ON A.Id = #B.Id",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_NoAlias_BracketedQualifierPreservesBrackets()
+        {
+            Stmt stmt = Stmt.Parse(
+                "SELECT [A].Col FROM [A] INNER JOIN [B] ON [A].Id = [B].Id");
+            string result = stmt.ReplaceWithTempTables("B").ToSource();
+
+            Assert.Equal(
+                "SELECT Id INTO #B FROM [B];\n" +
+                "SELECT [A].Col FROM [A] INNER JOIN #B ON [A].Id = [#B].Id",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_NoAlias_PushedPredicateKeepsOriginalQualifier()
+        {
+            Stmt stmt = Stmt.Parse(
+                "SELECT A.Col FROM A INNER JOIN B ON A.Id = B.Id WHERE B.Active = 1");
+            string result = stmt.ReplaceWithTempTables("B").ToSource();
+
+            Assert.Equal(
+                "SELECT Id, Active INTO #B FROM B WHERE B.Active = 1;\n" +
+                "SELECT A.Col FROM A INNER JOIN #B ON A.Id = #B.Id",
+                result);
+        }
         #endregion
     }
 }

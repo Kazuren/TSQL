@@ -321,7 +321,7 @@ namespace TSQL
         {
             public DatabaseName DatabaseName { get; }
             public SchemaName SchemaName { get; }
-            public ObjectName ObjectName { get; }
+            public ObjectName ObjectName { get; set; }
             public ColumnName ColumnName { get; }
 
             internal Token _databaseToSchemaDot;

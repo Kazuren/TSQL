@@ -935,6 +935,14 @@ namespace TSQL
     {
         public ObjectName(string name) : base(name) { }
         internal ObjectName(Token token) : base(token) { }
+
+        public ObjectName Rename(string newName)
+        {
+            bool bracketed = Lexeme.StartsWith("[", System.StringComparison.Ordinal);
+            string lexeme = bracketed ? "[" + newName + "]" : newName;
+            return new ObjectName(
+                ConcreteToken.WithLeadingSpace(TokenType.IDENTIFIER, lexeme, newName));
+        }
     }
 
     public class ColumnName : SqlName

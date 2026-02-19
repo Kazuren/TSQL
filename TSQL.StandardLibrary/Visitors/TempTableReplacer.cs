@@ -358,6 +358,42 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
+            // Rewrite column qualifiers that reference matched table names directly.
+            // When a table has no alias, columns use the table name as qualifier
+            // (e.g., [Orders].[Id]). After renaming the table to #Orders, these
+            // qualifiers must match.
+            // Skip column identifiers inside pushed predicates — they reference the
+            // original table in the SELECT INTO statement.
+            var pushedColumnIds = new HashSet<Expr.ColumnIdentifier>();
+            foreach (var kvp in pushedPredicates)
+            {
+                foreach (AST.Predicate pred in kvp.Value)
+                {
+                    var pc = new PredicateColumnCollector();
+                    pc.Walk(pred);
+                    foreach (Expr.ColumnIdentifier col in pc.Columns)
+                    {
+                        pushedColumnIds.Add(col);
+                    }
+                }
+            }
+
+            var matchedTableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string key in regularOrder)
+            {
+                matchedTableNames.Add(regularInfo[key].ObjectName);
+            }
+
+            foreach (Expr.ColumnIdentifier col in collector.ColumnIdentifiers)
+            {
+                if (col.ObjectName != null
+                    && matchedTableNames.Contains(col.ObjectName.Name)
+                    && !pushedColumnIds.Contains(col))
+                {
+                    col.ObjectName = col.ObjectName.Rename("#" + col.ObjectName.Name);
+                }
+            }
+
             // ── Phase 4: EMIT ─────────────────────────────────────────────────
             // Assemble the output Script. Statement order matters — each SELECT INTO
             // must appear before any query that references its temp table.
