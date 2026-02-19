@@ -1138,10 +1138,19 @@ namespace TSQL
             return parenSource;
         }
 
-        private TableReference ParseNamedTableSource()
+        private TableSource ParseNamedTableSource()
         {
             IdentifierPartsBuffer parts = CollectIdentifierParts();
             Expr.ObjectIdentifier objectId = ObjectIdentifier(parts);
+
+            // Table-valued function: identifier followed by (args)
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                Expr.FunctionCall functionCall = FinishCall(objectId);
+                RowsetFunctionReference rowsetRef = new RowsetFunctionReference(functionCall);
+                rowsetRef.Alias = Alias();
+                return rowsetRef;
+            }
 
             TableReference tableRef = new TableReference(objectId);
 

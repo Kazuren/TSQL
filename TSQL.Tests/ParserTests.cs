@@ -1282,6 +1282,57 @@ namespace TSQL.Tests
             Assert.Equal(source, stmt.ToSource());
         }
 
+        // ---- Table-valued functions ----
+
+        [Fact]
+        public void Parse_TableValuedFunction_HasCorrectStructure()
+        {
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM MyFunction(1, 2) AS f");
+            FromClause from = SelectExpressionOf(select).From;
+
+            RowsetFunctionReference rowset = Assert.IsType<RowsetFunctionReference>(from.TableSources[0]);
+            Assert.Equal("MyFunction", rowset.FunctionCall.Callee.ObjectName.Name);
+            Assert.Equal(2, rowset.FunctionCall.Arguments.Count);
+            Assert.NotNull(rowset.Alias);
+            Assert.Equal("f", rowset.Alias.Name);
+        }
+
+        [Fact]
+        public void Parse_SchemaQualifiedTvf_HasCorrectStructure()
+        {
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM dbo.MyFunction(1, 2) AS f");
+            FromClause from = SelectExpressionOf(select).From;
+
+            RowsetFunctionReference rowset = Assert.IsType<RowsetFunctionReference>(from.TableSources[0]);
+            Assert.Equal("dbo", rowset.FunctionCall.Callee.SchemaName.Name);
+            Assert.Equal("MyFunction", rowset.FunctionCall.Callee.ObjectName.Name);
+            Assert.Equal(2, rowset.FunctionCall.Arguments.Count);
+            Assert.NotNull(rowset.Alias);
+            Assert.Equal("f", rowset.Alias.Name);
+        }
+
+        [Fact]
+        public void Parse_TvfWithoutAlias_HasCorrectStructure()
+        {
+            Stmt.Select select = Stmt.ParseSelect("SELECT a FROM MyFunction(1, 2)");
+            FromClause from = SelectExpressionOf(select).From;
+
+            RowsetFunctionReference rowset = Assert.IsType<RowsetFunctionReference>(from.TableSources[0]);
+            Assert.Equal("MyFunction", rowset.FunctionCall.Callee.ObjectName.Name);
+            Assert.Equal(2, rowset.FunctionCall.Arguments.Count);
+            Assert.Null(rowset.Alias);
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM MyFunction(1, 2) AS f")]
+        [InlineData("SELECT a FROM dbo.MyFunction(1, 2) AS f")]
+        [InlineData("SELECT a FROM MyFunction(1, 2)")]
+        [InlineData("SELECT a FROM T INNER JOIN MyFunction(1) AS f ON T.id = f.id")]
+        public void Parse_TableValuedFunction_RoundTripsCorrectly(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
         // ---- Combined / edge cases ----
 
         [Theory]

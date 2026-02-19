@@ -1097,6 +1097,57 @@ namespace TSQL.Tests
                 result);
         }
 
+        [Fact]
+        public void TempTableReplacer_TvfMatchedByFunctionName_MaterializedAndReplaced()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT f.Val FROM Users u INNER JOIN TableValuedFunction(1, 2) AS f ON u.Id = f.Id");
+            string result = stmt.ReplaceWithTempTables("TableValuedFunction").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #TableValuedFunction FROM TableValuedFunction(1, 2);\n" +
+                "SELECT f.Val FROM Users u INNER JOIN #TableValuedFunction AS f ON u.Id = f.Id",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_TvfWithoutAlias_MaterializedAndReplaced()
+        {
+            var stmt = Stmt.Parse("SELECT * FROM TableValuedFunction(1, 2)");
+            string result = stmt.ReplaceWithTempTables("TableValuedFunction").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #TableValuedFunction FROM TableValuedFunction(1, 2);\n" +
+                "SELECT * FROM #TableValuedFunction",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_SchemaQualifiedTvf_MaterializedAndReplaced()
+        {
+            var stmt = Stmt.Parse("SELECT f.Val FROM dbo.MyFunction(1, 2) AS f");
+            string result = stmt.ReplaceWithTempTables("MyFunction").ToSource();
+
+            Assert.Equal(
+                "SELECT * INTO #MyFunction FROM dbo.MyFunction(1, 2);\n" +
+                "SELECT f.Val FROM #MyFunction AS f",
+                result);
+        }
+
+        [Fact]
+        public void TempTableReplacer_TvfAndRegularTable_BothReplaced()
+        {
+            var stmt = Stmt.Parse(
+                "SELECT u.Name, f.Val FROM Users u INNER JOIN GetDetails(u.Id) AS f ON u.Id = f.Id");
+            string result = stmt.ReplaceWithTempTables("Users", "GetDetails").ToSource();
+
+            Assert.Equal(
+                "SELECT Name, Id INTO #Users FROM Users;\n" +
+                "SELECT * INTO #GetDetails FROM GetDetails(u.Id);\n" +
+                "SELECT u.Name, f.Val FROM #Users u INNER JOIN #GetDetails AS f ON u.Id = f.Id",
+                result);
+        }
+
         #endregion
     }
 }

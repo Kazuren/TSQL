@@ -297,18 +297,36 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // 4d. Rowset functions (e.g., OPENQUERY): materialize via
-            //     SELECT * INTO #alias FROM OPENQUERY(...), then swap the node in the
-            //     outer FROM with a TableReference to #alias.
+            // 4d. Rowset functions and table-valued functions: materialize via
+            //     SELECT * INTO #name FROM function(...), then swap the node in the
+            //     outer FROM with a TableReference to #name.
+            //     When matched by function name (TVFs), preserve the original alias.
+            //     When matched by alias (OPENQUERY etc.), use alias as temp table name.
             foreach (RowsetFunctionReference rowsetRef in collector.MatchedRowsetFunctions)
             {
-                string aliasName = rowsetRef.Alias.Name;
+                string functionName = rowsetRef.FunctionCall.Callee.ObjectName.Name;
+                bool matchedByFunctionName = targetSet.Contains(functionName);
+
+                string tempName;
+                Alias preservedAlias;
+                if (matchedByFunctionName)
+                {
+                    tempName = functionName;
+                    preservedAlias = rowsetRef.Alias;
+                }
+                else
+                {
+                    tempName = rowsetRef.Alias.Name;
+                    preservedAlias = null;
+                }
+
                 rowsetRef.Alias = null;
-                allStatements.Add(SelectStarInto(aliasName, rowsetRef));
+                allStatements.Add(SelectStarInto(tempName, rowsetRef));
 
                 if (outerSelect?.From != null)
                 {
-                    var tempRef = new TableReference(TempTableIdentifier(aliasName));
+                    var tempRef = new TableReference(TempTableIdentifier(tempName));
+                    tempRef.Alias = preservedAlias;
                     ReplaceTableSource(outerSelect.From, rowsetRef, tempRef);
                 }
             }
@@ -454,6 +472,10 @@ namespace TSQL.StandardLibrary.Visitors
             protected override void VisitRowsetFunctionReference(RowsetFunctionReference source)
             {
                 if (source.Alias != null && _targetNames.Contains(source.Alias.Name))
+                {
+                    MatchedRowsetFunctions.Add(source);
+                }
+                else if (_targetNames.Contains(source.FunctionCall.Callee.ObjectName.Name))
                 {
                     MatchedRowsetFunctions.Add(source);
                 }
