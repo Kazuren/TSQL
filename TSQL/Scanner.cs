@@ -521,21 +521,27 @@ namespace TSQL
             _previousToken = token;
         }
 
-        // Characterization
-        private bool IsDigit(char c)
+        // Character classification lookup table — replaces range-check methods with
+        // a single bounds check + array access per call (same principle as .NET 8's SearchValues<char>).
+        private const byte DIGIT = 1;
+        private const byte ALPHA = 2;
+        private static readonly byte[] CharKind = InitCharKind();
+
+        private static byte[] InitCharKind()
         {
-            return c >= '0' && c <= '9';
+            byte[] table = new byte[128];
+            for (char c = '0'; c <= '9'; c++) table[c] = DIGIT;
+            for (char c = 'a'; c <= 'z'; c++) table[c] = ALPHA;
+            for (char c = 'A'; c <= 'Z'; c++) table[c] = ALPHA;
+            table['_'] = ALPHA;
+            table['#'] = ALPHA;
+            return table;
         }
-        private bool IsAlpha(char c)
-        {
-            return (c >= 'a' && c <= 'z') ||
-                (c >= 'A' && c <= 'Z') ||
-                c == '_' || c == '#';
-        }
-        private bool IsAlphaNumeric(char c)
-        {
-            return IsAlpha(c) || IsDigit(c);
-        }
+
+        // (uint)c < 128 lets the JIT elide the separate array bounds check.
+        private static bool IsDigit(char c) { return (uint)c < 128 && (CharKind[c] & DIGIT) != 0; }
+        private static bool IsAlpha(char c) { return (uint)c < 128 && (CharKind[c] & ALPHA) != 0; }
+        private static bool IsAlphaNumeric(char c) { return (uint)c < 128 && CharKind[c] != 0; }
 
         /// <summary>
         /// Inline ASCII-only whitespace check. Avoids char.IsWhiteSpace which checks the full
