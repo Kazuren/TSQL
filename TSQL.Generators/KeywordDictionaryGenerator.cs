@@ -10,7 +10,7 @@ namespace TSQL.Generators
     [Generator]
     public class KeywordDictionaryGenerator : ISourceGenerator
     {
-        private const int DiscriminatorThreshold = 4;
+        private const int TrieThreshold = 4;
 
         public void Initialize(GeneratorInitializationContext context)
         {
@@ -114,19 +114,18 @@ namespace TSQL.Generators
         /// <summary>
         /// Emits matching code for a group of same-length keywords.
         /// For small groups (≤4), emits a linear if-chain.
-        /// For larger groups, emits a two-level dispatch: first a switch on one
-        /// carefully chosen character, then linear if-chains within each case.
-        /// See <see cref="EmitDiscriminatorSwitch"/> for details.
+        /// For larger groups, emits a trie-based dispatch where each character
+        /// position is checked exactly once via nested switch/if chains.
         /// </summary>
         private static void EmitKeywordGroup(StringBuilder sb, List<string> keywords, string indent)
         {
-            if (keywords.Count <= DiscriminatorThreshold)
+            if (keywords.Count <= TrieThreshold)
             {
                 EmitLinearChain(sb, keywords, indent);
             }
             else
             {
-                EmitDiscriminatorSwitch(sb, keywords, indent);
+                EmitTrie(sb, keywords, indent);
             }
         }
 
@@ -140,87 +139,83 @@ namespace TSQL.Generators
         }
 
         /// <summary>
-        /// Emits a switch that narrows down candidates by looking at a single character
-        /// before doing full string comparisons.
-        ///
-        /// Problem: the length-4 bucket has ~28 keywords (CASE, CAST, FROM, INTO, JOIN,
-        /// NULL, OVER, THEN, WHEN, WITH, ...). When the scanner sees an identifier like
-        /// "col1" in <c>SELECT col1 FROM Orders</c>, it must rule out all 28 before
-        /// concluding it's not a keyword.
-        ///
-        /// Solution: pick the character position where the keywords differ the most
-        /// (the "discriminator"), then switch on that one character. For example, if
-        /// position 2 is chosen, the runtime reads slice[2] once and jumps straight to
-        /// the small subset of keywords that share that character — typically 1-6 instead
-        /// of 28. Each case then does a short linear if-chain over just that subset.
-        ///
-        /// Example for length-4 keywords with discriminator at position 0:
-        /// <code>
-        /// switch (slice.LowerAt(0))
-        /// {
-        ///     case 'c':
-        ///         if (slice.EqualsIgnoreCaseUnchecked("cast")) { ... }
-        ///         if (slice.EqualsIgnoreCaseUnchecked("case")) { ... }
-        ///         break;
-        ///     case 'n':
-        ///         if (slice.EqualsIgnoreCaseUnchecked("null")) { ... }
-        ///         break;
-        ///     ...
-        /// }
-        /// </code>
+        /// Emits a trie-based dispatch for a group of same-length keywords.
+        /// Each character position is checked exactly once via nested switch/if chains.
+        /// Non-keywords exit at the first character that doesn't match any keyword path.
         /// </summary>
-        private static void EmitDiscriminatorSwitch(StringBuilder sb, List<string> keywords, string indent)
+        private static void EmitTrie(StringBuilder sb, List<string> keywords, string indent)
         {
-            int bestPos = FindBestDiscriminator(keywords);
-
-            // Group keywords by their lowercased char at the discriminating position
-            var groups = new SortedDictionary<char, List<string>>();
-            foreach (var keyword in keywords)
-            {
-                char key = char.ToLowerInvariant(keyword[bestPos]);
-                if (!groups.ContainsKey(key))
-                    groups[key] = new List<string>();
-                groups[key].Add(keyword);
-            }
-
-            sb.AppendLine($"{indent}switch (slice.LowerAt({bestPos}))");
-            sb.AppendLine($"{indent}{{");
-
-            foreach (var group in groups)
-            {
-                sb.AppendLine($"{indent}    case '{group.Key}':");
-                EmitLinearChain(sb, group.Value, indent + "        ");
-                sb.AppendLine($"{indent}        break;");
-            }
-
-            sb.AppendLine($"{indent}}}");
+            var root = BuildTrie(keywords);
+            EmitTrieNode(sb, root, 0, indent);
         }
 
-        /// <summary>
-        /// Finds the character position with the most distinct lowercased characters
-        /// across all keywords. This position best discriminates between keywords.
-        /// </summary>
-        private static int FindBestDiscriminator(List<string> keywords)
+        /// <returns>true if every code path through this node ends with a return statement.</returns>
+        private static bool EmitTrieNode(StringBuilder sb, TrieNode node, int depth, string indent)
         {
-            int length = keywords[0].Length;
-            int bestPos = 0;
-            int bestDistinct = 0;
-
-            for (int pos = 0; pos < length; pos++)
+            if (node.Keyword != null)
             {
-                var seen = new HashSet<char>();
-                foreach (var kw in keywords)
-                {
-                    seen.Add(char.ToLowerInvariant(kw[pos]));
-                }
-                if (seen.Count > bestDistinct)
-                {
-                    bestDistinct = seen.Count;
-                    bestPos = pos;
-                }
+                sb.AppendLine($"{indent}tokenType = TokenType.{node.Keyword}; return true;");
+                return true;
             }
 
-            return bestPos;
+            if (node.Children.Count == 0)
+            {
+                return false;
+            }
+
+            if (node.Children.Count == 1)
+            {
+                var kvp = node.Children.First();
+                sb.AppendLine($"{indent}if (slice.LowerAt({depth}) == '{kvp.Key}')");
+                sb.AppendLine($"{indent}{{");
+                EmitTrieNode(sb, kvp.Value, depth + 1, indent + "    ");
+                sb.AppendLine($"{indent}}}");
+                return false;
+            }
+            else
+            {
+                sb.AppendLine($"{indent}switch (slice.LowerAt({depth}))");
+                sb.AppendLine($"{indent}{{");
+
+                foreach (var kvp in node.Children.OrderBy(c => c.Key))
+                {
+                    sb.AppendLine($"{indent}    case '{kvp.Key}':");
+                    bool returns = EmitTrieNode(sb, kvp.Value, depth + 1, indent + "        ");
+                    if (!returns)
+                    {
+                        sb.AppendLine($"{indent}        break;");
+                    }
+                }
+
+                sb.AppendLine($"{indent}}}");
+                return false;
+            }
+        }
+
+        private class TrieNode
+        {
+            public Dictionary<char, TrieNode> Children = new Dictionary<char, TrieNode>();
+            public string Keyword; // non-null at leaf — the TokenType enum name
+        }
+
+        private static TrieNode BuildTrie(List<string> keywords)
+        {
+            var root = new TrieNode();
+            foreach (var keyword in keywords)
+            {
+                var node = root;
+                foreach (char c in keyword.ToLowerInvariant())
+                {
+                    if (!node.Children.TryGetValue(c, out var child))
+                    {
+                        child = new TrieNode();
+                        node.Children[c] = child;
+                    }
+                    node = child;
+                }
+                node.Keyword = keyword;
+            }
+            return root;
         }
 
         private class SyntaxReceiver : ISyntaxReceiver
