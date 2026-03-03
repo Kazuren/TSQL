@@ -113,6 +113,42 @@ namespace TSQL
             return true;
         }
 
+        /// <summary>
+        /// Case-insensitive comparison that skips null and length checks.
+        /// Only safe when the caller has already guaranteed non-null and matching length
+        /// (e.g. the generated TryGetKeyword method).
+        /// </summary>
+        internal bool EqualsIgnoreCaseUnchecked(string other)
+        {
+            for (int i = 0; i < _length; i++)
+            {
+                char c = _source[_start + i];
+                if (c >= 'A' && c <= 'Z')
+                {
+                    c = (char)(c + 32);
+                }
+                if (c != other[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the lowercased character at the given index within the slice.
+        /// Only converts ASCII uppercase (A-Z) to lowercase.
+        /// </summary>
+        internal char LowerAt(int index)
+        {
+            char c = _source[_start + index];
+            if (c >= 'A' && c <= 'Z')
+            {
+                c = (char)(c + 32);
+            }
+            return c;
+        }
+
         public override bool Equals(object obj)
         {
             if (obj is StringSlice slice) return Equals(slice);
