@@ -290,13 +290,17 @@
         }
 
         [Fact]
-        public void ScanTokens_UnexpectedNbsp_IncludesUnicodeNameInError()
+        public void ScanTokens_UnicodeSpaces_TreatedAsWhitespace()
         {
+            // NBSP between tokens should be treated as whitespace, not cause an error
             string sql = "SELECT\u00A01";
             var scanner = new Scanner(sql);
 
-            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
-            Assert.Equal("Unexpected character: U+00A0 NO-BREAK SPACE", ex.Message);
+            var tokens = scanner.ScanTokens();
+
+            Assert.Equal(TokenType.SELECT, tokens[0].Type);
+            Assert.Equal(TokenType.WHOLE_NUMBER, tokens[1].Type);
+            Assert.Equal(TokenType.EOF, tokens[2].Type);
         }
 
         [Fact]

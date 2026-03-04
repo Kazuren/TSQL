@@ -173,6 +173,12 @@ namespace TSQL
                 case ' ':
                 case '\t':
                 case '\r':
+                case '\u00A0': // NO-BREAK SPACE
+                case '\u2002': // EN SPACE
+                case '\u2003': // EM SPACE
+                case '\u2009': // THIN SPACE
+                case '\u202F': // NARROW NO-BREAK SPACE
+                case '\u3000': // IDEOGRAPHIC SPACE
                     Whitespace();
                     break;
                 default:
@@ -550,18 +556,17 @@ namespace TSQL
         /// </summary>
         private static bool IsWhiteSpace(char c)
         {
-            return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+            return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+                || c == '\u00A0' || c == '\u2002' || c == '\u2003'
+                || c == '\u2009' || c == '\u202F' || c == '\u3000';
         }
 
+        /// <summary>
+        /// Human-readable names for Unicode characters that commonly appear in copy-pasted SQL
+        /// but are not valid T-SQL. Used in error messages to help users identify the problem character.
+        /// </summary>
         private static readonly Dictionary<char, string> UnicodeCharNames = new Dictionary<char, string>
         {
-            // Spaces
-            { '\u00A0', "NO-BREAK SPACE" },
-            { '\u2002', "EN SPACE" },
-            { '\u2003', "EM SPACE" },
-            { '\u2009', "THIN SPACE" },
-            { '\u202F', "NARROW NO-BREAK SPACE" },
-            { '\u3000', "IDEOGRAPHIC SPACE" },
             // Zero-width
             { '\u200B', "ZERO WIDTH SPACE" },
             { '\u200C', "ZERO WIDTH NON-JOINER" },
