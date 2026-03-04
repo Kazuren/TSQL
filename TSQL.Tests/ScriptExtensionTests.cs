@@ -15,9 +15,9 @@ namespace TSQL.Tests
 
             script.AddCondition("Active = 1");
 
-            string result = script.ToSource();
-            Assert.Contains("SELECT * FROM Users WHERE Active = 1", result);
-            Assert.Contains("SELECT * FROM Orders WHERE Active = 1", result);
+            Assert.Equal(
+                "SELECT * FROM Users WHERE Active = 1; SELECT * FROM Orders WHERE Active = 1",
+                script.ToSource());
         }
 
         [Fact]
@@ -31,13 +31,12 @@ namespace TSQL.Tests
                 new object[] { ("@Status", 1) },
                 out IReadOnlyDictionary<string, object> parameters);
 
-            string result = script.ToSource();
-            // The condition variable should be renamed due to collision with stmt1's @Status
+            // @Status collides with stmt1's existing @Status, so renamed to @Status_1
+            Assert.Equal(
+                "SELECT * FROM Users WHERE Id = @Status AND Status = @Status_1; SELECT * FROM Orders WHERE Status = @Status_1",
+                script.ToSource());
             Assert.Single(parameters);
-            string paramName = parameters.Keys.First();
-            Assert.Equal(1, parameters[paramName]);
-            // The renamed variable should appear in both statements' conditions
-            Assert.Contains("Status = " + paramName, result);
+            Assert.Equal(1, parameters["@Status_1"]);
         }
 
         [Fact]
@@ -49,10 +48,10 @@ namespace TSQL.Tests
                 new object[] { ("@TenantId", 42) },
                 out IReadOnlyDictionary<string, object> parameters);
 
-            string result = script.ToSource();
+            Assert.Equal(
+                "SELECT * FROM Users WHERE TenantId = @TenantId; SELECT * FROM Orders WHERE TenantId = @TenantId",
+                script.ToSource());
             Assert.Equal(42, parameters["@TenantId"]);
-            Assert.Contains("Users WHERE TenantId = @TenantId", result);
-            Assert.Contains("Orders WHERE TenantId = @TenantId", result);
         }
 
         [Fact]
@@ -62,20 +61,9 @@ namespace TSQL.Tests
 
             script.AddCondition("Active = 1");
 
-            string result = script.ToSource();
-            Assert.Contains("DROP TABLE #Temp", result);
-            Assert.Contains("SELECT * FROM Users WHERE Active = 1", result);
-        }
-
-        [Fact]
-        public void AddCondition_RoundTripsCorrectly()
-        {
-            Script script = Script.Parse("SELECT * FROM Users; SELECT * FROM Orders");
-            script.AddCondition("Active = 1");
-
-            // Re-parse and verify structure
-            Script reparsed = Script.Parse(script.ToSource());
-            Assert.Equal(2, reparsed.Statements.Count);
+            Assert.Equal(
+                "DROP TABLE #Temp; SELECT * FROM Users WHERE Active = 1",
+                script.ToSource());
         }
 
         // #####################################################################
@@ -91,13 +79,12 @@ namespace TSQL.Tests
             script.Parameterize(out IReadOnlyDictionary<string, object> parameters);
 
             // Should get @P0 for 'Alice' and @P1 for 100 — not @P0 for both
+            Assert.Equal(
+                "SELECT * FROM Users WHERE Name = @P0; SELECT * FROM Orders WHERE Total = @P1",
+                script.ToSource());
             Assert.Equal(2, parameters.Count);
             Assert.Equal("Alice", parameters["@P0"]);
             Assert.Equal(100, parameters["@P1"]);
-
-            string result = script.ToSource();
-            Assert.Contains("Name = @P0", result);
-            Assert.Contains("Total = @P1", result);
         }
 
         [Fact]
@@ -109,6 +96,9 @@ namespace TSQL.Tests
             script.Parameterize(out IReadOnlyDictionary<string, object> parameters);
 
             // @P0 already exists in stmt1, so the literal 99 should get @P1 (not @P0)
+            Assert.Equal(
+                "SELECT * FROM Users WHERE Id = @P0; SELECT * FROM Orders WHERE Total = @P1",
+                script.ToSource());
             Assert.Single(parameters);
             Assert.Equal(99, parameters["@P1"]);
         }
@@ -130,11 +120,10 @@ namespace TSQL.Tests
 
             script.AddSchemaAwareCondition("TenantId = 1", checker);
 
-            string result = script.ToSource();
-            Assert.Contains("Users", result);
-            Assert.Contains("Orders", result);
-            // Both tables have TenantId, so both should get the condition
-            Assert.Contains("TenantId = 1", result);
+            // Both tables have TenantId, so both get the condition prefixed with table name
+            Assert.Equal(
+                "SELECT * FROM Users WHERE Users.TenantId = 1; SELECT * FROM Orders WHERE Orders.TenantId = 1",
+                script.ToSource());
         }
 
         [Fact]
@@ -153,10 +142,12 @@ namespace TSQL.Tests
                 checker,
                 out IReadOnlyDictionary<string, object> parameters);
 
-            // @TenantId collides with stmt1's existing @TenantId
+            // @TenantId collides with stmt1's existing @TenantId, so renamed to @TenantId_1
+            Assert.Equal(
+                "SELECT * FROM Users WHERE Id = @TenantId AND Users.TenantId = @TenantId_1; SELECT * FROM Orders WHERE Orders.TenantId = @TenantId_1",
+                script.ToSource());
             Assert.Single(parameters);
-            string paramName = parameters.Keys.First();
-            Assert.Equal(5, parameters[paramName]);
+            Assert.Equal(5, parameters["@TenantId_1"]);
         }
 
         // #####################################################################
@@ -173,7 +164,7 @@ namespace TSQL.Tests
 
             // Users, Orders, Products
             Assert.Equal(3, refs.Tables.Count);
-            Assert.Equal(1, refs.Joins.Count);
+            Assert.Single(refs.Joins);
         }
 
         [Fact]
@@ -201,11 +192,11 @@ namespace TSQL.Tests
 
             Script result = script.ReplaceWithTempTables("Users");
 
-            // Each statement produces a SELECT INTO + modified query
-            // The flattened script should have all of them
-            Assert.True(result.Statements.Count >= 2);
-            string source = result.ToSource();
-            Assert.Contains("#Users", source);
+            // Each statement produces a SELECT INTO + modified query (2 per input = 4 total)
+            Assert.Equal(4, result.Statements.Count);
+            Assert.Equal(
+                "SELECT * INTO #Users FROM Users;\nSELECT * FROM #Users;\nSELECT * INTO #Users FROM Users;\nSELECT * FROM #Users",
+                result.ToSource());
         }
 
         // #####################################################################
