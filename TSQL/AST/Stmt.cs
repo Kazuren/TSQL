@@ -38,12 +38,22 @@ namespace TSQL
             return Parser.CreateParser(sql).ParseDrop();
         }
 
+        /// <summary>Parses a SQL EXECUTE/EXEC statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be an EXECUTE statement.</param>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Stmt ParseExecute(string sql)
+        {
+            return Parser.CreateParser(sql).ParseExecute();
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
         public interface Visitor<T>
         {
             T VisitSelectStmt(Stmt.Select stmt);
             T VisitInsertStmt(Stmt.Insert stmt);
             T VisitDropStmt(Stmt.Drop stmt);
+            T VisitExecuteStmt(Stmt.Execute stmt);
+            T VisitExecuteStringStmt(Stmt.ExecuteString stmt);
         }
 
         public class Select : Stmt
@@ -205,12 +215,488 @@ namespace TSQL
                 }
             }
         }
+
+        public class Execute : Stmt
+        {
+            public Token ReturnVariable { get; }
+            public Expr Target { get; }
+            public SyntaxElementList<ExecuteArgument> Arguments { get; }
+            public ExecuteWithClause WithClause { get; set; }
+
+            internal Token _execToken;
+            internal Token _returnEqualsToken;
+
+            public Execute(Expr target, SyntaxElementList<ExecuteArgument> arguments)
+            {
+                Target = target;
+                Arguments = arguments;
+            }
+
+            public Execute(Token returnVariable, Token returnEquals, Expr target, SyntaxElementList<ExecuteArgument> arguments)
+            {
+                ReturnVariable = returnVariable;
+                _returnEqualsToken = returnEquals;
+                Target = target;
+                Arguments = arguments;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitExecuteStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _execToken;
+
+                if (ReturnVariable != null)
+                {
+                    yield return ReturnVariable;
+                    yield return _returnEqualsToken;
+                }
+
+                foreach (Token token in Target.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (Arguments.Count > 0)
+                {
+                    foreach (Token token in Arguments.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+
+                if (WithClause != null)
+                {
+                    foreach (Token token in WithClause.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+            }
+        }
+
+        public class ExecuteString : Stmt
+        {
+            public SyntaxElementList<Expr> Expressions { get; }
+            public ExecuteContext Context { get; set; }
+            public ExecuteAtClause AtClause { get; set; }
+
+            internal Token _execToken;
+            internal Token _leftParen;
+            internal Token _rightParen;
+
+            public ExecuteString(SyntaxElementList<Expr> expressions)
+            {
+                Expressions = expressions;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitExecuteStringStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _execToken;
+                yield return _leftParen;
+
+                foreach (Token token in Expressions.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return _rightParen;
+
+                if (Context != null)
+                {
+                    foreach (Token token in Context.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+
+                if (AtClause != null)
+                {
+                    foreach (Token token in AtClause.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+            }
+        }
     }
     #endregion
 
     #region DROP Object Types
 
     public enum ObjectType { Table }
+
+    #endregion
+
+    #region EXECUTE Supporting Types
+
+    public class ExecuteArgument : SyntaxElement
+    {
+        public Token ParameterName { get; }
+        public Expr Value { get; }
+        public bool IsDefault { get; }
+        public bool IsOutput { get; }
+
+        internal Token _equalsToken;
+        internal Token _defaultToken;
+        internal Token _outputToken;
+
+        public ExecuteArgument(Expr value)
+        {
+            Value = value;
+        }
+
+        public ExecuteArgument(Token parameterName, Token equalsToken, Expr value)
+        {
+            ParameterName = parameterName;
+            _equalsToken = equalsToken;
+            Value = value;
+        }
+
+        public ExecuteArgument(Token defaultToken)
+        {
+            IsDefault = true;
+            _defaultToken = defaultToken;
+        }
+
+        public ExecuteArgument(Expr value, Token outputToken)
+        {
+            Value = value;
+            IsOutput = true;
+            _outputToken = outputToken;
+        }
+
+        public ExecuteArgument(Token parameterName, Token equalsToken, Expr value, Token outputToken)
+        {
+            ParameterName = parameterName;
+            _equalsToken = equalsToken;
+            Value = value;
+            IsOutput = true;
+            _outputToken = outputToken;
+        }
+
+        public ExecuteArgument(Token parameterName, Token equalsToken, Token defaultToken)
+        {
+            ParameterName = parameterName;
+            _equalsToken = equalsToken;
+            IsDefault = true;
+            _defaultToken = defaultToken;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            if (ParameterName != null)
+            {
+                yield return ParameterName;
+                yield return _equalsToken;
+            }
+
+            if (IsDefault)
+            {
+                yield return _defaultToken;
+            }
+            else
+            {
+                foreach (Token token in Value.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+
+            if (_outputToken != null)
+            {
+                yield return _outputToken;
+            }
+        }
+    }
+
+    public class ExecuteContext : SyntaxElement
+    {
+        public bool IsLogin { get; }
+
+        internal Token _asToken;
+        internal Token _contextTypeToken;
+        internal Token _equalsToken;
+        internal Token _nameToken;
+
+        public ExecuteContext(bool isLogin)
+        {
+            IsLogin = isLogin;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _asToken;
+            yield return _contextTypeToken;
+            yield return _equalsToken;
+            yield return _nameToken;
+        }
+    }
+
+    public class ExecuteAtClause : SyntaxElement
+    {
+        public bool IsDataSource { get; }
+        public Token ServerOrSourceName { get; }
+
+        internal Token _atToken;
+        internal Token _dataSourceToken;
+
+        public ExecuteAtClause(Token serverOrSourceName, bool isDataSource)
+        {
+            ServerOrSourceName = serverOrSourceName;
+            IsDataSource = isDataSource;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _atToken;
+
+            if (_dataSourceToken != null)
+            {
+                yield return _dataSourceToken;
+            }
+
+            yield return ServerOrSourceName;
+        }
+    }
+
+    public class ExecuteWithClause : SyntaxElement
+    {
+        public bool Recompile { get; }
+        public ResultSetsSpec ResultSets { get; }
+
+        internal Token _withToken;
+        internal Token _recompileToken;
+        internal Token _commaToken;
+
+        public ExecuteWithClause(bool recompile, ResultSetsSpec resultSets)
+        {
+            Recompile = recompile;
+            ResultSets = resultSets;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _withToken;
+
+            if (_recompileToken != null)
+            {
+                yield return _recompileToken;
+            }
+
+            if (_commaToken != null)
+            {
+                yield return _commaToken;
+            }
+
+            if (ResultSets != null)
+            {
+                foreach (Token token in ResultSets.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+    }
+
+    public abstract class ResultSetsSpec : SyntaxElement { }
+
+    public class ResultSetsUndefined : ResultSetsSpec
+    {
+        internal Token _resultToken;
+        internal Token _setsToken;
+        internal Token _undefinedToken;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _resultToken;
+            yield return _setsToken;
+            yield return _undefinedToken;
+        }
+    }
+
+    public class ResultSetsNone : ResultSetsSpec
+    {
+        internal Token _resultToken;
+        internal Token _setsToken;
+        internal Token _noneToken;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _resultToken;
+            yield return _setsToken;
+            yield return _noneToken;
+        }
+    }
+
+    public class ResultSetsDefined : ResultSetsSpec
+    {
+        public SyntaxElementList<ResultSetDefinition> Definitions { get; }
+
+        internal Token _resultToken;
+        internal Token _setsToken;
+        internal Token _outerLeftParen;
+        internal Token _outerRightParen;
+
+        public ResultSetsDefined(SyntaxElementList<ResultSetDefinition> definitions)
+        {
+            Definitions = definitions;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _resultToken;
+            yield return _setsToken;
+            yield return _outerLeftParen;
+
+            foreach (Token token in Definitions.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            yield return _outerRightParen;
+        }
+    }
+
+    public abstract class ResultSetDefinition : SyntaxElement { }
+
+    public class ColumnResultSet : ResultSetDefinition
+    {
+        public SyntaxElementList<ResultSetColumn> Columns { get; }
+
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public ColumnResultSet(SyntaxElementList<ResultSetColumn> columns)
+        {
+            Columns = columns;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _leftParen;
+
+            foreach (Token token in Columns.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            yield return _rightParen;
+        }
+    }
+
+    public class ResultSetColumn : SyntaxElement
+    {
+        public DataType DataType { get; }
+
+        internal Token _columnNameToken;
+        internal Token _collateToken;
+        internal Token _collationNameToken;
+        internal Token _notToken;
+        internal Token _nullToken;
+
+        public ResultSetColumn(Token columnName, DataType dataType)
+        {
+            _columnNameToken = columnName;
+            DataType = dataType;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _columnNameToken;
+
+            foreach (Token token in DataType.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            if (_collateToken != null)
+            {
+                yield return _collateToken;
+                yield return _collationNameToken;
+            }
+
+            if (_notToken != null)
+            {
+                yield return _notToken;
+            }
+
+            if (_nullToken != null)
+            {
+                yield return _nullToken;
+            }
+        }
+    }
+
+    public class ObjectResultSet : ResultSetDefinition
+    {
+        public Expr.ObjectIdentifier ObjectName { get; }
+
+        internal Token _asToken;
+        internal Token _objectToken;
+
+        public ObjectResultSet(Expr.ObjectIdentifier objectName)
+        {
+            ObjectName = objectName;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _asToken;
+            yield return _objectToken;
+
+            foreach (Token token in ObjectName.DescendantTokens())
+            {
+                yield return token;
+            }
+        }
+    }
+
+    public class TypeResultSet : ResultSetDefinition
+    {
+        public Expr.ObjectIdentifier TypeName { get; }
+
+        internal Token _asToken;
+        internal Token _typeToken;
+
+        public TypeResultSet(Expr.ObjectIdentifier typeName)
+        {
+            TypeName = typeName;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _asToken;
+            yield return _typeToken;
+
+            foreach (Token token in TypeName.DescendantTokens())
+            {
+                yield return token;
+            }
+        }
+    }
+
+    public class XmlResultSet : ResultSetDefinition
+    {
+        internal Token _asToken;
+        internal Token _forToken;
+        internal Token _xmlToken;
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _asToken;
+            yield return _forToken;
+            yield return _xmlToken;
+        }
+    }
 
     #endregion
 

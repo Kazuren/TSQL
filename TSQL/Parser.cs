@@ -368,7 +368,15 @@ namespace TSQL
             TokenType.SYSTEM_TIME,
             // Miscellaneous keywords
             TokenType.TIMESTAMP,
-            TokenType.PRECISION
+            TokenType.PRECISION,
+            // EXECUTE statement keywords
+            TokenType.OUTPUT,
+            TokenType.OUT,
+            TokenType.LOGIN,
+            TokenType.RESULT,
+            TokenType.NONE,
+            TokenType.UNDEFINED,
+            TokenType.OBJECT
         };
 
         public Parser(IReadOnlyList<Token> tokens)
@@ -432,6 +440,14 @@ namespace TSQL
             return dropStmt;
         }
 
+        public Stmt ParseExecute()
+        {
+            Reset();
+            Stmt executeStmt = ExecuteStatement();
+            ExpectEnd();
+            return executeStmt;
+        }
+
         public Script ParseScript()
         {
             Reset();
@@ -472,6 +488,11 @@ namespace TSQL
             if (Check(TokenType.DROP))
             {
                 return DropStatement();
+            }
+
+            if (Check(TokenType.EXEC) || Check(TokenType.EXECUTE))
+            {
+                return ExecuteStatement();
             }
 
             Cte cte = null;
@@ -598,6 +619,371 @@ namespace TSQL
         }
 
         /// <summary>
+        /// EXEC | EXECUTE (proc form or string form)
+        /// </summary>
+        private Stmt ExecuteStatement()
+        {
+            Token execToken = Advance(); // EXEC or EXECUTE
+
+            // String form: EXEC ('string' + @var) [AS LOGIN/USER = 'name'] [AT server]
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                return ExecuteStringStatement(execToken);
+            }
+
+            // Proc form: EXEC [@ret =] target [args] [WITH ...]
+            Token returnVariable = null;
+            Token returnEquals = null;
+
+            // Check for return status: @ret = proc_name
+            if (Check(TokenType.VARIABLE) && CheckNext(TokenType.EQUAL))
+            {
+                returnVariable = Advance();
+                returnEquals = Advance();
+            }
+
+            // Parse target: variable (@module_name_var) or ObjectIdentifier
+            Expr target;
+            if (Check(TokenType.VARIABLE))
+            {
+                target = new Expr.Variable(Advance());
+            }
+            else
+            {
+                IdentifierPartsBuffer parts = CollectIdentifierParts();
+                target = ObjectIdentifier(parts);
+            }
+
+            // Parse optional arguments
+            SyntaxElementList<ExecuteArgument> arguments = new SyntaxElementList<ExecuteArgument>();
+            if (!IsAtEnd() && !Check(TokenType.SEMICOLON) && !Check(TokenType.OPTION)
+                && !IsStatementStart())
+            {
+                arguments.Add(ParseExecuteArgument());
+
+                while (Match(TokenType.COMMA, out Token comma))
+                {
+                    arguments.Add(ParseExecuteArgument(), comma);
+                }
+            }
+
+            Stmt.Execute executeStmt;
+            if (returnVariable != null)
+            {
+                executeStmt = new Stmt.Execute(returnVariable, returnEquals, target, arguments);
+            }
+            else
+            {
+                executeStmt = new Stmt.Execute(target, arguments);
+            }
+            executeStmt._execToken = execToken;
+
+            // Parse optional WITH clause
+            if (Check(TokenType.WITH))
+            {
+                executeStmt.WithClause = ParseExecuteWithClause();
+            }
+
+            return executeStmt;
+        }
+
+        private ExecuteArgument ParseExecuteArgument()
+        {
+            // Named parameter: @param = value [OUTPUT]
+            if (Check(TokenType.VARIABLE) && CheckNext(TokenType.EQUAL))
+            {
+                Token paramName = Advance();
+                Token equals = Advance();
+
+                // Named DEFAULT: @param = DEFAULT
+                if (Check(TokenType.DEFAULT))
+                {
+                    Token defaultToken = Advance();
+                    return new ExecuteArgument(paramName, equals, defaultToken);
+                }
+
+                Expr value = Expression();
+
+                // Check for OUTPUT/OUT modifier
+                if (Match(TokenType.OUTPUT, TokenType.OUT, out Token outputToken))
+                {
+                    return new ExecuteArgument(paramName, equals, value, outputToken);
+                }
+
+                return new ExecuteArgument(paramName, equals, value);
+            }
+
+            // Positional DEFAULT
+            if (Check(TokenType.DEFAULT))
+            {
+                Token defaultToken = Advance();
+                return new ExecuteArgument(defaultToken);
+            }
+
+            // Positional value [OUTPUT]
+            Expr expr = Expression();
+
+            if (Match(TokenType.OUTPUT, TokenType.OUT, out Token outToken))
+            {
+                return new ExecuteArgument(expr, outToken);
+            }
+
+            return new ExecuteArgument(expr);
+        }
+
+        private Stmt.ExecuteString ExecuteStringStatement(Token execToken)
+        {
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '('");
+
+            SyntaxElementList<Expr> expressions = new SyntaxElementList<Expr>();
+            expressions.Add(Expression());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                expressions.Add(Expression(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
+
+            Stmt.ExecuteString execString = new Stmt.ExecuteString(expressions);
+            execString._execToken = execToken;
+            execString._leftParen = leftParen;
+            execString._rightParen = rightParen;
+
+            // Optional AS LOGIN/USER = 'name'
+            if (Check(TokenType.AS))
+            {
+                execString.Context = ParseExecuteContext();
+            }
+
+            // Optional AT server / AT DATA_SOURCE name
+            if (Check(TokenType.AT))
+            {
+                execString.AtClause = ParseExecuteAtClause();
+            }
+
+            return execString;
+        }
+
+        private ExecuteContext ParseExecuteContext()
+        {
+            Token asToken = Consume(TokenType.AS, "Expected AS");
+
+            bool isLogin;
+            Token contextTypeToken;
+            if (Match(TokenType.LOGIN, out contextTypeToken))
+            {
+                isLogin = true;
+            }
+            else if (Match(TokenType.USER, out contextTypeToken))
+            {
+                isLogin = false;
+            }
+            else
+            {
+                throw Error(Peek(), "Expected LOGIN or USER");
+            }
+
+            Token equalsToken = Consume(TokenType.EQUAL, "Expected '='");
+            Token nameToken = Consume(TokenType.STRING, "Expected string literal for login/user name");
+
+            ExecuteContext ctx = new ExecuteContext(isLogin);
+            ctx._asToken = asToken;
+            ctx._contextTypeToken = contextTypeToken;
+            ctx._equalsToken = equalsToken;
+            ctx._nameToken = nameToken;
+            return ctx;
+        }
+
+        private ExecuteAtClause ParseExecuteAtClause()
+        {
+            Token atToken = Consume(TokenType.AT, "Expected AT");
+
+            // Check for DATA_SOURCE (a two-word contextual keyword)
+            // DATA_SOURCE is not a token type — it would be scanned as identifier "DATA_SOURCE"
+            // For simplicity, we check if the identifier is "DATA_SOURCE"
+            bool isDataSource = false;
+            Token dataSourceToken = null;
+            if (IsIdentifierOrContextualKeyword() && Peek().Lexeme.Equals("DATA_SOURCE", System.StringComparison.OrdinalIgnoreCase))
+            {
+                dataSourceToken = Advance();
+                isDataSource = true;
+            }
+
+            Token serverName = ConsumeIdentifierOrContextualKeyword("Expected server name or data source name");
+
+            ExecuteAtClause atClause = new ExecuteAtClause(serverName, isDataSource);
+            atClause._atToken = atToken;
+            atClause._dataSourceToken = dataSourceToken;
+            return atClause;
+        }
+
+        private ExecuteWithClause ParseExecuteWithClause()
+        {
+            Token withToken = Consume(TokenType.WITH, "Expected WITH");
+
+            bool recompile = false;
+            Token recompileToken = null;
+            Token commaToken = null;
+            ResultSetsSpec resultSets = null;
+
+            if (Match(TokenType.RECOMPILE, out recompileToken))
+            {
+                recompile = true;
+
+                // Check for optional comma followed by RESULT SETS
+                if (Match(TokenType.COMMA, out commaToken))
+                {
+                    resultSets = ParseResultSetsSpec();
+                }
+            }
+            else
+            {
+                resultSets = ParseResultSetsSpec();
+            }
+
+            ExecuteWithClause withClause = new ExecuteWithClause(recompile, resultSets);
+            withClause._withToken = withToken;
+            withClause._recompileToken = recompileToken;
+            withClause._commaToken = commaToken;
+            return withClause;
+        }
+
+        private ResultSetsSpec ParseResultSetsSpec()
+        {
+            Token resultToken = Consume(TokenType.RESULT, "Expected RESULT");
+            Token setsToken = Consume(TokenType.SETS, "Expected SETS");
+
+            if (Match(TokenType.UNDEFINED, out Token undefinedToken))
+            {
+                ResultSetsUndefined spec = new ResultSetsUndefined();
+                spec._resultToken = resultToken;
+                spec._setsToken = setsToken;
+                spec._undefinedToken = undefinedToken;
+                return spec;
+            }
+
+            if (Match(TokenType.NONE, out Token noneToken))
+            {
+                ResultSetsNone spec = new ResultSetsNone();
+                spec._resultToken = resultToken;
+                spec._setsToken = setsToken;
+                spec._noneToken = noneToken;
+                return spec;
+            }
+
+            // Defined result sets: ( definition (, definition)* )
+            Token outerLeft = Consume(TokenType.LEFT_PAREN, "Expected '('");
+
+            SyntaxElementList<ResultSetDefinition> definitions = new SyntaxElementList<ResultSetDefinition>();
+            definitions.Add(ParseResultSetDefinition());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                definitions.Add(ParseResultSetDefinition(), comma);
+            }
+
+            Token outerRight = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
+
+            ResultSetsDefined spec2 = new ResultSetsDefined(definitions);
+            spec2._resultToken = resultToken;
+            spec2._setsToken = setsToken;
+            spec2._outerLeftParen = outerLeft;
+            spec2._outerRightParen = outerRight;
+            return spec2;
+        }
+
+        private ResultSetDefinition ParseResultSetDefinition()
+        {
+            // AS OBJECT / AS TYPE / AS FOR XML
+            if (Check(TokenType.AS))
+            {
+                Token asToken = Advance();
+
+                if (Match(TokenType.OBJECT, out Token objectToken))
+                {
+                    IdentifierPartsBuffer parts = CollectIdentifierParts();
+                    Expr.ObjectIdentifier objectName = ObjectIdentifier(parts);
+                    ObjectResultSet ors = new ObjectResultSet(objectName);
+                    ors._asToken = asToken;
+                    ors._objectToken = objectToken;
+                    return ors;
+                }
+
+                if (Match(TokenType.TYPE, out Token typeToken))
+                {
+                    IdentifierPartsBuffer parts = CollectIdentifierParts();
+                    Expr.ObjectIdentifier typeName = ObjectIdentifier(parts);
+                    TypeResultSet trs = new TypeResultSet(typeName);
+                    trs._asToken = asToken;
+                    trs._typeToken = typeToken;
+                    return trs;
+                }
+
+                if (Check(TokenType.FOR))
+                {
+                    Token forToken = Advance();
+                    Token xmlToken = Consume(TokenType.XML, "Expected XML after FOR");
+                    XmlResultSet xrs = new XmlResultSet();
+                    xrs._asToken = asToken;
+                    xrs._forToken = forToken;
+                    xrs._xmlToken = xmlToken;
+                    return xrs;
+                }
+
+                throw Error(Peek(), "Expected OBJECT, TYPE, or FOR after AS");
+            }
+
+            // Column result set: (col1 type [COLLATE name] [NULL|NOT NULL], ...)
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' for column result set definition");
+
+            SyntaxElementList<ResultSetColumn> columns = new SyntaxElementList<ResultSetColumn>();
+            columns.Add(ParseResultSetColumn());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                columns.Add(ParseResultSetColumn(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
+
+            ColumnResultSet crs = new ColumnResultSet(columns);
+            crs._leftParen = leftParen;
+            crs._rightParen = rightParen;
+            return crs;
+        }
+
+        private ResultSetColumn ParseResultSetColumn()
+        {
+            Token columnName = ConsumeIdentifierOrContextualKeyword("Expected column name");
+            DataType dataType = ParseDataType();
+
+            ResultSetColumn col = new ResultSetColumn(columnName, dataType);
+
+            // Optional COLLATE collation_name
+            if (Match(TokenType.COLLATE, out Token collateToken))
+            {
+                Token collationName = ConsumeIdentifierOrContextualKeyword("Expected collation name");
+                col._collateToken = collateToken;
+                col._collationNameToken = collationName;
+            }
+
+            // Optional NULL or NOT NULL
+            if (Match(TokenType.NOT, out Token notToken))
+            {
+                Token nullToken = Consume(TokenType.NULL, "Expected NULL after NOT");
+                col._notToken = notToken;
+                col._nullToken = nullToken;
+            }
+            else if (Match(TokenType.NULL, out Token nullToken2))
+            {
+                col._nullToken = nullToken2;
+            }
+
+            return col;
+        }
+
+        /// <summary>
         /// Looks ahead to determine if the current LEFT_PAREN starts an insert source
         /// (e.g., a subquery SELECT) rather than a column list.
         /// </summary>
@@ -706,7 +1092,8 @@ namespace TSQL
         private bool IsStatementStart()
         {
             TokenType t = Peek().Type;
-            return t == TokenType.SELECT || t == TokenType.INSERT || t == TokenType.WITH;
+            return t == TokenType.SELECT || t == TokenType.INSERT || t == TokenType.WITH
+                || t == TokenType.EXEC || t == TokenType.EXECUTE || t == TokenType.DROP;
         }
 
         private Expr.Subquery Subquery()

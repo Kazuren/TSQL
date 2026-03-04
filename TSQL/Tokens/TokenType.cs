@@ -2,7 +2,7 @@ namespace TSQL
 {
     public enum TokenType
     {
-        NONE,
+        INVALID_TOKEN,
         IDENTIFIER,
         VARIABLE,
         STRING, WHOLE_NUMBER, DECIMAL,
@@ -94,6 +94,9 @@ namespace TSQL
 
         // Miscellaneous keywords (contextual - can also be used as identifiers)
         TIMESTAMP,
-        PRECISION
+        PRECISION,
+
+        // EXECUTE statement keywords (contextual - can also be used as identifiers)
+        OUTPUT, OUT, LOGIN, RESULT, NONE, UNDEFINED, OBJECT
     }
 }

@@ -3580,6 +3580,169 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region EXECUTE Statement - Proc Form Round-Trips
+
+        [Theory]
+        [InlineData("EXEC sp_Help")]
+        [InlineData("EXEC sp_GetData 1")]
+        [InlineData("EXECUTE dbo.MyProc 1")]
+        [InlineData("EXEC sp_GetData 1, 'hello', @Var")]
+        [InlineData("EXECUTE sp_GetData")]
+        [InlineData("EXEC dbo.MyProc @p1 = 1, @p2 = 'hello'")]
+        [InlineData("EXEC sp_Proc @Var OUTPUT")]
+        [InlineData("EXEC sp_Proc @p1 = @Var OUTPUT")]
+        [InlineData("EXEC sp_Proc DEFAULT, @p2 = DEFAULT")]
+        [InlineData("EXEC @ret = dbo.MyProc 1")]
+        [InlineData("EXEC @procVar")]
+        [InlineData("EXEC sp_Proc WITH RECOMPILE")]
+        [InlineData("EXEC sp_Proc @p1 = @Var OUT")]
+        public void Execute_RoundTrips(string source)
+        {
+            Assert.Equal(source, Stmt.ParseExecute(source).ToSource());
+        }
+
+        #endregion
+
+        #region EXECUTE Statement - String Form Round-Trips
+
+        [Theory]
+        [InlineData("EXEC ('SELECT 1')")]
+        [InlineData("EXEC (@sql)")]
+        [InlineData("EXEC (N'SELECT ' + @col + N' FROM T')")]
+        [InlineData("EXEC ('SELECT 1') AS USER = 'dbo'")]
+        [InlineData("EXEC ('SELECT 1') AS LOGIN = 'sa'")]
+        [InlineData("EXEC ('SELECT 1') AT LinkedServer")]
+        [InlineData("EXEC ('SELECT ?', @p1) AT LinkedServer")]
+        public void ExecuteString_RoundTrips(string source)
+        {
+            Assert.Equal(source, Stmt.ParseExecute(source).ToSource());
+        }
+
+        #endregion
+
+        #region EXECUTE Statement - WITH RESULT SETS Round-Trips
+
+        [Theory]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS ((col1 INT, col2 VARCHAR(50)))")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS ((col1 INT NOT NULL, col2 NVARCHAR(MAX) NULL))")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS ((col1 INT COLLATE Latin1_General_CI_AS))")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS NONE")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS UNDEFINED")]
+        [InlineData("EXEC sp_Proc WITH RECOMPILE, RESULT SETS NONE")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS (AS OBJECT dbo.MyTable)")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS (AS TYPE dbo.MyTableType)")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS (AS FOR XML)")]
+        [InlineData("EXEC sp_Proc WITH RESULT SETS ((col1 INT), (col2 VARCHAR(50)))")]
+        public void Execute_WithResultSets_RoundTrips(string source)
+        {
+            Assert.Equal(source, Stmt.ParseExecute(source).ToSource());
+        }
+
+        #endregion
+
+        #region EXECUTE Statement - Structure Tests
+
+        [Fact]
+        public void Execute_HasCorrectTarget()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC dbo.MyProc 1"));
+            var target = Assert.IsType<Expr.ObjectIdentifier>(exec.Target);
+            Assert.Equal("MyProc", target.ObjectName.Name);
+            Assert.Equal("dbo", target.SchemaName.Name);
+        }
+
+        [Fact]
+        public void Execute_NoArgs_HasEmptyArguments()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Help"));
+            Assert.Equal(0, exec.Arguments.Count);
+        }
+
+        [Fact]
+        public void Execute_MultipleArgs_HasCorrectCount()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_GetData 1, 'hello', @Var"));
+            Assert.Equal(3, exec.Arguments.Count);
+        }
+
+        [Fact]
+        public void Execute_ReturnStatus_ParsedCorrectly()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @ret = dbo.MyProc 1"));
+            Assert.NotNull(exec.ReturnVariable);
+            Assert.Equal("@ret", exec.ReturnVariable.Lexeme);
+        }
+
+        [Fact]
+        public void Execute_NamedParameters_CorrectNames()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @p1 = 1, @p2 = 'hello'"));
+            Assert.Equal(2, exec.Arguments.Count);
+            Assert.Equal("@p1", exec.Arguments[0].ParameterName.Lexeme);
+            Assert.Equal("@p2", exec.Arguments[1].ParameterName.Lexeme);
+        }
+
+        [Fact]
+        public void Execute_OutputFlag_IsSet()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @Var OUTPUT"));
+            Assert.Single(exec.Arguments);
+            Assert.True(exec.Arguments[0].IsOutput);
+        }
+
+        [Fact]
+        public void Execute_VariableTarget_IsVariable()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @procVar"));
+            Assert.IsType<Expr.Variable>(exec.Target);
+        }
+
+        [Fact]
+        public void Execute_DefaultArg_IsDefault()
+        {
+            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc DEFAULT, @p2 = DEFAULT"));
+            Assert.True(exec.Arguments[0].IsDefault);
+            Assert.True(exec.Arguments[1].IsDefault);
+        }
+
+        #endregion
+
+        #region EXECUTE Statement - Script/Dispatch Tests
+
+        [Fact]
+        public void Execute_ViaGenericParse_ReturnsExecute()
+        {
+            Stmt stmt = Stmt.Parse("EXEC sp_GetData 1");
+            Assert.IsType<Stmt.Execute>(stmt);
+        }
+
+        [Fact]
+        public void Execute_ViaGenericParse_ReturnsExecuteString()
+        {
+            Stmt stmt = Stmt.Parse("EXEC ('SELECT 1')");
+            Assert.IsType<Stmt.ExecuteString>(stmt);
+        }
+
+        [Fact]
+        public void Execute_InScript_RoundTrips()
+        {
+            string source = "EXEC sp_A; SELECT 1";
+            Script script = Script.Parse(source);
+            Assert.Equal(2, script.Statements.Count);
+            Assert.IsType<Stmt.Execute>(script.Statements[0]);
+            Assert.IsType<Stmt.Select>(script.Statements[1]);
+            Assert.Equal(source, script.ToSource());
+        }
+
+        [Fact]
+        public void ExecuteString_ViaParseExecute_ReturnsExecuteString()
+        {
+            Stmt stmt = Stmt.ParseExecute("EXEC ('SELECT 1')");
+            Assert.IsType<Stmt.ExecuteString>(stmt);
+        }
+
+        #endregion
+
         #region Contextual Keyword as Identifier
 
         [Theory]

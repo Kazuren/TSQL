@@ -83,6 +83,25 @@ namespace TSQL
 
         protected virtual void VisitDrop(Stmt.Drop stmt) { }
 
+        protected virtual void VisitExecute(Stmt.Execute stmt)
+        {
+            foreach (ExecuteArgument arg in stmt.Arguments)
+            {
+                if (arg.Value != null)
+                {
+                    Walk(arg.Value);
+                }
+            }
+        }
+
+        protected virtual void VisitExecuteString(Stmt.ExecuteString stmt)
+        {
+            foreach (Expr expr in stmt.Expressions)
+            {
+                Walk(expr);
+            }
+        }
+
         #endregion
 
         #region Expr Visit Methods
@@ -529,6 +548,8 @@ namespace TSQL
         object Stmt.Visitor<object>.VisitSelectStmt(Stmt.Select stmt) { VisitSelect(stmt); return null; }
         object Stmt.Visitor<object>.VisitInsertStmt(Stmt.Insert stmt) { VisitInsert(stmt); return null; }
         object Stmt.Visitor<object>.VisitDropStmt(Stmt.Drop stmt) { VisitDrop(stmt); return null; }
+        object Stmt.Visitor<object>.VisitExecuteStmt(Stmt.Execute stmt) { VisitExecute(stmt); return null; }
+        object Stmt.Visitor<object>.VisitExecuteStringStmt(Stmt.ExecuteString stmt) { VisitExecuteString(stmt); return null; }
 
         object Expr.Visitor<object>.VisitBinaryExpr(Expr.Binary expr) { VisitBinary(expr); return null; }
         object Expr.Visitor<object>.VisitStringLiteralExpr(Expr.StringLiteral expr) { VisitStringLiteral(expr); return null; }
