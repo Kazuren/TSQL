@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 
 namespace TSQL
@@ -185,7 +186,7 @@ namespace TSQL
                     }
                     else
                     {
-                        throw new ParseError($"Unexpected character: {c}", _line, ColumnAtStart(), _source);
+                        throw new ParseError($"Unexpected character: {DescribeChar(c)}", _line, ColumnAtStart(), _source);
                     }
                     break;
             }
@@ -550,6 +551,51 @@ namespace TSQL
         private static bool IsWhiteSpace(char c)
         {
             return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+        }
+
+        private static readonly Dictionary<char, string> UnicodeCharNames = new Dictionary<char, string>
+        {
+            // Spaces
+            { '\u00A0', "NO-BREAK SPACE" },
+            { '\u2002', "EN SPACE" },
+            { '\u2003', "EM SPACE" },
+            { '\u2009', "THIN SPACE" },
+            { '\u202F', "NARROW NO-BREAK SPACE" },
+            { '\u3000', "IDEOGRAPHIC SPACE" },
+            // Zero-width
+            { '\u200B', "ZERO WIDTH SPACE" },
+            { '\u200C', "ZERO WIDTH NON-JOINER" },
+            { '\u200D', "ZERO WIDTH JOINER" },
+            { '\u2060', "WORD JOINER" },
+            { '\uFEFF', "BYTE ORDER MARK" },
+            // Smart quotes
+            { '\u2018', "LEFT SINGLE QUOTATION MARK" },
+            { '\u2019', "RIGHT SINGLE QUOTATION MARK" },
+            { '\u201C', "LEFT DOUBLE QUOTATION MARK" },
+            { '\u201D', "RIGHT DOUBLE QUOTATION MARK" },
+            // Dashes
+            { '\u2013', "EN DASH" },
+            { '\u2014', "EM DASH" },
+            { '\u2212', "MINUS SIGN" },
+            // Other
+            { '\u00AD', "SOFT HYPHEN" },
+            { '\u2011', "NON-BREAKING HYPHEN" },
+            { '\u2026', "HORIZONTAL ELLIPSIS" },
+            { '\uFFFD', "REPLACEMENT CHARACTER" },
+        };
+
+        private static string DescribeChar(char c)
+        {
+            string codePoint = $"U+{(int)c:X4}";
+
+            if (UnicodeCharNames.TryGetValue(c, out string name))
+            {
+                return $"{codePoint} {name}";
+            }
+            else
+            {
+                return $"{codePoint} ({CharUnicodeInfo.GetUnicodeCategory(c)})";
+            }
         }
     }
 }

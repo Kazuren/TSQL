@@ -286,7 +286,28 @@
             Assert.Equal(1, ex.Line);
             Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
-            Assert.Contains("`", ex.Message);
+            Assert.Equal("Unexpected character: U+0060 (ModifierSymbol)", ex.Message);
+        }
+
+        [Fact]
+        public void ScanTokens_UnexpectedNbsp_IncludesUnicodeNameInError()
+        {
+            string sql = "SELECT\u00A01";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal("Unexpected character: U+00A0 NO-BREAK SPACE", ex.Message);
+        }
+
+        [Fact]
+        public void ScanTokens_UnexpectedUnicode_FallsBackToCategory()
+        {
+            // U+00E9 is LATIN SMALL LETTER E WITH ACUTE — not in the dictionary
+            string sql = "SELECT \u00E9";
+            var scanner = new Scanner(sql);
+
+            ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
+            Assert.Equal("Unexpected character: U+00E9 (LowercaseLetter)", ex.Message);
         }
 
         [Fact]
