@@ -22,10 +22,19 @@ namespace TSQL
     === Statements ===
 
         script -> statement (";" statement)* ";"?
-        statement -> ("WITH" cte_list)? (select_statement | insert_statement) | drop_statement
+        statement -> ("WITH" cte_list)? (select_statement | insert_statement) | drop_statement | execute_statement
         select_statement -> query_expression (option_clause)?
         insert_statement -> "INSERT" ("INTO")? target (column_list)? insert_source
         drop_statement -> "DROP" "TABLE" ("IF" "EXISTS")? target ("," target)*
+        execute_statement -> ("EXEC" | "EXECUTE") (execute_proc | execute_string)
+        execute_proc -> (VARIABLE "=")? (fully_qualified_identifier | VARIABLE) (execute_arg ("," execute_arg)*)? (execute_with_clause)?
+        execute_string -> "(" expression ("," expression)* ")" (execute_context)? (execute_at)?
+        execute_arg -> (VARIABLE "=")? (expression (("OUTPUT" | "OUT"))? | "DEFAULT")
+        execute_context -> "AS" ("LOGIN" | "USER") "=" STRING
+        execute_at -> "AT" ("DATA_SOURCE")? IDENTIFIER
+        execute_with_clause -> "WITH" ("RECOMPILE" (",")?  )? (result_sets_spec)?
+        result_sets_spec -> "RESULT" "SETS" ("UNDEFINED" | "NONE" | "(" result_set_def ("," result_set_def)* ")")
+        result_set_def -> "(" column_def ("," column_def)* ")" | "AS" "OBJECT" fully_qualified_identifier | "AS" "TYPE" fully_qualified_identifier | "AS" "FOR" "XML"
         target -> fully_qualified_identifier | VARIABLE
         column_list -> "(" IDENTIFIER ("," IDENTIFIER)* ")"
         insert_source -> "DEFAULT" "VALUES" | "VALUES" values_row ("," values_row)* | ("EXEC" | "EXECUTE") fully_qualified_identifier (expression ("," expression)*)? | query_expression (option_clause)?
