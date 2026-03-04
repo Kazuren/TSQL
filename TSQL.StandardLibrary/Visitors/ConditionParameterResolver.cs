@@ -10,6 +10,37 @@ namespace TSQL.StandardLibrary.Visitors
         public static (string Condition, IReadOnlyDictionary<string, object> Parameters)
             Resolve(Stmt stmt, string condition, IEnumerable<object> values)
         {
+            HashSet<string> existingVars = CollectVariableNames(stmt);
+            return ResolveCore(existingVars, condition, values);
+        }
+
+        public static (string Condition, IReadOnlyDictionary<string, object> Parameters)
+            Resolve(IReadOnlyList<Stmt> stmts, string condition, IEnumerable<object> values)
+        {
+            HashSet<string> existingVars = CollectVariableNames(stmts);
+            return ResolveCore(existingVars, condition, values);
+        }
+
+        private static HashSet<string> CollectVariableNames(Stmt stmt)
+        {
+            VariableNameCollector collector = new VariableNameCollector();
+            collector.Walk(stmt);
+            return collector.Names;
+        }
+
+        private static HashSet<string> CollectVariableNames(IReadOnlyList<Stmt> stmts)
+        {
+            VariableNameCollector collector = new VariableNameCollector();
+            foreach (Stmt stmt in stmts)
+            {
+                collector.Walk(stmt);
+            }
+            return collector.Names;
+        }
+
+        private static (string Condition, IReadOnlyDictionary<string, object> Parameters)
+            ResolveCore(HashSet<string> existingVars, string condition, IEnumerable<object> values)
+        {
             // 1. Build name-value dictionary from values
             Dictionary<string, object> paramValues = BuildParamValues(values);
 
@@ -38,12 +69,7 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // 6. Collect existing variable names in the statement
-            VariableNameCollector stmtCollector = new VariableNameCollector();
-            stmtCollector.Walk(stmt);
-            HashSet<string> existingVars = stmtCollector.Names;
-
-            // 7. Detect collisions and build rename map
+            // 6. Detect collisions and build rename map
             Dictionary<string, string> renameMap =
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> allUsedNames = new HashSet<string>(existingVars);
@@ -72,14 +98,14 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            // 8. Rename variables in the predicate if needed
+            // 7. Rename variables in the predicate if needed
             if (renameMap.Count > 0)
             {
                 VariableRenamer renamer = new VariableRenamer(renameMap);
                 renamer.Walk(predicate);
             }
 
-            // 9. Build final parameters dictionary with renamed keys
+            // 8. Build final parameters dictionary with renamed keys
             Dictionary<string, object> finalParams =
                 new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             foreach (KeyValuePair<string, object> kvp in filteredParams)

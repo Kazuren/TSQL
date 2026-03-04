@@ -27,6 +27,30 @@ namespace TSQL.StandardLibrary.Visitors
             return replacer.Parameters;
         }
 
+        /// <summary>
+        /// Parameterizes all non-NULL literals across multiple statements in place.
+        /// A single parameter counter is shared across all statements, producing
+        /// unique names (@P0, @P1, ...) across the whole set.
+        /// </summary>
+        public static IReadOnlyDictionary<string, object> Parameterize(IReadOnlyList<Stmt> stmts)
+        {
+            // Phase 1: Collect existing variable names from ALL statements
+            VariableNameCollector variableCollector = new VariableNameCollector();
+            foreach (Stmt stmt in stmts)
+            {
+                variableCollector.Walk(stmt);
+            }
+
+            // Phase 2: Walk each statement sequentially with a shared replacer
+            LiteralReplacer replacer = new LiteralReplacer(variableCollector.Names);
+            foreach (Stmt stmt in stmts)
+            {
+                replacer.Walk(stmt);
+            }
+
+            return replacer.Parameters;
+        }
+
         private class LiteralReplacer : SqlWalker
         {
             private readonly HashSet<string> _existingNames;
