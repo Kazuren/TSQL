@@ -32,7 +32,7 @@ namespace TSQL
         MERGE,
         NATIONAL, NOCHECK, NONCLUSTERED, NOT, NULL, NULLIF,
         OF, OFF, OFFSETS, ON, OPEN, OPENDATASOURCE, OPENQUERY, OPENROWSET, OPENXML, OPTION, OR, ORDER, OUTER, OVER,
-        PERCENT, PIVOT, PLAN, PRECISION, PRIMARY, PRINT, PROC, PROCEDURE, PUBLIC,
+        PERCENT, PIVOT, PLAN, PRIMARY, PRINT, PROC, PROCEDURE, PUBLIC,
         RAISERROR, READ, READTEXT, RECONFIGURE, REFERENCES, REPLICATION, RESTORE, RESTRICT,
         RETURN, REVERT, REVOKE, RIGHT, ROLLBACK, ROWCOUNT, ROWGUIDCOL, RULE,
         SAVE, SCHEMA, SECURITYAUDIT, SELECT,
@@ -92,7 +92,8 @@ namespace TSQL
         // Temporal table keywords (contextual - can also be used as identifiers)
         SYSTEM_TIME,
 
-        // Miscellaneous hint keywords (contextual - can also be used as identifiers)
-        TIMESTAMP
+        // Miscellaneous keywords (contextual - can also be used as identifiers)
+        TIMESTAMP,
+        PRECISION
     }
 }

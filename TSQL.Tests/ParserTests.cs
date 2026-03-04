@@ -3008,83 +3008,83 @@ namespace TSQL.Tests
         [Fact]
         public void Construct_SelectStarFromTable_ProducesValidSql()
         {
-            var selectExpr = new SelectExpression();
+            SelectExpression selectExpr = new SelectExpression();
             selectExpr.Columns.Add(new Expr.Wildcard());
 
-            var from = new FromClause();
+            FromClause from = new FromClause();
             from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("Users"))));
             selectExpr.From = from;
 
-            var stmt = new Stmt.Select(selectExpr);
+            Stmt.Select stmt = new Stmt.Select(selectExpr);
             Assert.Equal("SELECT * FROM Users", stmt.ToSource());
         }
 
         [Fact]
         public void Construct_SelectMultipleColumns_ProducesValidSql()
         {
-            var selectExpr = new SelectExpression();
+            SelectExpression selectExpr = new SelectExpression();
             selectExpr.Columns.Add(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("a")), null));
             selectExpr.Columns.Add(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("b")), null));
 
-            var from = new FromClause();
+            FromClause from = new FromClause();
             from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
             selectExpr.From = from;
 
-            var stmt = new Stmt.Select(selectExpr);
+            Stmt.Select stmt = new Stmt.Select(selectExpr);
             Assert.Equal("SELECT a, b FROM T", stmt.ToSource());
         }
 
         [Fact]
         public void Construct_SelectWithAlias_ProducesValidSql()
         {
-            var selectExpr = new SelectExpression();
+            SelectExpression selectExpr = new SelectExpression();
             selectExpr.Columns.Add(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("a")),
                 new SuffixAlias("alias")));
 
-            var from = new FromClause();
+            FromClause from = new FromClause();
             from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
             selectExpr.From = from;
 
-            var stmt = new Stmt.Select(selectExpr);
+            Stmt.Select stmt = new Stmt.Select(selectExpr);
             Assert.Equal("SELECT a AS alias FROM T", stmt.ToSource());
         }
 
         [Fact]
         public void Construct_BinaryExpression_ProducesValidSql()
         {
-            var binary = new Expr.Binary(
+            Expr.Binary binary = new Expr.Binary(
                 new Expr.ColumnIdentifier(new ColumnName("a")),
                 Expr.ArithmeticOperator.Add,
                 new Expr.ColumnIdentifier(new ColumnName("b")));
 
-            var selectExpr = new SelectExpression();
+            SelectExpression selectExpr = new SelectExpression();
             selectExpr.Columns.Add(new SelectColumn(binary, null));
 
-            var stmt = new Stmt.Select(selectExpr);
+            Stmt.Select stmt = new Stmt.Select(selectExpr);
             Assert.Equal("SELECT a + b", stmt.ToSource());
         }
 
         [Fact]
         public void Construct_ComparisonPredicate_ProducesValidSql()
         {
-            var comparison = new AST.Predicate.Comparison(
+            Predicate.Comparison comparison = new AST.Predicate.Comparison(
                 new Expr.ColumnIdentifier(new ColumnName("x")),
                 AST.ComparisonOperator.GreaterThan,
                 new Expr.IntLiteral(10));
 
-            var selectExpr = new SelectExpression();
+            SelectExpression selectExpr = new SelectExpression();
             selectExpr.Columns.Add(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("a")), null));
 
-            var from = new FromClause();
+            FromClause from = new FromClause();
             from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
             selectExpr.From = from;
             selectExpr.AddWhere(comparison);
 
-            var stmt = new Stmt.Select(selectExpr);
+            Stmt.Select stmt = new Stmt.Select(selectExpr);
             Assert.Equal("SELECT a FROM T WHERE x > 10", stmt.ToSource());
         }
 
@@ -3213,7 +3213,7 @@ namespace TSQL.Tests
         public void ParseInsert_WithCte_RoundTrips()
         {
             string source = "WITH cte AS (SELECT col1 FROM T) INSERT INTO #Temp SELECT col1 FROM cte";
-            var stmt = Stmt.Parse(source);
+            Stmt stmt = Stmt.Parse(source);
             Assert.IsType<Stmt.Insert>(stmt);
             Assert.Equal(source, stmt.ToSource());
         }
@@ -3297,7 +3297,7 @@ namespace TSQL.Tests
         public void ParseScript_SingleSelect_RoundTrips()
         {
             string source = "SELECT 1";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Single(script.Statements);
             Assert.Equal(source, script.ToSource());
         }
@@ -3306,7 +3306,7 @@ namespace TSQL.Tests
         public void ParseScript_TwoSelects_WithSemicolons_RoundTrips()
         {
             string source = "SELECT 1; SELECT 2";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Equal(2, script.Statements.Count);
             Assert.Equal(source, script.ToSource());
         }
@@ -3315,7 +3315,7 @@ namespace TSQL.Tests
         public void ParseScript_SelectThenInsert_RoundTrips()
         {
             string source = "SELECT col1 FROM T; INSERT INTO #Temp SELECT col1 FROM T";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Equal(2, script.Statements.Count);
             Assert.IsType<Stmt.Select>(script.Statements[0]);
             Assert.IsType<Stmt.Insert>(script.Statements[1]);
@@ -3326,7 +3326,7 @@ namespace TSQL.Tests
         public void ParseScript_InsertThenSelect_RoundTrips()
         {
             string source = "INSERT INTO #Temp SELECT 1; SELECT * FROM #Temp";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Equal(2, script.Statements.Count);
             Assert.IsType<Stmt.Insert>(script.Statements[0]);
             Assert.IsType<Stmt.Select>(script.Statements[1]);
@@ -3337,7 +3337,7 @@ namespace TSQL.Tests
         public void ParseScript_ThreeStatements_RoundTrips()
         {
             string source = "SELECT 1; SELECT 2; SELECT 3";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Equal(3, script.Statements.Count);
             Assert.Equal(source, script.ToSource());
         }
@@ -3346,7 +3346,7 @@ namespace TSQL.Tests
         public void ParseScript_TrailingSemicolon_RoundTrips()
         {
             string source = "SELECT 1;";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Single(script.Statements);
             Assert.Equal(source, script.ToSource());
         }
@@ -3356,7 +3356,7 @@ namespace TSQL.Tests
         {
             // Statements can be separated by the next statement keyword without semicolon
             string source = "SELECT 1\nINSERT INTO T VALUES (1)";
-            var script = Script.Parse(source);
+            Script script = Script.Parse(source);
             Assert.Equal(2, script.Statements.Count);
             Assert.Equal(source, script.ToSource());
         }
@@ -3365,14 +3365,14 @@ namespace TSQL.Tests
         public void Parse_SingleStatement_AllowsTrailingSemicolon()
         {
             string source = "SELECT 1;";
-            var stmt = Stmt.Parse(source);
+            Stmt stmt = Stmt.Parse(source);
             Assert.IsType<Stmt.Select>(stmt);
         }
 
         [Fact]
         public void Parse_InsertViaGenericParse_ReturnsInsert()
         {
-            var stmt = Stmt.Parse("INSERT INTO T VALUES (1)");
+            Stmt stmt = Stmt.Parse("INSERT INTO T VALUES (1)");
             Assert.IsType<Stmt.Insert>(stmt);
         }
 
@@ -3514,6 +3514,18 @@ namespace TSQL.Tests
         public void Parse_MixedBracketedAndUnbracketed_ToSourcePreservesBrackets()
         {
             string source = "SELECT [a], b FROM [dbo].[T1]";
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        #endregion
+
+        #region Contextual Keyword as Identifier
+
+        [Theory]
+        [InlineData("SELECT c.precision AS Precision FROM sys.columns c")]
+        [InlineData("SELECT precision FROM sys.columns")]
+        public void Parse_PrecisionAsIdentifier_RoundTrips(string source)
+        {
             Assert.Equal(source, RoundTrip(source));
         }
 

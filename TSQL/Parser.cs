@@ -365,8 +365,9 @@ namespace TSQL
             TokenType.VIEWS,
             // Temporal table keywords
             TokenType.SYSTEM_TIME,
-            // Miscellaneous hint keywords
-            TokenType.TIMESTAMP
+            // Miscellaneous keywords
+            TokenType.TIMESTAMP,
+            TokenType.PRECISION
         };
 
         public Parser(IReadOnlyList<Token> tokens)
