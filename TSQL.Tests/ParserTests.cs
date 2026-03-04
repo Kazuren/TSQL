@@ -3519,6 +3519,67 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region DROP TABLE
+
+        [Fact]
+        public void DropTable_Basic()
+        {
+            var drop = Stmt.ParseDrop("DROP TABLE MyTable");
+
+            Assert.Equal(ObjectType.Table, drop.ObjectType);
+            Assert.False(drop.IfExists);
+            Assert.Single(drop.Targets);
+            Assert.Equal("MyTable", drop.Targets[0].ObjectName.Name);
+        }
+
+        [Fact]
+        public void DropTable_IfExists()
+        {
+            var drop = Stmt.ParseDrop("DROP TABLE IF EXISTS #TempTable");
+
+            Assert.Equal(ObjectType.Table, drop.ObjectType);
+            Assert.True(drop.IfExists);
+            Assert.Single(drop.Targets);
+            Assert.Equal("#TempTable", drop.Targets[0].ObjectName.Name);
+        }
+
+        [Fact]
+        public void DropTable_MultipleTargets()
+        {
+            var drop = Stmt.ParseDrop("DROP TABLE T1, T2, T3");
+
+            Assert.Equal(3, drop.Targets.Count);
+            Assert.Equal("T1", drop.Targets[0].ObjectName.Name);
+            Assert.Equal("T2", drop.Targets[1].ObjectName.Name);
+            Assert.Equal("T3", drop.Targets[2].ObjectName.Name);
+        }
+
+        [Theory]
+        [InlineData("DROP TABLE MyTable")]
+        [InlineData("DROP TABLE IF EXISTS #TempTable")]
+        [InlineData("DROP TABLE T1, T2, T3")]
+        [InlineData("DROP TABLE dbo.MyTable")]
+        [InlineData("DROP TABLE IF EXISTS dbo.T1, dbo.T2")]
+        public void DropTable_RoundTrips(string source)
+        {
+            Assert.Equal(source, Stmt.ParseDrop(source).ToSource());
+        }
+
+        [Fact]
+        public void DropTable_InScript()
+        {
+            string sql = "DROP TABLE IF EXISTS #temp; SELECT 1 INTO #temp; SELECT * FROM #temp";
+            var script = Script.Parse(sql);
+
+            Assert.Equal(3, script.Statements.Count);
+            Assert.IsType<Stmt.Drop>(script.Statements[0]);
+            Assert.IsType<Stmt.Select>(script.Statements[1]);
+            Assert.IsType<Stmt.Select>(script.Statements[2]);
+            Assert.Equal(sql, script.ToSource());
+        }
+
+        #endregion
+
         #region Contextual Keyword as Identifier
 
         [Theory]

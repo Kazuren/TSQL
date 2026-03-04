@@ -22,9 +22,10 @@ namespace TSQL
     === Statements ===
 
         script -> statement (";" statement)* ";"?
-        statement -> ("WITH" cte_list)? (select_statement | insert_statement)
+        statement -> ("WITH" cte_list)? (select_statement | insert_statement) | drop_statement
         select_statement -> query_expression (option_clause)?
         insert_statement -> "INSERT" ("INTO")? target (column_list)? insert_source
+        drop_statement -> "DROP" "TABLE" ("IF" "EXISTS")? target ("," target)*
         target -> fully_qualified_identifier | VARIABLE
         column_list -> "(" IDENTIFIER ("," IDENTIFIER)* ")"
         insert_source -> "DEFAULT" "VALUES" | "VALUES" values_row ("," values_row)* | ("EXEC" | "EXECUTE") fully_qualified_identifier (expression ("," expression)*)? | query_expression (option_clause)?
@@ -423,6 +424,14 @@ namespace TSQL
             return insertStmt;
         }
 
+        public Stmt.Drop ParseDrop()
+        {
+            Reset();
+            Stmt.Drop dropStmt = DropStatement();
+            ExpectEnd();
+            return dropStmt;
+        }
+
         public Script ParseScript()
         {
             Reset();
@@ -460,6 +469,11 @@ namespace TSQL
         /// </summary>
         private Stmt Statement()
         {
+            if (Check(TokenType.DROP))
+            {
+                return DropStatement();
+            }
+
             Cte cte = null;
             if (Check(TokenType.WITH))
             {
@@ -544,6 +558,43 @@ namespace TSQL
             insertStmt.ColumnList = columnList;
 
             return insertStmt;
+        }
+
+        /// <summary>
+        /// DROP TABLE [IF EXISTS] target ("," target)*
+        /// </summary>
+        private Stmt.Drop DropStatement()
+        {
+            Token dropToken = Consume(TokenType.DROP, "Expected DROP");
+            Token objectTypeToken = Consume(TokenType.TABLE, "Expected TABLE after DROP");
+
+            // Optional IF EXISTS
+            Token ifToken = null;
+            Token existsToken = null;
+            bool ifExists = false;
+            if (Match(TokenType.IF, out ifToken))
+            {
+                existsToken = Consume(TokenType.EXISTS, "Expected EXISTS after IF");
+                ifExists = true;
+            }
+
+            // Parse comma-separated target list
+            SyntaxElementList<Expr.ObjectIdentifier> targets = new SyntaxElementList<Expr.ObjectIdentifier>();
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            targets.Add(ObjectIdentifier(parts));
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                parts = CollectIdentifierParts();
+                targets.Add(ObjectIdentifier(parts), comma);
+            }
+
+            Stmt.Drop dropStmt = new Stmt.Drop(ObjectType.Table, ifExists, targets);
+            dropStmt._dropToken = dropToken;
+            dropStmt._objectTypeToken = objectTypeToken;
+            dropStmt._ifToken = ifToken;
+            dropStmt._existsToken = existsToken;
+            return dropStmt;
         }
 
         /// <summary>

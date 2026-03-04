@@ -30,11 +30,20 @@ namespace TSQL
             return Parser.CreateParser(sql).ParseInsert();
         }
 
+        /// <summary>Parses a SQL DROP statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be a DROP statement.</param>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Drop ParseDrop(string sql)
+        {
+            return Parser.CreateParser(sql).ParseDrop();
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
         public interface Visitor<T>
         {
             T VisitSelectStmt(Stmt.Select stmt);
             T VisitInsertStmt(Stmt.Insert stmt);
+            T VisitDropStmt(Stmt.Drop stmt);
         }
 
         public class Select : Stmt
@@ -155,7 +164,54 @@ namespace TSQL
                 }
             }
         }
+
+        public class Drop : Stmt
+        {
+            public ObjectType ObjectType { get; }
+            public bool IfExists { get; }
+            public SyntaxElementList<Expr.ObjectIdentifier> Targets { get; }
+
+            internal Token _dropToken;
+            internal Token _objectTypeToken;
+            internal Token _ifToken;
+            internal Token _existsToken;
+
+            public Drop(ObjectType objectType, bool ifExists, SyntaxElementList<Expr.ObjectIdentifier> targets)
+            {
+                ObjectType = objectType;
+                IfExists = ifExists;
+                Targets = targets;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitDropStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _dropToken;
+                yield return _objectTypeToken;
+
+                if (_ifToken != null)
+                {
+                    yield return _ifToken;
+                    yield return _existsToken;
+                }
+
+                foreach (Token token in Targets.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
     }
+    #endregion
+
+    #region DROP Object Types
+
+    public enum ObjectType { Table }
+
     #endregion
 
     #region INSERT Source Types
