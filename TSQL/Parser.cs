@@ -2330,6 +2330,17 @@ namespace TSQL
         {
             Token leftParen = Advance();
 
+            Token quantifierKeyword = null;
+            SetQuantifier? quantifier = null;
+            if (Match(TokenType.DISTINCT, out quantifierKeyword))
+            {
+                quantifier = SetQuantifier.Distinct;
+            }
+            else if (Match(TokenType.ALL, out quantifierKeyword))
+            {
+                quantifier = SetQuantifier.All;
+            }
+
             SyntaxElementList<Expr> arguments = new SyntaxElementList<Expr>();
             if (!Check(TokenType.RIGHT_PAREN))
             {
@@ -2352,6 +2363,8 @@ namespace TSQL
 
             Expr.FunctionCall functionCall = new FunctionCall(callee, arguments);
             functionCall._leftParen = leftParen;
+            functionCall._quantifierKeyword = quantifierKeyword;
+            functionCall.Quantifier = quantifier;
             functionCall._rightParen = rightParen;
 
             return functionCall;

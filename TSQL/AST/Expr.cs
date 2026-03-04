@@ -436,10 +436,12 @@ namespace TSQL
                 get => _callee;
                 set => SetWithTrivia(ref _callee, value);
             }
+            public SetQuantifier? Quantifier { get; set; }
             public SyntaxElementList<Expr> Arguments { get; set; }
             public WithinGroupClause WithinGroup { get; set; }
 
             internal Token _leftParen;
+            internal Token _quantifierKeyword;
             internal Token _rightParen;
 
             public FunctionCall(ObjectIdentifier callee, SyntaxElementList<Expr> args)
@@ -461,6 +463,11 @@ namespace TSQL
                 }
 
                 yield return _leftParen;
+
+                if (_quantifierKeyword != null)
+                {
+                    yield return _quantifierKeyword;
+                }
 
                 foreach (Token token in Arguments.DescendantTokens())
                 {

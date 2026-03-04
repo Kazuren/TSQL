@@ -1530,6 +1530,33 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region Aggregate DISTINCT/ALL Tests
+
+        [Theory]
+        [InlineData("SELECT COUNT(DISTINCT a) FROM T")]
+        [InlineData("SELECT SUM(DISTINCT amount) FROM T")]
+        [InlineData("SELECT AVG(ALL price) FROM T")]
+        [InlineData("SELECT COUNT(DISTINCT a), SUM(b) FROM T GROUP BY b")]
+        [InlineData("SELECT COUNT(DISTINCT a) FROM T WHERE x > 1")]
+        public void Parse_AggregateDistinctAll(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_CountDistinct_Structure()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT COUNT(DISTINCT a) FROM T");
+            SelectColumn selectColumn = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
+            Expr.FunctionCall funcCall = Assert.IsType<Expr.FunctionCall>(selectColumn.Expression);
+            Assert.Equal(SetQuantifier.Distinct, funcCall.Quantifier);
+            Assert.Equal(1, funcCall.Arguments.Count);
+            Expr.ColumnIdentifier col = Assert.IsType<Expr.ColumnIdentifier>(funcCall.Arguments[0]);
+            Assert.Equal("a", col.ColumnName.Name);
+        }
+
+        #endregion
+
         #region GROUP BY Tests
 
         [Theory]
