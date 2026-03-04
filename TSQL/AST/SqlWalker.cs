@@ -81,15 +81,25 @@ namespace TSQL
             }
         }
 
-        protected virtual void VisitDrop(Stmt.Drop stmt) { }
+        protected virtual void VisitDrop(Stmt.Drop stmt)
+        {
+            foreach (Expr.ObjectIdentifier target in stmt.Targets)
+            {
+                Walk(target);
+            }
+        }
 
         protected virtual void VisitExecute(Stmt.Execute stmt)
         {
             foreach (ExecuteArgument arg in stmt.Arguments)
             {
-                if (arg.Value != null)
+                if (arg is ValueArgument valueArg)
                 {
-                    Walk(arg.Value);
+                    Walk(valueArg.Value);
+                }
+                else if (arg is OutputArgument outputArg)
+                {
+                    Walk(outputArg.Value);
                 }
             }
         }

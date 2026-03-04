@@ -376,7 +376,9 @@ namespace TSQL
             TokenType.RESULT,
             TokenType.NONE,
             TokenType.UNDEFINED,
-            TokenType.OBJECT
+            TokenType.OBJECT,
+            TokenType.SIMPLE,
+            TokenType.FORCED
         };
 
         public Parser(IReadOnlyList<Token> tokens)
@@ -699,7 +701,7 @@ namespace TSQL
                 if (Check(TokenType.DEFAULT))
                 {
                     Token defaultToken = Advance();
-                    return new ExecuteArgument(paramName, equals, defaultToken);
+                    return new DefaultArgument(paramName, equals, defaultToken);
                 }
 
                 Expr value = Expression();
@@ -707,17 +709,17 @@ namespace TSQL
                 // Check for OUTPUT/OUT modifier
                 if (Match(TokenType.OUTPUT, TokenType.OUT, out Token outputToken))
                 {
-                    return new ExecuteArgument(paramName, equals, value, outputToken);
+                    return new OutputArgument(paramName, equals, value, outputToken);
                 }
 
-                return new ExecuteArgument(paramName, equals, value);
+                return new ValueArgument(paramName, equals, value);
             }
 
             // Positional DEFAULT
             if (Check(TokenType.DEFAULT))
             {
                 Token defaultToken = Advance();
-                return new ExecuteArgument(defaultToken);
+                return new DefaultArgument(defaultToken);
             }
 
             // Positional value [OUTPUT]
@@ -725,10 +727,10 @@ namespace TSQL
 
             if (Match(TokenType.OUTPUT, TokenType.OUT, out Token outToken))
             {
-                return new ExecuteArgument(expr, outToken);
+                return new OutputArgument(expr, outToken);
             }
 
-            return new ExecuteArgument(expr);
+            return new ValueArgument(expr);
         }
 
         private Stmt.ExecuteString ExecuteStringStatement(Token execToken)
@@ -769,15 +771,15 @@ namespace TSQL
         {
             Token asToken = Consume(TokenType.AS, "Expected AS");
 
-            bool isLogin;
+            ExecuteContextType contextType;
             Token contextTypeToken;
             if (Match(TokenType.LOGIN, out contextTypeToken))
             {
-                isLogin = true;
+                contextType = ExecuteContextType.Login;
             }
             else if (Match(TokenType.USER, out contextTypeToken))
             {
-                isLogin = false;
+                contextType = ExecuteContextType.User;
             }
             else
             {
@@ -787,7 +789,7 @@ namespace TSQL
             Token equalsToken = Consume(TokenType.EQUAL, "Expected '='");
             Token nameToken = Consume(TokenType.STRING, "Expected string literal for login/user name");
 
-            ExecuteContext ctx = new ExecuteContext(isLogin);
+            ExecuteContext ctx = new ExecuteContext(contextType);
             ctx._asToken = asToken;
             ctx._contextTypeToken = contextTypeToken;
             ctx._equalsToken = equalsToken;
@@ -802,17 +804,17 @@ namespace TSQL
             // Check for DATA_SOURCE (a two-word contextual keyword)
             // DATA_SOURCE is not a token type — it would be scanned as identifier "DATA_SOURCE"
             // For simplicity, we check if the identifier is "DATA_SOURCE"
-            bool isDataSource = false;
+            ExecuteAtTarget target = ExecuteAtTarget.LinkedServer;
             Token dataSourceToken = null;
             if (IsIdentifierOrContextualKeyword() && Peek().Lexeme.Equals("DATA_SOURCE", System.StringComparison.OrdinalIgnoreCase))
             {
                 dataSourceToken = Advance();
-                isDataSource = true;
+                target = ExecuteAtTarget.DataSource;
             }
 
             Token serverName = ConsumeIdentifierOrContextualKeyword("Expected server name or data source name");
 
-            ExecuteAtClause atClause = new ExecuteAtClause(serverName, isDataSource);
+            ExecuteAtClause atClause = new ExecuteAtClause(serverName, target);
             atClause._atToken = atToken;
             atClause._dataSourceToken = dataSourceToken;
             return atClause;

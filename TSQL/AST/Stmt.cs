@@ -338,98 +338,132 @@ namespace TSQL
 
     #region EXECUTE Supporting Types
 
-    public class ExecuteArgument : SyntaxElement
+    public abstract class ExecuteArgument : SyntaxElement
     {
         public Token ParameterName { get; }
-        public Expr Value { get; }
-        public bool IsDefault { get; }
-        public bool IsOutput { get; }
-
         internal Token _equalsToken;
-        internal Token _defaultToken;
-        internal Token _outputToken;
 
-        public ExecuteArgument(Expr value)
-        {
-            Value = value;
-        }
+        protected ExecuteArgument() { }
 
-        public ExecuteArgument(Token parameterName, Token equalsToken, Expr value)
+        protected ExecuteArgument(Token parameterName, Token equalsToken)
         {
             ParameterName = parameterName;
             _equalsToken = equalsToken;
-            Value = value;
         }
 
-        public ExecuteArgument(Token defaultToken)
-        {
-            IsDefault = true;
-            _defaultToken = defaultToken;
-        }
-
-        public ExecuteArgument(Expr value, Token outputToken)
-        {
-            Value = value;
-            IsOutput = true;
-            _outputToken = outputToken;
-        }
-
-        public ExecuteArgument(Token parameterName, Token equalsToken, Expr value, Token outputToken)
-        {
-            ParameterName = parameterName;
-            _equalsToken = equalsToken;
-            Value = value;
-            IsOutput = true;
-            _outputToken = outputToken;
-        }
-
-        public ExecuteArgument(Token parameterName, Token equalsToken, Token defaultToken)
-        {
-            ParameterName = parameterName;
-            _equalsToken = equalsToken;
-            IsDefault = true;
-            _defaultToken = defaultToken;
-        }
-
-        public override IEnumerable<Token> DescendantTokens()
+        protected IEnumerable<Token> ParameterTokens()
         {
             if (ParameterName != null)
             {
                 yield return ParameterName;
                 yield return _equalsToken;
             }
+        }
+    }
 
-            if (IsDefault)
+    public class ValueArgument : ExecuteArgument
+    {
+        public Expr Value { get; }
+
+        public ValueArgument(Expr value)
+        {
+            Value = value;
+        }
+
+        public ValueArgument(Token parameterName, Token equalsToken, Expr value)
+            : base(parameterName, equalsToken)
+        {
+            Value = value;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in ParameterTokens())
             {
-                yield return _defaultToken;
-            }
-            else
-            {
-                foreach (Token token in Value.DescendantTokens())
-                {
-                    yield return token;
-                }
+                yield return token;
             }
 
-            if (_outputToken != null)
+            foreach (Token token in Value.DescendantTokens())
             {
-                yield return _outputToken;
+                yield return token;
             }
         }
     }
 
+    public class DefaultArgument : ExecuteArgument
+    {
+        internal Token _defaultToken;
+
+        public DefaultArgument(Token defaultToken)
+        {
+            _defaultToken = defaultToken;
+        }
+
+        public DefaultArgument(Token parameterName, Token equalsToken, Token defaultToken)
+            : base(parameterName, equalsToken)
+        {
+            _defaultToken = defaultToken;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in ParameterTokens())
+            {
+                yield return token;
+            }
+
+            yield return _defaultToken;
+        }
+    }
+
+    public class OutputArgument : ExecuteArgument
+    {
+        public Expr Value { get; }
+        internal Token _outputToken;
+
+        public OutputArgument(Expr value, Token outputToken)
+        {
+            Value = value;
+            _outputToken = outputToken;
+        }
+
+        public OutputArgument(Token parameterName, Token equalsToken, Expr value, Token outputToken)
+            : base(parameterName, equalsToken)
+        {
+            Value = value;
+            _outputToken = outputToken;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in ParameterTokens())
+            {
+                yield return token;
+            }
+
+            foreach (Token token in Value.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            yield return _outputToken;
+        }
+    }
+
+    public enum ExecuteContextType { Login, User }
+
     public class ExecuteContext : SyntaxElement
     {
-        public bool IsLogin { get; }
+        public ExecuteContextType ContextType { get; }
 
         internal Token _asToken;
         internal Token _contextTypeToken;
         internal Token _equalsToken;
         internal Token _nameToken;
 
-        public ExecuteContext(bool isLogin)
+        public ExecuteContext(ExecuteContextType contextType)
         {
-            IsLogin = isLogin;
+            ContextType = contextType;
         }
 
         public override IEnumerable<Token> DescendantTokens()
@@ -441,18 +475,20 @@ namespace TSQL
         }
     }
 
+    public enum ExecuteAtTarget { LinkedServer, DataSource }
+
     public class ExecuteAtClause : SyntaxElement
     {
-        public bool IsDataSource { get; }
+        public ExecuteAtTarget Target { get; }
         public Token ServerOrSourceName { get; }
 
         internal Token _atToken;
         internal Token _dataSourceToken;
 
-        public ExecuteAtClause(Token serverOrSourceName, bool isDataSource)
+        public ExecuteAtClause(Token serverOrSourceName, ExecuteAtTarget target)
         {
             ServerOrSourceName = serverOrSourceName;
-            IsDataSource = isDataSource;
+            Target = target;
         }
 
         public override IEnumerable<Token> DescendantTokens()

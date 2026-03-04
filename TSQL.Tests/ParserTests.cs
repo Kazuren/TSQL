@@ -932,53 +932,6 @@ namespace TSQL.Tests
             Assert.Equal(WindowFrameBoundType.Following, windowFunc.Over.Frame.End.BoundType);
         }
 
-        // === Contextual Keywords as Identifiers ===
-
-        [Fact]
-        public void Parse_RowsAsColumnAlias_ParsesAsIdentifier()
-        {
-            // Arrange & Act
-            Stmt.Select select = Stmt.ParseSelect("SELECT 1 AS ROWS FROM T");
-
-            // Assert
-            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            Assert.NotNull(item.Alias);
-            Assert.Equal("ROWS", item.Alias.Name);
-        }
-
-        [Fact]
-        public void Parse_RankAsColumnName_ParsesAsIdentifier()
-        {
-            // Arrange & Act
-            Stmt.Select select = Stmt.ParseSelect("SELECT RANK FROM T");
-
-            // Assert
-            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
-            Assert.Equal("RANK", columnId.ColumnName.Name);
-        }
-
-        [Fact]
-        public void Parse_PartitionAsColumnName_ParsesAsIdentifier()
-        {
-            // Arrange & Act
-            Stmt.Select select = Stmt.ParseSelect("SELECT PARTITION FROM T");
-
-            // Assert
-            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
-            Expr.ColumnIdentifier columnId = Assert.IsType<Expr.ColumnIdentifier>(item.Expression);
-            Assert.Equal("PARTITION", columnId.ColumnName.Name);
-        }
-
-        [Fact]
-        public void Parse_MultipleContextualKeywordsAsColumns_ParsesCorrectly()
-        {
-            // Arrange & Act
-            Stmt.Select select = Stmt.ParseSelect("SELECT PARTITION, ROWS, PRECEDING FROM T");
-
-            // Assert
-            Assert.Equal(3, SelectExpressionOf(select).Columns.Count);
-        }
 
         // === Error Cases ===
 
@@ -2986,20 +2939,6 @@ namespace TSQL.Tests
             Assert.Null(stmt.Query.For);
         }
 
-        // Contextual keyword as identifier tests
-        [Theory]
-        [InlineData("SELECT XML FROM T")]
-        [InlineData("SELECT JSON FROM T")]
-        [InlineData("SELECT RAW FROM T")]
-        [InlineData("SELECT AUTO FROM T")]
-        [InlineData("SELECT PATH FROM T")]
-        [InlineData("SELECT ROOT FROM T")]
-        [InlineData("SELECT ELEMENTS FROM T")]
-        [InlineData("SELECT TYPE FROM T")]
-        public void Parse_ForKeywords_AsIdentifiers(string source)
-        {
-            Assert.Equal(source, RoundTrip(source));
-        }
 
         #endregion
 
@@ -3687,7 +3626,7 @@ namespace TSQL.Tests
         {
             var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @Var OUTPUT"));
             Assert.Single(exec.Arguments);
-            Assert.True(exec.Arguments[0].IsOutput);
+            Assert.IsType<OutputArgument>(exec.Arguments[0]);
         }
 
         [Fact]
@@ -3701,8 +3640,8 @@ namespace TSQL.Tests
         public void Execute_DefaultArg_IsDefault()
         {
             var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc DEFAULT, @p2 = DEFAULT"));
-            Assert.True(exec.Arguments[0].IsDefault);
-            Assert.True(exec.Arguments[1].IsDefault);
+            Assert.IsType<DefaultArgument>(exec.Arguments[0]);
+            Assert.IsType<DefaultArgument>(exec.Arguments[1]);
         }
 
         #endregion
@@ -3746,11 +3685,143 @@ namespace TSQL.Tests
         #region Contextual Keyword as Identifier
 
         [Theory]
-        [InlineData("SELECT c.precision AS Precision FROM sys.columns c")]
-        [InlineData("SELECT precision FROM sys.columns")]
-        public void Parse_PrecisionAsIdentifier_RoundTrips(string source)
+        // Window frame keywords
+        [InlineData("SELECT ROWS FROM T")]
+        [InlineData("SELECT RANGE FROM T")]
+        [InlineData("SELECT PARTITION FROM T")]
+        [InlineData("SELECT UNBOUNDED FROM T")]
+        [InlineData("SELECT PRECEDING FROM T")]
+        [InlineData("SELECT FOLLOWING FROM T")]
+        [InlineData("SELECT ROW FROM T")]
+        // Ranking function names (without parens, parsed as identifiers)
+        [InlineData("SELECT ROW_NUMBER FROM T")]
+        [InlineData("SELECT RANK FROM T")]
+        [InlineData("SELECT DENSE_RANK FROM T")]
+        [InlineData("SELECT NTILE FROM T")]
+        // Join / apply keywords
+        [InlineData("SELECT APPLY FROM T")]
+        // Join hint keywords
+        [InlineData("SELECT LOOP FROM T")]
+        [InlineData("SELECT HASH FROM T")]
+        [InlineData("SELECT REMOTE FROM T")]
+        // TABLESAMPLE keywords
+        [InlineData("SELECT SYSTEM FROM T")]
+        [InlineData("SELECT CONTAINED FROM T")]
+        [InlineData("SELECT REPEATABLE FROM T")]
+        // GROUP BY keywords
+        [InlineData("SELECT ROLLUP FROM T")]
+        [InlineData("SELECT CUBE FROM T")]
+        [InlineData("SELECT GROUPING FROM T")]
+        [InlineData("SELECT SETS FROM T")]
+        // Full-text / misc expression keywords
+        [InlineData("SELECT LANGUAGE FROM T")]
+        [InlineData("SELECT IIF FROM T")]
+        // AT TIME ZONE keywords
+        [InlineData("SELECT AT FROM T")]
+        [InlineData("SELECT TIME FROM T")]
+        [InlineData("SELECT ZONE FROM T")]
+        // TOP clause keywords
+        [InlineData("SELECT TIES FROM T")]
+        // OFFSET-FETCH keywords
+        [InlineData("SELECT OFFSET FROM T")]
+        [InlineData("SELECT FIRST FROM T")]
+        [InlineData("SELECT NEXT FROM T")]
+        [InlineData("SELECT ONLY FROM T")]
+        // FOR XML/JSON keywords
+        [InlineData("SELECT XML FROM T")]
+        [InlineData("SELECT JSON FROM T")]
+        [InlineData("SELECT RAW FROM T")]
+        [InlineData("SELECT AUTO FROM T")]
+        [InlineData("SELECT EXPLICIT FROM T")]
+        [InlineData("SELECT PATH FROM T")]
+        [InlineData("SELECT ROOT FROM T")]
+        [InlineData("SELECT ELEMENTS FROM T")]
+        [InlineData("SELECT TYPE FROM T")]
+        [InlineData("SELECT BINARY FROM T")]
+        [InlineData("SELECT BASE64 FROM T")]
+        [InlineData("SELECT XMLDATA FROM T")]
+        [InlineData("SELECT XMLSCHEMA FROM T")]
+        [InlineData("SELECT XSINIL FROM T")]
+        [InlineData("SELECT ABSENT FROM T")]
+        [InlineData("SELECT INCLUDE_NULL_VALUES FROM T")]
+        [InlineData("SELECT WITHOUT_ARRAY_WRAPPER FROM T")]
+        // Table hint keywords
+        [InlineData("SELECT NOEXPAND FROM T")]
+        [InlineData("SELECT FORCESCAN FROM T")]
+        [InlineData("SELECT FORCESEEK FROM T")]
+        [InlineData("SELECT NOLOCK FROM T")]
+        [InlineData("SELECT NOWAIT FROM T")]
+        [InlineData("SELECT PAGLOCK FROM T")]
+        [InlineData("SELECT READCOMMITTED FROM T")]
+        [InlineData("SELECT READCOMMITTEDLOCK FROM T")]
+        [InlineData("SELECT READPAST FROM T")]
+        [InlineData("SELECT READUNCOMMITTED FROM T")]
+        [InlineData("SELECT REPEATABLEREAD FROM T")]
+        [InlineData("SELECT ROWLOCK FROM T")]
+        [InlineData("SELECT SERIALIZABLE FROM T")]
+        [InlineData("SELECT SNAPSHOT FROM T")]
+        [InlineData("SELECT SPATIAL_WINDOW_MAX_CELLS FROM T")]
+        [InlineData("SELECT TABLOCK FROM T")]
+        [InlineData("SELECT TABLOCKX FROM T")]
+        [InlineData("SELECT UPDLOCK FROM T")]
+        [InlineData("SELECT XLOCK FROM T")]
+        // Query hint keywords
+        [InlineData("SELECT CONCAT FROM T")]
+        [InlineData("SELECT DISABLE FROM T")]
+        [InlineData("SELECT DISABLE_OPTIMIZED_PLAN_FORCING FROM T")]
+        [InlineData("SELECT EXPAND FROM T")]
+        [InlineData("SELECT EXTERNALPUSHDOWN FROM T")]
+        [InlineData("SELECT FAST FROM T")]
+        [InlineData("SELECT FORCE FROM T")]
+        [InlineData("SELECT HINT FROM T")]
+        [InlineData("SELECT IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX FROM T")]
+        [InlineData("SELECT KEEP FROM T")]
+        [InlineData("SELECT KEEPFIXED FROM T")]
+        [InlineData("SELECT LABEL FROM T")]
+        [InlineData("SELECT MAX_GRANT_PERCENT FROM T")]
+        [InlineData("SELECT MAXDOP FROM T")]
+        [InlineData("SELECT MAXRECURSION FROM T")]
+        [InlineData("SELECT MIN_GRANT_PERCENT FROM T")]
+        [InlineData("SELECT NO_PERFORMANCE_SPOOL FROM T")]
+        [InlineData("SELECT OPTIMIZE FROM T")]
+        [InlineData("SELECT PARAMETERIZATION FROM T")]
+        [InlineData("SELECT QUERYTRACEON FROM T")]
+        [InlineData("SELECT RECOMPILE FROM T")]
+        [InlineData("SELECT ROBUST FROM T")]
+        [InlineData("SELECT SCALEOUTEXECUTION FROM T")]
+        [InlineData("SELECT UNKNOWN FROM T")]
+        [InlineData("SELECT VIEWS FROM T")]
+        // Temporal table keywords
+        [InlineData("SELECT SYSTEM_TIME FROM T")]
+        // Miscellaneous keywords
+        [InlineData("SELECT TIMESTAMP FROM T")]
+        [InlineData("SELECT PRECISION FROM T")]
+        // EXECUTE statement keywords
+        [InlineData("SELECT OUTPUT FROM T")]
+        [InlineData("SELECT OUT FROM T")]
+        [InlineData("SELECT LOGIN FROM T")]
+        [InlineData("SELECT RESULT FROM T")]
+        [InlineData("SELECT NONE FROM T")]
+        [InlineData("SELECT UNDEFINED FROM T")]
+        [InlineData("SELECT OBJECT FROM T")]
+        [InlineData("SELECT SIMPLE FROM T")]
+        [InlineData("SELECT FORCED FROM T")]
+        public void Parse_ContextualKeywordAsIdentifier_RoundTrips(string source)
         {
             Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_ContextualKeywordAsAlias_RoundTrips()
+        {
+            Assert.Equal("SELECT 1 AS ROWS FROM T", RoundTrip("SELECT 1 AS ROWS FROM T"));
+        }
+
+[Fact]
+        public void Parse_QualifiedContextualKeyword_RoundTrips()
+        {
+            Assert.Equal("SELECT c.precision AS Precision FROM sys.columns c",
+                RoundTrip("SELECT c.precision AS Precision FROM sys.columns c"));
         }
 
         #endregion
