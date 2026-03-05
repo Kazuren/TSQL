@@ -55,6 +55,7 @@ namespace TSQL.StandardLibrary.Visitors
         {
             private readonly HashSet<string> _existingNames;
             private int _paramIndex;
+            private readonly Dictionary<object, string> _valueToParam = new Dictionary<object, string>();
 
             public Dictionary<string, object> Parameters { get; } = new Dictionary<string, object>();
 
@@ -85,6 +86,12 @@ namespace TSQL.StandardLibrary.Visitors
                     return expr;
                 }
 
+                // Reuse existing parameter for identical values
+                if (_valueToParam.TryGetValue(value, out string existingParam))
+                {
+                    return new Expr.Variable(existingParam);
+                }
+
                 string paramName;
                 do
                 {
@@ -93,6 +100,7 @@ namespace TSQL.StandardLibrary.Visitors
                 } while (_existingNames.Contains(paramName.ToUpperInvariant()));
 
                 Parameters[paramName] = value;
+                _valueToParam[value] = paramName;
                 return new Expr.Variable(paramName);
             }
 

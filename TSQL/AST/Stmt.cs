@@ -11,7 +11,9 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Stmt Parse(string sql)
         {
-            return Parser.CreateParser(sql).Parse();
+            Stmt result = Parser.CreateParser(sql).Parse();
+            BuildTokenChain(result);
+            return result;
         }
 
         /// <summary>Parses a SQL SELECT statement from the given string.</summary>
@@ -19,7 +21,9 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Select ParseSelect(string sql)
         {
-            return Parser.CreateParser(sql).ParseSelect();
+            Select result = Parser.CreateParser(sql).ParseSelect();
+            BuildTokenChain(result);
+            return result;
         }
 
         /// <summary>Parses a SQL INSERT statement from the given string.</summary>
@@ -27,7 +31,9 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Insert ParseInsert(string sql)
         {
-            return Parser.CreateParser(sql).ParseInsert();
+            Insert result = Parser.CreateParser(sql).ParseInsert();
+            BuildTokenChain(result);
+            return result;
         }
 
         /// <summary>Parses a SQL DROP statement from the given string.</summary>
@@ -35,7 +41,9 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Drop ParseDrop(string sql)
         {
-            return Parser.CreateParser(sql).ParseDrop();
+            Drop result = Parser.CreateParser(sql).ParseDrop();
+            BuildTokenChain(result);
+            return result;
         }
 
         /// <summary>Parses a SQL EXECUTE/EXEC statement from the given string.</summary>
@@ -43,7 +51,9 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Stmt ParseExecute(string sql)
         {
-            return Parser.CreateParser(sql).ParseExecute();
+            Stmt result = Parser.CreateParser(sql).ParseExecute();
+            BuildTokenChain(result);
+            return result;
         }
 
         public abstract T Accept<T>(Visitor<T> visitor);
@@ -1076,7 +1086,9 @@ namespace TSQL
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Script Parse(string sql)
         {
-            return Parser.CreateParser(sql).ParseScript();
+            Script result = Parser.CreateParser(sql).ParseScript();
+            BuildTokenChain(result);
+            return result;
         }
 
         internal Script(IReadOnlyList<Stmt> statements, List<Token> semicolons)

@@ -333,6 +333,53 @@ namespace TSQL.Tests
             Assert.Equal(3, parameters["@P2"]);
         }
 
+        [Fact]
+        public void LiteralParameterizer_DeduplicatesIdenticalValues()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 5 AND y = 5");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(5, parameters["@P0"]);
+        }
+
+        [Fact]
+        public void LiteralParameterizer_DifferentTypesSameValueNotDeduplicated()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 0 AND y = 0.0");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(0, parameters["@P0"]);
+            Assert.Equal(0.0m, parameters["@P1"]);
+        }
+
+        [Fact]
+        public void LiteralParameterizer_TokenMerging_StringBeforeKeyword()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T1 WHERE c1<>''AND c2 = 5");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
+
+            Assert.Equal("SELECT * FROM T1 WHERE c1<>@P0 AND c2 = @P1", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal("", parameters["@P0"]);
+            Assert.Equal(5, parameters["@P1"]);
+        }
+
+        [Fact]
+        public void LiteralParameterizer_TokenMerging_NumberBeforeKeyword()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T1 WHERE c1 = 5AND''<>c2");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
+
+            Assert.Equal("SELECT * FROM T1 WHERE c1 = @P0 AND @P1<>c2", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(5, parameters["@P0"]);
+            Assert.Equal("", parameters["@P1"]);
+        }
+
         #endregion
 
         #region Fluent API

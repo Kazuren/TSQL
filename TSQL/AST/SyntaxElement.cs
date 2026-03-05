@@ -39,6 +39,20 @@ namespace TSQL
             return null;
         }
 
+        internal Token LastToken()
+        {
+            Token last = null;
+            foreach (Token t in DescendantTokens()) last = t;
+            return last;
+        }
+
+        internal static Token LastTokenOf(ISyntaxElement element)
+        {
+            Token last = null;
+            foreach (Token t in element.DescendantTokens()) last = t;
+            return last;
+        }
+
         /// <summary>
         /// Attaches a single-line comment (-- comment) before this node.
         /// The comment appears on the line before the node in the output.
@@ -70,6 +84,48 @@ namespace TSQL
         }
 
         /// <summary>
+        /// Builds a doubly-linked list of tokens in document order. Called once after parsing.
+        /// </summary>
+        internal static void BuildTokenChain(ISyntaxElement root)
+        {
+            Token prev = null;
+            foreach (Token token in root.DescendantTokens())
+            {
+                if (prev != null)
+                {
+                    prev.NextToken = token;
+                    token.PreviousToken = prev;
+                }
+                prev = token;
+            }
+        }
+
+        /// <summary>
+        /// Returns true if the character could be part of a word-like token (identifiers,
+        /// keywords, variables, temp table names) that would merge with an adjacent
+        /// word-like token when no whitespace separates them.
+        /// </summary>
+        private static bool IsWordChar(char c)
+        {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '@' || c == '#';
+        }
+
+        /// <summary>
+        /// Adds a leading space to the right token if it would merge with the left token
+        /// (both end/start with word characters and no trivia separates them).
+        /// </summary>
+        private static void EnsureSeparation(Token left, Token right)
+        {
+            if (left == null || right == null) return;
+            if (right.LeadingTrivia.Count > 0) return;
+            if (IsWordChar(left.LastChar) && IsWordChar(right.FirstChar))
+            {
+                right.AddLeadingTrivia(Whitespace.Space);
+            }
+        }
+
+        /// <summary>
         /// Copies the leading trivia from one node's first token to another's,
         /// replacing any existing leading trivia on the target.
         /// Used by property setters to preserve whitespace when replacing child nodes.
@@ -90,11 +146,64 @@ namespace TSQL
 
         /// <summary>
         /// Transfers leading trivia from the old value to the new value when both are non-null,
-        /// then returns the new value. This is the single source of truth for trivia-aware replacement.
+        /// maintains the token linked list, and ensures adjacent tokens don't merge.
+        /// This is the single source of truth for trivia-aware replacement.
         /// </summary>
         internal static T SetWithTrivia<T>(T oldValue, T newValue) where T : class, ISyntaxElement
         {
-            if (oldValue != null && newValue != null) TransferLeadingTrivia(oldValue, newValue);
+            if (oldValue != null && newValue != null)
+            {
+                TransferLeadingTrivia(oldValue, newValue);
+
+                // Maintain the token chain if it was built (PreviousToken/NextToken set)
+                Token oldFirst = FirstTokenOf(oldValue);
+                Token oldLast = LastTokenOf(oldValue);
+                if (oldFirst != null && oldLast != null
+                    && (oldFirst.PreviousToken != null || oldLast.NextToken != null))
+                {
+                    Token before = oldFirst.PreviousToken;
+                    Token after = oldLast.NextToken;
+
+                    // Build internal chain for the new element's tokens
+                    Token newFirst = null;
+                    Token newLast = null;
+                    Token prev = null;
+                    foreach (Token t in newValue.DescendantTokens())
+                    {
+                        if (newFirst == null)
+                        {
+                            newFirst = t;
+                        }
+                        if (prev != null)
+                        {
+                            prev.NextToken = t;
+                            t.PreviousToken = prev;
+                        }
+                        prev = t;
+                        newLast = t;
+                    }
+
+                    if (newFirst != null && newLast != null)
+                    {
+                        // Splice into the chain
+                        newFirst.PreviousToken = before;
+                        if (before != null)
+                        {
+                            before.NextToken = newFirst;
+                        }
+
+                        newLast.NextToken = after;
+                        if (after != null)
+                        {
+                            after.PreviousToken = newLast;
+                        }
+
+                        // Fix merging at both boundaries
+                        EnsureSeparation(before, newFirst);
+                        EnsureSeparation(newLast, after);
+                    }
+                }
+            }
             return newValue;
         }
 

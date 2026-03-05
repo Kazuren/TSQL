@@ -3483,7 +3483,7 @@ namespace TSQL.Tests
         [Fact]
         public void DropTable_Basic()
         {
-            var drop = Stmt.ParseDrop("DROP TABLE MyTable");
+            Stmt.Drop drop = Stmt.ParseDrop("DROP TABLE MyTable");
 
             Assert.Equal(ObjectType.Table, drop.ObjectType);
             Assert.False(drop.IfExists);
@@ -3494,7 +3494,7 @@ namespace TSQL.Tests
         [Fact]
         public void DropTable_IfExists()
         {
-            var drop = Stmt.ParseDrop("DROP TABLE IF EXISTS #TempTable");
+            Stmt.Drop drop = Stmt.ParseDrop("DROP TABLE IF EXISTS #TempTable");
 
             Assert.Equal(ObjectType.Table, drop.ObjectType);
             Assert.True(drop.IfExists);
@@ -3505,7 +3505,7 @@ namespace TSQL.Tests
         [Fact]
         public void DropTable_MultipleTargets()
         {
-            var drop = Stmt.ParseDrop("DROP TABLE T1, T2, T3");
+            Stmt.Drop drop = Stmt.ParseDrop("DROP TABLE T1, T2, T3");
 
             Assert.Equal(3, drop.Targets.Count);
             Assert.Equal("T1", drop.Targets[0].ObjectName.Name);
@@ -3528,7 +3528,7 @@ namespace TSQL.Tests
         public void DropTable_InScript()
         {
             string sql = "DROP TABLE IF EXISTS #temp; SELECT 1 INTO #temp; SELECT * FROM #temp";
-            var script = Script.Parse(sql);
+            Script script = Script.Parse(sql);
 
             Assert.Equal(3, script.Statements.Count);
             Assert.IsType<Stmt.Drop>(script.Statements[0]);
@@ -3604,8 +3604,8 @@ namespace TSQL.Tests
         [Fact]
         public void Execute_HasCorrectTarget()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC dbo.MyProc 1"));
-            var target = Assert.IsType<Expr.ObjectIdentifier>(exec.Target);
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC dbo.MyProc 1"));
+            Expr.ObjectIdentifier target = Assert.IsType<Expr.ObjectIdentifier>(exec.Target);
             Assert.Equal("MyProc", target.ObjectName.Name);
             Assert.Equal("dbo", target.SchemaName.Name);
         }
@@ -3613,21 +3613,21 @@ namespace TSQL.Tests
         [Fact]
         public void Execute_NoArgs_HasEmptyArguments()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Help"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Help"));
             Assert.Equal(0, exec.Arguments.Count);
         }
 
         [Fact]
         public void Execute_MultipleArgs_HasCorrectCount()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_GetData 1, 'hello', @Var"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_GetData 1, 'hello', @Var"));
             Assert.Equal(3, exec.Arguments.Count);
         }
 
         [Fact]
         public void Execute_ReturnStatus_ParsedCorrectly()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @ret = dbo.MyProc 1"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @ret = dbo.MyProc 1"));
             Assert.NotNull(exec.ReturnVariable);
             Assert.Equal("@ret", exec.ReturnVariable.Lexeme);
         }
@@ -3635,7 +3635,7 @@ namespace TSQL.Tests
         [Fact]
         public void Execute_NamedParameters_CorrectNames()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @p1 = 1, @p2 = 'hello'"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @p1 = 1, @p2 = 'hello'"));
             Assert.Equal(2, exec.Arguments.Count);
             Assert.Equal("@p1", exec.Arguments[0].ParameterName.Lexeme);
             Assert.Equal("@p2", exec.Arguments[1].ParameterName.Lexeme);
@@ -3644,7 +3644,7 @@ namespace TSQL.Tests
         [Fact]
         public void Execute_OutputFlag_IsSet()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @Var OUTPUT"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @Var OUTPUT"));
             Assert.Single(exec.Arguments);
             Assert.IsType<OutputArgument>(exec.Arguments[0]);
         }
@@ -3652,14 +3652,14 @@ namespace TSQL.Tests
         [Fact]
         public void Execute_VariableTarget_IsVariable()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @procVar"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @procVar"));
             Assert.IsType<Expr.Variable>(exec.Target);
         }
 
         [Fact]
         public void Execute_DefaultArg_IsDefault()
         {
-            var exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc DEFAULT, @p2 = DEFAULT"));
+            Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc DEFAULT, @p2 = DEFAULT"));
             Assert.IsType<DefaultArgument>(exec.Arguments[0]);
             Assert.IsType<DefaultArgument>(exec.Arguments[1]);
         }
@@ -3837,7 +3837,7 @@ namespace TSQL.Tests
             Assert.Equal("SELECT 1 AS ROWS FROM T", RoundTrip("SELECT 1 AS ROWS FROM T"));
         }
 
-[Fact]
+        [Fact]
         public void Parse_QualifiedContextualKeyword_RoundTrips()
         {
             Assert.Equal("SELECT c.precision AS Precision FROM sys.columns c",

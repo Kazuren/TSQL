@@ -38,6 +38,8 @@ namespace TSQL
         }
 
         public override string Lexeme => _lexeme;
+        internal override char FirstChar => _lexeme[0];
+        internal override char LastChar => _lexeme[_lexeme.Length - 1];
     }
 
     /// <summary>
@@ -107,6 +109,9 @@ namespace TSQL
             }
         }
 
+        internal override char FirstChar => _lexemeSlice[0];
+        internal override char LastChar => _lexemeSlice[_lexemeSlice.Length - 1];
+
         /// <summary>
         /// Appends the lexeme directly from the underlying StringSlice, bypassing the Lexeme property
         /// to avoid allocating an intermediate string.
@@ -128,6 +133,10 @@ namespace TSQL
         public abstract string Lexeme { get; }
         public object Literal { get; }
         internal string IdentifierName => (Literal as string) ?? Lexeme;
+        internal abstract char FirstChar { get; }
+        internal abstract char LastChar { get; }
+        internal Token NextToken { get; set; }
+        internal Token PreviousToken { get; set; }
         public IReadOnlyList<Trivia> LeadingTrivia => GetTriviaList(_leadingTriviaSingle, _leadingTriviaList);
         public IReadOnlyList<Trivia> TrailingTrivia => GetTriviaList(_trailingTriviaSingle, _trailingTriviaList);
 
