@@ -154,57 +154,80 @@ namespace TSQL
             if (oldValue != null && newValue != null)
             {
                 TransferLeadingTrivia(oldValue, newValue);
-
-                // Maintain the token chain if it was built (PreviousToken/NextToken set)
-                Token oldFirst = FirstTokenOf(oldValue);
-                Token oldLast = LastTokenOf(oldValue);
-                if (oldFirst != null && oldLast != null
-                    && (oldFirst.PreviousToken != null || oldLast.NextToken != null))
-                {
-                    Token before = oldFirst.PreviousToken;
-                    Token after = oldLast.NextToken;
-
-                    // Build internal chain for the new element's tokens
-                    Token newFirst = null;
-                    Token newLast = null;
-                    Token prev = null;
-                    foreach (Token t in newValue.DescendantTokens())
-                    {
-                        if (newFirst == null)
-                        {
-                            newFirst = t;
-                        }
-                        if (prev != null)
-                        {
-                            prev.NextToken = t;
-                            t.PreviousToken = prev;
-                        }
-                        prev = t;
-                        newLast = t;
-                    }
-
-                    if (newFirst != null && newLast != null)
-                    {
-                        // Splice into the chain
-                        newFirst.PreviousToken = before;
-                        if (before != null)
-                        {
-                            before.NextToken = newFirst;
-                        }
-
-                        newLast.NextToken = after;
-                        if (after != null)
-                        {
-                            after.PreviousToken = newLast;
-                        }
-
-                        // Fix merging at both boundaries
-                        EnsureSeparation(before, newFirst);
-                        EnsureSeparation(newLast, after);
-                    }
-                }
+                SpliceTokenChain(oldValue, newValue);
             }
             return newValue;
+        }
+
+        /// <summary>
+        /// Replaces the old element's span in the token linked list with the new element's tokens.
+        /// Builds internal prev/next links for the new tokens and splices them in place,
+        /// then ensures adjacent tokens at the boundaries don't merge.
+        /// </summary>
+        private static void SpliceTokenChain(ISyntaxElement oldValue, ISyntaxElement newValue)
+        {
+            // Find the first and last tokens of the old element in a single pass
+            Token oldFirst = null;
+            Token oldLast = null;
+            foreach (Token t in oldValue.DescendantTokens())
+            {
+                if (oldFirst == null)
+                {
+                    oldFirst = t;
+                }
+                oldLast = t;
+            }
+
+            // Only splice if the chain was built (PreviousToken/NextToken set)
+            if (oldFirst == null || oldLast == null
+                || (oldFirst.PreviousToken == null && oldLast.NextToken == null))
+            {
+                return;
+            }
+
+            Token before = oldFirst.PreviousToken;
+            Token after = oldLast.NextToken;
+
+            // Build internal chain for the new element's tokens
+            Token newFirst = null;
+            Token newLast = null;
+            Token prev = null;
+            foreach (Token t in newValue.DescendantTokens())
+            {
+                if (newFirst == null)
+                {
+                    newFirst = t;
+                }
+                if (prev != null)
+                {
+                    prev.NextToken = t;
+                    t.PreviousToken = prev;
+                }
+                prev = t;
+                newLast = t;
+            }
+
+            if (newFirst == null || newLast == null)
+            {
+                return;
+            }
+
+            // Splice into the chain
+            newFirst.PreviousToken = before;
+            if (before != null)
+            {
+                before.NextToken = newFirst;
+            }
+
+            newLast.NextToken = after;
+            if (after != null)
+            {
+                after.PreviousToken = newLast;
+            }
+
+            // Fix merging at both boundaries
+            EnsureSeparation(before, newFirst);
+            EnsureSeparation(newLast, after);
         }
 
         /// <summary>

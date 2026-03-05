@@ -13,7 +13,9 @@ namespace TSQL.AST
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
         public static Predicate ParsePredicate(string sql)
         {
-            return Parser.CreateParser(sql).ParseSearchCondition();
+            Predicate result = Parser.CreateParser(sql).ParseSearchCondition();
+            BuildTokenChain(result);
+            return result;
         }
 
         public abstract T Accept<T>(Visitor<T> visitor);

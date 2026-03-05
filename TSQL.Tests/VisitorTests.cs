@@ -345,6 +345,17 @@ namespace TSQL.Tests
         }
 
         [Fact]
+        public void LiteralParameterizer_DeduplicatesIdenticalStringValues()
+        {
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 'hello' AND y = 'hello'");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0 AND y = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal("hello", parameters["@P0"]);
+        }
+
+        [Fact]
         public void LiteralParameterizer_DifferentTypesSameValueNotDeduplicated()
         {
             Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x = 0 AND y = 0.0");
