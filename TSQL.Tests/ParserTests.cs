@@ -691,6 +691,10 @@ namespace TSQL.Tests
         [InlineData("SELECT alias = a FROM T")]
         [InlineData("SELECT GETDATE() FROM T")]
         [InlineData("SELECT COALESCE(a, b) FROM T")]
+        [InlineData("SELECT LEFT(Col, 5) FROM T")]
+        [InlineData("SELECT RIGHT(Col, 5) FROM T")]
+        [InlineData("SELECT RIGHT(FILENAME, CHARINDEX('.', REVERSE(FILENAME)) - 1) FROM T")]
+        [InlineData("SELECT LEFT(Name, 3) AS Prefix, RIGHT(Name, 3) AS Suffix FROM T")]
         [InlineData("SELECT @P0 FROM T")]
         // FROM clause - qualified names
         [InlineData("SELECT a FROM dbo.T")]
@@ -2247,6 +2251,30 @@ namespace TSQL.Tests
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
             Assert.Equal("NULLIF", call.Callee.ObjectName.Name);
+            Assert.Equal(2, call.Arguments.Count);
+        }
+
+        #endregion
+
+        #region LEFT / RIGHT Function Tests
+
+        [Fact]
+        public void Parse_Right_IsFunctionCall()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT RIGHT(Col, 5) FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
+            Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
+            Assert.Equal("RIGHT", call.Callee.ObjectName.Name);
+            Assert.Equal(2, call.Arguments.Count);
+        }
+
+        [Fact]
+        public void Parse_Left_IsFunctionCall()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT LEFT(Col, 5) FROM T");
+            SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
+            Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
+            Assert.Equal("LEFT", call.Callee.ObjectName.Name);
             Assert.Equal(2, call.Arguments.Count);
         }
 

@@ -2752,6 +2752,15 @@ namespace TSQL
                 return FinishCall(callee);
             }
 
+            // Handle LEFT / RIGHT keywords - string functions that conflict with join keywords
+            // The CheckNext guard ensures LEFT JOIN / RIGHT JOIN are unaffected.
+            if (Check(TokenType.LEFT, TokenType.RIGHT) && CheckNext(TokenType.LEFT_PAREN))
+            {
+                Token funcToken = Advance();
+                ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(funcToken));
+                return FinishCall(callee);
+            }
+
             // Handle OPENXML keyword - has optional WITH clause
             if (Match(TokenType.OPENXML, out Token openXmlToken))
             {
