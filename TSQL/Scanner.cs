@@ -7,6 +7,20 @@ namespace TSQL
 {
     internal partial class Scanner
     {
+        // Pre-boxed integers 0-127. SQL commonly uses small integer literals (WHERE x = 1,
+        // TOP 10, NTILE(4), etc.). Caching the boxed values avoids a heap allocation per literal.
+        private static readonly object[] BoxedIntegers = InitBoxedIntegers();
+
+        private static object[] InitBoxedIntegers()
+        {
+            object[] cache = new object[128];
+            for (int i = 0; i < cache.Length; i++)
+            {
+                cache[i] = i;
+            }
+            return cache;
+        }
+
         private readonly string _source;
         private readonly List<SourceToken> _tokens;
         private readonly List<Trivia> _pendingTrivia;
@@ -277,7 +291,17 @@ namespace TSQL
                 c = Peek();
             }
 
-            AddTrivia(new Whitespace(_source, _start, _current - _start));
+            // Single spaces are the most common whitespace in SQL. Reuse the static
+            // singleton to avoid allocating a new Whitespace object (~40 bytes) per token gap.
+            int length = _current - _start;
+            if (length == 1 && _source[_start] == ' ')
+            {
+                AddTrivia(TSQL.Whitespace.Space);
+            }
+            else
+            {
+                AddTrivia(new Whitespace(_source, _start, length));
+            }
         }
 
         private void Number()
@@ -308,16 +332,43 @@ namespace TSQL
             }
             else
             {
-                string literal = _source.Substring(_start, _current - _start);
+                // Parse directly from source characters to avoid allocating a Substring
+                // just to pass to int.Parse(). The lexeme is already captured by StringSlice.
+                int length = _current - _start;
+                long value;
                 try
                 {
-                    AddToken(TokenType.WHOLE_NUMBER, int.Parse(literal));
+                    value = ParseIntFromSource(_start, length);
                 }
-                catch (OverflowException ex)
+                catch (OverflowException)
                 {
-                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source, ex);
+                    string literal = _source.Substring(_start, length);
+                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source);
                 }
+                if (value > int.MaxValue)
+                {
+                    string literal = _source.Substring(_start, length);
+                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source);
+                }
+                object boxed = (uint)value < (uint)BoxedIntegers.Length
+                    ? BoxedIntegers[value]
+                    : (object)(int)value;
+                AddToken(TokenType.WHOLE_NUMBER, boxed);
             }
+        }
+
+        /// <summary>
+        /// Parses an integer directly from the source string, avoiding the Substring
+        /// allocation that int.Parse() would require.
+        /// </summary>
+        private long ParseIntFromSource(int start, int length)
+        {
+            long result = 0;
+            for (int i = start; i < start + length; i++)
+            {
+                result = checked(result * 10 + (_source[i] - '0'));
+            }
+            return result;
         }
 
         private void Identifier()

@@ -336,7 +336,7 @@
             Assert.Equal(1, ex.Line);
             Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
-            Assert.IsType<OverflowException>(ex.InnerException);
+            Assert.Equal("Numeric literal too large: 99999999999999999999", ex.Message);
         }
 
         [Fact]
@@ -348,6 +348,35 @@
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
             Assert.Equal(2, ex.Line);
             Assert.Equal(0, ex.Column);
+        }
+
+        [Fact]
+        public void ScanTokens_SingleSpaceWhitespace_ReusesStaticSingleton()
+        {
+            string sql = "SELECT a, b FROM t";
+            var scanner = new Scanner(sql);
+            var tokens = scanner.ScanTokens();
+
+            // Collect all single-space trivia from leading trivia of all tokens
+            var singleSpaces = new List<Trivia>();
+            foreach (var token in tokens)
+            {
+                foreach (var trivia in token.LeadingTrivia)
+                {
+                    if (trivia is Whitespace ws && ws.Content == " ")
+                    {
+                        singleSpaces.Add(ws);
+                    }
+                }
+            }
+
+            Assert.True(singleSpaces.Count >= 3, $"Expected at least 3 single-space trivia items, got {singleSpaces.Count}");
+
+            // Every single-space whitespace should be the exact same singleton instance
+            foreach (var trivia in singleSpaces)
+            {
+                Assert.Same(Whitespace.Space, trivia);
+            }
         }
     }
 
