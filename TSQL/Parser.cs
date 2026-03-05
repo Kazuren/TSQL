@@ -2745,16 +2745,11 @@ namespace TSQL
                 return Grouping();
             }
 
-            // Handle COALESCE / NULLIF keywords - standard function call syntax
-            if (Match(TokenType.COALESCE, TokenType.NULLIF, out Token builtinFuncToken))
-            {
-                ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(builtinFuncToken));
-                return FinishCall(callee);
-            }
-
-            // Handle LEFT / RIGHT keywords - string functions that conflict with join keywords
-            // The CheckNext guard ensures LEFT JOIN / RIGHT JOIN are unaffected.
-            if (Check(TokenType.LEFT, TokenType.RIGHT) && CheckNext(TokenType.LEFT_PAREN))
+            // Handle keywords that are standard function calls.
+            // The CheckNext guard is required for LEFT/RIGHT (which double as join keywords)
+            // and harmless for COALESCE/NULLIF (which always require parentheses).
+            if (Check(TokenType.COALESCE, TokenType.NULLIF, TokenType.LEFT, TokenType.RIGHT)
+                && CheckNext(TokenType.LEFT_PAREN))
             {
                 Token funcToken = Advance();
                 ObjectIdentifier callee = new ObjectIdentifier(new ObjectName(funcToken));

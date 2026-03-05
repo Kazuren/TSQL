@@ -2258,23 +2258,15 @@ namespace TSQL.Tests
 
         #region LEFT / RIGHT Function Tests
 
-        [Fact]
-        public void Parse_Right_IsFunctionCall()
+        [Theory]
+        [InlineData("SELECT RIGHT(Col, 5) FROM T", "RIGHT")]
+        [InlineData("SELECT LEFT(Col, 5) FROM T", "LEFT")]
+        public void Parse_LeftRight_IsFunctionCall(string source, string expectedName)
         {
-            Stmt.Select stmt = Stmt.ParseSelect("SELECT RIGHT(Col, 5) FROM T");
+            Stmt.Select stmt = Stmt.ParseSelect(source);
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
-            Assert.Equal("RIGHT", call.Callee.ObjectName.Name);
-            Assert.Equal(2, call.Arguments.Count);
-        }
-
-        [Fact]
-        public void Parse_Left_IsFunctionCall()
-        {
-            Stmt.Select stmt = Stmt.ParseSelect("SELECT LEFT(Col, 5) FROM T");
-            SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
-            Expr.FunctionCall call = Assert.IsType<Expr.FunctionCall>(col.Expression);
-            Assert.Equal("LEFT", call.Callee.ObjectName.Name);
+            Assert.Equal(expectedName, call.Callee.ObjectName.Name);
             Assert.Equal(2, call.Arguments.Count);
         }
 
