@@ -446,6 +446,25 @@ namespace TSQL
             internal Token _beginToken;
             internal Token _endToken;
 
+            public Block(IReadOnlyList<Stmt> statements)
+            {
+                Statements = statements;
+                _semicolons = new List<Token>();
+                for (int i = 0; i < statements.Count; i++)
+                {
+                    if (i < statements.Count - 1)
+                    {
+                        _semicolons.Add(new ConcreteToken(TokenType.SEMICOLON, ";", null));
+                    }
+                    else
+                    {
+                        _semicolons.Add(null);
+                    }
+                }
+                _beginToken = new ConcreteToken(TokenType.BEGIN, "BEGIN", null);
+                _endToken = ConcreteToken.WithLeadingSpace(TokenType.END, "END");
+            }
+
             internal Block(IReadOnlyList<Stmt> statements, List<Token> semicolons)
             {
                 Statements = statements;

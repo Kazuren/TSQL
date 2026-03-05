@@ -22,7 +22,7 @@ namespace TSQL
     === Statements ===
 
         script -> statement (";" statement)* ";"?
-        statement -> ("WITH" cte_list)? (select_statement | insert_statement) | drop_statement | execute_statement
+        statement -> ("WITH" cte_list)? (select_statement | insert_statement) | drop_statement | execute_statement | declare_statement | set_statement | if_statement | block_statement
         select_statement -> query_expression (option_clause)?
         insert_statement -> "INSERT" ("INTO")? target (column_list)? insert_source
         drop_statement -> "DROP" "TABLE" ("IF" "EXISTS")? target ("," target)*
@@ -35,6 +35,12 @@ namespace TSQL
         execute_with_clause -> "WITH" ("RECOMPILE" (",")?  )? (result_sets_spec)?
         result_sets_spec -> "RESULT" "SETS" ("UNDEFINED" | "NONE" | "(" result_set_def ("," result_set_def)* ")")
         result_set_def -> "(" column_def ("," column_def)* ")" | "AS" "OBJECT" fully_qualified_identifier | "AS" "TYPE" fully_qualified_identifier | "AS" "FOR" "XML"
+        declare_statement -> "DECLARE" variable_declaration ("," variable_declaration)*
+        variable_declaration -> VARIABLE data_type ("=" expression)?
+        set_statement -> "SET" VARIABLE "=" expression
+        if_statement -> "IF" search_condition statement ("ELSE" statement)?
+        block_statement -> "BEGIN" statement (";" statement)* "END"
+
         target -> fully_qualified_identifier | VARIABLE
         column_list -> "(" IDENTIFIER ("," IDENTIFIER)* ")"
         insert_source -> "DEFAULT" "VALUES" | "VALUES" values_row ("," values_row)* | ("EXEC" | "EXECUTE") fully_qualified_identifier (expression ("," expression)*)? | query_expression (option_clause)?
@@ -462,10 +468,17 @@ namespace TSQL
         public Script ParseScript()
         {
             Reset();
-            List<Stmt> statements = new List<Stmt>();
-            List<Token> semicolons = new List<Token>();
+            ParseStatementList(() => !IsAtEnd(), out List<Stmt> statements, out List<Token> semicolons);
+            return new Script(statements, semicolons);
+        }
 
-            while (!IsAtEnd())
+        private void ParseStatementList(Func<bool> shouldContinue,
+            out List<Stmt> statements, out List<Token> semicolons)
+        {
+            statements = new List<Stmt>();
+            semicolons = new List<Token>();
+
+            while (shouldContinue())
             {
                 statements.Add(Statement());
 
@@ -473,8 +486,6 @@ namespace TSQL
                 Match(TokenType.SEMICOLON, out semi);
                 semicolons.Add(semi);
             }
-
-            return new Script(statements, semicolons);
         }
 
         public AST.Predicate ParseSearchCondition()
@@ -623,17 +634,8 @@ namespace TSQL
         {
             Token beginToken = Consume(TokenType.BEGIN, "Expected BEGIN");
 
-            List<Stmt> statements = new List<Stmt>();
-            List<Token> semicolons = new List<Token>();
-
-            while (!Check(TokenType.END) && !IsAtEnd())
-            {
-                statements.Add(Statement());
-
-                Token semi = null;
-                Match(TokenType.SEMICOLON, out semi);
-                semicolons.Add(semi);
-            }
+            ParseStatementList(() => !Check(TokenType.END) && !IsAtEnd(),
+                out List<Stmt> statements, out List<Token> semicolons);
 
             Token endToken = Consume(TokenType.END, "Expected END");
 
@@ -1216,22 +1218,27 @@ namespace TSQL
             return selectSource;
         }
 
+        private static readonly HashSet<TokenType> StatementStartTokens = new HashSet<TokenType>
+        {
+            TokenType.SELECT, TokenType.INSERT, TokenType.WITH,
+            TokenType.EXEC, TokenType.EXECUTE, TokenType.DROP,
+            TokenType.DECLARE, TokenType.SET, TokenType.IF,
+            TokenType.BEGIN
+        };
+
         /// <summary>
         /// Returns true if the current token looks like the start of a new statement.
         /// Used to stop parsing EXEC arguments.
         /// </summary>
         private bool IsStatementStart()
         {
-            TokenType t = Peek().Type;
-            return t == TokenType.SELECT || t == TokenType.INSERT || t == TokenType.WITH
-                || t == TokenType.EXEC || t == TokenType.EXECUTE || t == TokenType.DROP
-                || t == TokenType.DECLARE || t == TokenType.SET || t == TokenType.IF
-                || t == TokenType.BEGIN;
+            if (IsAtEnd()) return false;
+            return StatementStartTokens.Contains(Peek().Type);
         }
 
         private bool IsAtStatementBoundary()
         {
-            return IsAtEnd() || Check(TokenType.SEMICOLON, TokenType.OPTION, TokenType.END)
+            return IsAtEnd() || Check(TokenType.SEMICOLON, TokenType.OPTION, TokenType.END, TokenType.ELSE)
                 || IsStatementStart();
         }
 
@@ -4443,6 +4450,13 @@ namespace TSQL
             if (IsAtEnd()) return false;
             var currentType = Peek().Type;
             return currentType == type1 || currentType == type2 || currentType == type3;
+        }
+
+        private bool Check(TokenType type1, TokenType type2, TokenType type3, TokenType type4)
+        {
+            if (IsAtEnd()) return false;
+            var currentType = Peek().Type;
+            return currentType == type1 || currentType == type2 || currentType == type3 || currentType == type4;
         }
 
         private bool CheckNext(TokenType type)

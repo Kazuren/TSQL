@@ -3855,6 +3855,12 @@ namespace TSQL.Tests
         [InlineData("IF 1 = 1 BEGIN SELECT 1 END")]
         [InlineData("IF 1 = 1 BEGIN SELECT 1 END ELSE BEGIN SELECT 0 END")]
         [InlineData("IF 1 = 1 IF 2 = 2 SELECT 1 ELSE SELECT 0")]
+        // Edge cases
+        [InlineData("BEGIN END")]
+        [InlineData("BEGIN BEGIN SELECT 1 END END")]
+        [InlineData("SET @X = CASE WHEN @Y > 0 THEN 1 ELSE 0 END")]
+        [InlineData("IF 1 = 1 SELECT 1; SELECT 2")]
+        [InlineData("IF 1 = 1 EXEC sp_Test ELSE SELECT 0")]
         // Script combinations
         [InlineData("DECLARE @X INT; SET @X = 1; SELECT @X")]
         [InlineData("DECLARE @SQL NVARCHAR(250) SET @SQL = N'SELECT COL1 FROM T1 WHERE ID = 1 AND TYPE = 2' IF EXISTS (SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'T1' AND COLUMN_NAME = N'COL1') BEGIN EXEC SP_EXECUTESQL @SQL END ELSE SELECT 0")]
