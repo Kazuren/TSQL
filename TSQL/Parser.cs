@@ -496,6 +496,26 @@ namespace TSQL
         /// </summary>
         private Stmt Statement()
         {
+            if (Check(TokenType.DECLARE))
+            {
+                return DeclareStatement();
+            }
+
+            if (Check(TokenType.SET))
+            {
+                return SetStatement();
+            }
+
+            if (Check(TokenType.IF))
+            {
+                return IfStatement();
+            }
+
+            if (Check(TokenType.BEGIN))
+            {
+                return BlockStatement();
+            }
+
             if (Check(TokenType.DROP))
             {
                 return DropStatement();
@@ -520,6 +540,107 @@ namespace TSQL
             {
                 return SelectStatementWithCte(cte);
             }
+        }
+
+        /// <summary>
+        /// DECLARE @var type [= expr] [, @var2 type2 [= expr2], ...]
+        /// </summary>
+        private Stmt.Declare DeclareStatement()
+        {
+            Token declareToken = Consume(TokenType.DECLARE, "Expected DECLARE");
+
+            SyntaxElementList<VariableDeclaration> declarations = new SyntaxElementList<VariableDeclaration>();
+            declarations.Add(ParseVariableDeclaration());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                declarations.Add(ParseVariableDeclaration(), comma);
+            }
+
+            Stmt.Declare stmt = new Stmt.Declare(declarations);
+            stmt._declareToken = declareToken;
+            return stmt;
+        }
+
+        private VariableDeclaration ParseVariableDeclaration()
+        {
+            Token variable = Consume(TokenType.VARIABLE, "Expected variable name");
+            DataType dataType = ParseDataType();
+
+            if (Match(TokenType.EQUAL, out Token equalsToken))
+            {
+                Expr initializer = Expression();
+                return new VariableDeclaration(variable, dataType, equalsToken, initializer);
+            }
+            else
+            {
+                return new VariableDeclaration(variable, dataType);
+            }
+        }
+
+        /// <summary>
+        /// SET @variable = expression
+        /// </summary>
+        private Stmt.Set SetStatement()
+        {
+            Token setToken = Consume(TokenType.SET, "Expected SET");
+            Token variable = Consume(TokenType.VARIABLE, "Expected variable name");
+            Token equalsToken = Consume(TokenType.EQUAL, "Expected '='");
+            Expr value = Expression();
+
+            Stmt.Set stmt = new Stmt.Set(variable, value);
+            stmt._setToken = setToken;
+            stmt._equalsToken = equalsToken;
+            return stmt;
+        }
+
+        /// <summary>
+        /// IF predicate statement [ELSE statement]
+        /// </summary>
+        private Stmt.If IfStatement()
+        {
+            Token ifToken = Consume(TokenType.IF, "Expected IF");
+            AST.Predicate condition = SearchCondition();
+            Stmt thenBranch = Statement();
+
+            Token elseToken = null;
+            Stmt elseBranch = null;
+            if (Match(TokenType.ELSE, out elseToken))
+            {
+                elseBranch = Statement();
+            }
+
+            Stmt.If stmt = new Stmt.If(condition, thenBranch, elseBranch);
+            stmt._ifToken = ifToken;
+            stmt._elseToken = elseToken;
+            return stmt;
+        }
+
+        /// <summary>
+        /// BEGIN statement [; statement ...] END
+        /// </summary>
+        private Stmt.Block BlockStatement()
+        {
+            Token beginToken = Consume(TokenType.BEGIN, "Expected BEGIN");
+
+            List<Stmt> statements = new List<Stmt>();
+            List<Token> semicolons = new List<Token>();
+
+            while (!Check(TokenType.END) && !IsAtEnd())
+            {
+                statements.Add(Statement());
+
+                Token semi = null;
+                Match(TokenType.SEMICOLON, out semi);
+                semicolons.Add(semi);
+            }
+
+            Token endToken = Consume(TokenType.END, "Expected END");
+
+            Stmt.Block block = new Stmt.Block(statements, semicolons);
+            block._beginToken = beginToken;
+            block._endToken = endToken;
+            return block;
         }
 
         /// <summary>
@@ -667,8 +788,7 @@ namespace TSQL
 
             // Parse optional arguments
             SyntaxElementList<ExecuteArgument> arguments = new SyntaxElementList<ExecuteArgument>();
-            if (!IsAtEnd() && !Check(TokenType.SEMICOLON) && !Check(TokenType.OPTION)
-                && !IsStatementStart())
+            if (!IsAtStatementBoundary())
             {
                 arguments.Add(ParseExecuteArgument());
 
@@ -1068,7 +1188,7 @@ namespace TSQL
 
                 // Parse optional arguments (comma-separated expressions, no parentheses).
                 // Check if there's something that looks like an expression argument.
-                if (!IsAtEnd() && !Check(TokenType.SEMICOLON) && !Check(TokenType.OPTION) && !IsStatementStart())
+                if (!IsAtStatementBoundary())
                 {
                     arguments.Add(Expression());
 
@@ -1104,7 +1224,15 @@ namespace TSQL
         {
             TokenType t = Peek().Type;
             return t == TokenType.SELECT || t == TokenType.INSERT || t == TokenType.WITH
-                || t == TokenType.EXEC || t == TokenType.EXECUTE || t == TokenType.DROP;
+                || t == TokenType.EXEC || t == TokenType.EXECUTE || t == TokenType.DROP
+                || t == TokenType.DECLARE || t == TokenType.SET || t == TokenType.IF
+                || t == TokenType.BEGIN;
+        }
+
+        private bool IsAtStatementBoundary()
+        {
+            return IsAtEnd() || Check(TokenType.SEMICOLON, TokenType.OPTION, TokenType.END)
+                || IsStatementStart();
         }
 
         private Expr.Subquery Subquery()

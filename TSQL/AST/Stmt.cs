@@ -54,6 +54,10 @@ namespace TSQL
             T VisitDropStmt(Stmt.Drop stmt);
             T VisitExecuteStmt(Stmt.Execute stmt);
             T VisitExecuteStringStmt(Stmt.ExecuteString stmt);
+            T VisitDeclareStmt(Stmt.Declare stmt);
+            T VisitSetStmt(Stmt.Set stmt);
+            T VisitIfStmt(Stmt.If stmt);
+            T VisitBlockStmt(Stmt.Block stmt);
         }
 
         public class Select : Stmt
@@ -327,7 +331,200 @@ namespace TSQL
                 }
             }
         }
+
+        public class Declare : Stmt
+        {
+            public SyntaxElementList<VariableDeclaration> Declarations { get; }
+
+            internal Token _declareToken;
+
+            public Declare(SyntaxElementList<VariableDeclaration> declarations)
+            {
+                Declarations = declarations;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitDeclareStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _declareToken;
+
+                foreach (Token token in Declarations.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+
+        public class Set : Stmt
+        {
+            public Token Variable { get; }
+            public Expr Value { get; }
+
+            internal Token _setToken;
+            internal Token _equalsToken;
+
+            public Set(Token variable, Expr value)
+            {
+                Variable = variable;
+                Value = value;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitSetStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _setToken;
+                yield return Variable;
+                yield return _equalsToken;
+
+                foreach (Token token in Value.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+
+        public class If : Stmt
+        {
+            public AST.Predicate Condition { get; }
+            public Stmt ThenBranch { get; }
+            public Stmt ElseBranch { get; }
+
+            internal Token _ifToken;
+            internal Token _elseToken;
+
+            public If(AST.Predicate condition, Stmt thenBranch, Stmt elseBranch)
+            {
+                Condition = condition;
+                ThenBranch = thenBranch;
+                ElseBranch = elseBranch;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitIfStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _ifToken;
+
+                foreach (Token token in Condition.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                foreach (Token token in ThenBranch.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (_elseToken != null)
+                {
+                    yield return _elseToken;
+
+                    foreach (Token token in ElseBranch.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+            }
+        }
+
+        public class Block : Stmt
+        {
+            public IReadOnlyList<Stmt> Statements { get; }
+            internal readonly List<Token> _semicolons;
+
+            internal Token _beginToken;
+            internal Token _endToken;
+
+            internal Block(IReadOnlyList<Stmt> statements, List<Token> semicolons)
+            {
+                Statements = statements;
+                _semicolons = semicolons;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitBlockStmt(this);
+            }
+
+            public override IEnumerable<Token> DescendantTokens()
+            {
+                yield return _beginToken;
+
+                for (int i = 0; i < Statements.Count; i++)
+                {
+                    foreach (Token token in Statements[i].DescendantTokens())
+                    {
+                        yield return token;
+                    }
+
+                    if (_semicolons[i] != null)
+                    {
+                        yield return _semicolons[i];
+                    }
+                }
+
+                yield return _endToken;
+            }
+        }
     }
+    #endregion
+
+    #region DECLARE Supporting Types
+
+    public class VariableDeclaration : SyntaxElement
+    {
+        public Token Variable { get; }
+        public DataType DataType { get; }
+        public Expr Initializer { get; }
+
+        internal Token _equalsToken;
+
+        public VariableDeclaration(Token variable, DataType dataType)
+        {
+            Variable = variable;
+            DataType = dataType;
+        }
+
+        public VariableDeclaration(Token variable, DataType dataType, Token equalsToken, Expr initializer)
+        {
+            Variable = variable;
+            DataType = dataType;
+            _equalsToken = equalsToken;
+            Initializer = initializer;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return Variable;
+
+            foreach (Token token in DataType.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            if (_equalsToken != null)
+            {
+                yield return _equalsToken;
+
+                foreach (Token token in Initializer.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+        }
+    }
+
     #endregion
 
     #region DROP Object Types

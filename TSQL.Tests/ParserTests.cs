@@ -3825,5 +3825,44 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Procedural Statements - Round-Trips
+
+        [Theory]
+        // DECLARE
+        [InlineData("DECLARE @SQL NVARCHAR(250)")]
+        [InlineData("DECLARE @X INT")]
+        [InlineData("DECLARE @Name VARCHAR(100)")]
+        [InlineData("DECLARE @X INT, @Y INT")]
+        [InlineData("DECLARE @X INT, @Y VARCHAR(50), @Z DECIMAL(10, 2)")]
+        [InlineData("DECLARE @X INT = 1")]
+        [InlineData("DECLARE @X INT = 1, @Y INT = 2")]
+        // SET
+        [InlineData("SET @X = 1")]
+        [InlineData("SET @SQL = N'SELECT 1'")]
+        [InlineData("SET @X = @Y + 1")]
+        [InlineData("SET @Name = 'hello'")]
+        // BEGIN/END
+        [InlineData("BEGIN SELECT 1 END")]
+        [InlineData("BEGIN SELECT 1; SELECT 2 END")]
+        [InlineData("BEGIN EXEC sp_Test END")]
+        // IF/ELSE
+        [InlineData("IF 1 = 1 SELECT 1")]
+        [InlineData("IF 1 = 1 SELECT 1 ELSE SELECT 0")]
+        [InlineData("IF @X > 0 SELECT 1 ELSE SELECT 0")]
+        [InlineData("IF EXISTS (SELECT 1 FROM T) SELECT 1")]
+        [InlineData("IF EXISTS (SELECT 1 FROM T) SELECT 1 ELSE SELECT 0")]
+        [InlineData("IF 1 = 1 BEGIN SELECT 1 END")]
+        [InlineData("IF 1 = 1 BEGIN SELECT 1 END ELSE BEGIN SELECT 0 END")]
+        [InlineData("IF 1 = 1 IF 2 = 2 SELECT 1 ELSE SELECT 0")]
+        // Script combinations
+        [InlineData("DECLARE @X INT; SET @X = 1; SELECT @X")]
+        [InlineData("DECLARE @SQL NVARCHAR(250) SET @SQL = N'SELECT COL1 FROM T1 WHERE ID = 1 AND TYPE = 2' IF EXISTS (SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'T1' AND COLUMN_NAME = N'COL1') BEGIN EXEC SP_EXECUTESQL @SQL END ELSE SELECT 0")]
+        public void ProceduralStatement_RoundTrips(string source)
+        {
+            Assert.Equal(source, Script.Parse(source).ToSource());
+        }
+
+        #endregion
     }
 }

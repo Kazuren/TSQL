@@ -112,6 +112,40 @@ namespace TSQL
             }
         }
 
+        protected virtual void VisitDeclare(Stmt.Declare stmt)
+        {
+            foreach (VariableDeclaration decl in stmt.Declarations)
+            {
+                if (decl.Initializer != null)
+                {
+                    Walk(decl.Initializer);
+                }
+            }
+        }
+
+        protected virtual void VisitSet(Stmt.Set stmt)
+        {
+            Walk(stmt.Value);
+        }
+
+        protected virtual void VisitIf(Stmt.If stmt)
+        {
+            Walk(stmt.Condition);
+            Walk(stmt.ThenBranch);
+            if (stmt.ElseBranch != null)
+            {
+                Walk(stmt.ElseBranch);
+            }
+        }
+
+        protected virtual void VisitBlock(Stmt.Block stmt)
+        {
+            foreach (Stmt child in stmt.Statements)
+            {
+                Walk(child);
+            }
+        }
+
         #endregion
 
         #region Expr Visit Methods
@@ -560,6 +594,10 @@ namespace TSQL
         object Stmt.Visitor<object>.VisitDropStmt(Stmt.Drop stmt) { VisitDrop(stmt); return null; }
         object Stmt.Visitor<object>.VisitExecuteStmt(Stmt.Execute stmt) { VisitExecute(stmt); return null; }
         object Stmt.Visitor<object>.VisitExecuteStringStmt(Stmt.ExecuteString stmt) { VisitExecuteString(stmt); return null; }
+        object Stmt.Visitor<object>.VisitDeclareStmt(Stmt.Declare stmt) { VisitDeclare(stmt); return null; }
+        object Stmt.Visitor<object>.VisitSetStmt(Stmt.Set stmt) { VisitSet(stmt); return null; }
+        object Stmt.Visitor<object>.VisitIfStmt(Stmt.If stmt) { VisitIf(stmt); return null; }
+        object Stmt.Visitor<object>.VisitBlockStmt(Stmt.Block stmt) { VisitBlock(stmt); return null; }
 
         object Expr.Visitor<object>.VisitBinaryExpr(Expr.Binary expr) { VisitBinary(expr); return null; }
         object Expr.Visitor<object>.VisitStringLiteralExpr(Expr.StringLiteral expr) { VisitStringLiteral(expr); return null; }
