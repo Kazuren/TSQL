@@ -514,27 +514,34 @@ namespace TSQL
     public class VariableDeclaration : SyntaxElement
     {
         public Token Variable { get; }
+
+        internal VariableDeclaration(Token variable)
+        {
+            Variable = variable;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return Variable;
+        }
+    }
+
+    public class ScalarVariableDeclaration : VariableDeclaration
+    {
         public DataType DataType { get; }
-        public TableDefinition TableDefinition { get; }
         public Expr Initializer { get; }
 
         internal Token _equalsToken;
 
-        public VariableDeclaration(Token variable, DataType dataType)
+        internal ScalarVariableDeclaration(Token variable, DataType dataType)
+            : base(variable)
         {
-            Variable = variable;
             DataType = dataType;
         }
 
-        public VariableDeclaration(Token variable, TableDefinition tableDefinition)
+        internal ScalarVariableDeclaration(Token variable, DataType dataType, Token equalsToken, Expr initializer)
+            : base(variable)
         {
-            Variable = variable;
-            TableDefinition = tableDefinition;
-        }
-
-        public VariableDeclaration(Token variable, DataType dataType, Token equalsToken, Expr initializer)
-        {
-            Variable = variable;
             DataType = dataType;
             _equalsToken = equalsToken;
             Initializer = initializer;
@@ -544,29 +551,40 @@ namespace TSQL
         {
             yield return Variable;
 
-            if (TableDefinition != null)
+            foreach (Token token in DataType.DescendantTokens())
             {
-                foreach (Token token in TableDefinition.DescendantTokens())
+                yield return token;
+            }
+
+            if (_equalsToken != null)
+            {
+                yield return _equalsToken;
+
+                foreach (Token token in Initializer.DescendantTokens())
                 {
                     yield return token;
                 }
             }
-            else
+        }
+    }
+
+    public class TableVariableDeclaration : VariableDeclaration
+    {
+        public TableDefinition TableDefinition { get; }
+
+        internal TableVariableDeclaration(Token variable, TableDefinition tableDefinition)
+            : base(variable)
+        {
+            TableDefinition = tableDefinition;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return Variable;
+
+            foreach (Token token in TableDefinition.DescendantTokens())
             {
-                foreach (Token token in DataType.DescendantTokens())
-                {
-                    yield return token;
-                }
-
-                if (_equalsToken != null)
-                {
-                    yield return _equalsToken;
-
-                    foreach (Token token in Initializer.DescendantTokens())
-                    {
-                        yield return token;
-                    }
-                }
+                yield return token;
             }
         }
     }

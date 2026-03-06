@@ -116,9 +116,9 @@ namespace TSQL
         {
             foreach (VariableDeclaration decl in stmt.Declarations)
             {
-                if (decl.Initializer != null)
+                if (decl is ScalarVariableDeclaration scalar && scalar.Initializer != null)
                 {
-                    Walk(decl.Initializer);
+                    Walk(scalar.Initializer);
                 }
             }
         }

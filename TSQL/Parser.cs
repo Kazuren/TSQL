@@ -580,7 +580,7 @@ namespace TSQL
             if (Check(TokenType.TABLE))
             {
                 TableDefinition tableDefinition = ParseTableDefinition();
-                return new VariableDeclaration(variable, tableDefinition);
+                return new TableVariableDeclaration(variable, tableDefinition);
             }
             else
             {
@@ -589,11 +589,11 @@ namespace TSQL
                 if (Match(TokenType.EQUAL, out Token equalsToken))
                 {
                     Expr initializer = Expression();
-                    return new VariableDeclaration(variable, dataType, equalsToken, initializer);
+                    return new ScalarVariableDeclaration(variable, dataType, equalsToken, initializer);
                 }
                 else
                 {
-                    return new VariableDeclaration(variable, dataType);
+                    return new ScalarVariableDeclaration(variable, dataType);
                 }
             }
         }
