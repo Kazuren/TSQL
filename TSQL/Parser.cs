@@ -576,17 +576,86 @@ namespace TSQL
         private VariableDeclaration ParseVariableDeclaration()
         {
             Token variable = Consume(TokenType.VARIABLE, "Expected variable name");
-            DataType dataType = ParseDataType();
 
-            if (Match(TokenType.EQUAL, out Token equalsToken))
+            if (Check(TokenType.TABLE))
             {
-                Expr initializer = Expression();
-                return new VariableDeclaration(variable, dataType, equalsToken, initializer);
+                TableDefinition tableDefinition = ParseTableDefinition();
+                return new VariableDeclaration(variable, tableDefinition);
             }
             else
             {
-                return new VariableDeclaration(variable, dataType);
+                DataType dataType = ParseDataType();
+
+                if (Match(TokenType.EQUAL, out Token equalsToken))
+                {
+                    Expr initializer = Expression();
+                    return new VariableDeclaration(variable, dataType, equalsToken, initializer);
+                }
+                else
+                {
+                    return new VariableDeclaration(variable, dataType);
+                }
             }
+        }
+
+        private TableDefinition ParseTableDefinition()
+        {
+            Token tableToken = Consume(TokenType.TABLE, "Expected TABLE");
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after TABLE");
+
+            SyntaxElementList<TableColumnDefinition> columns = new SyntaxElementList<TableColumnDefinition>();
+            columns.Add(ParseTableColumnDefinition());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                columns.Add(ParseTableColumnDefinition(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after column definitions");
+
+            return new TableDefinition(tableToken, leftParen, columns, rightParen);
+        }
+
+        private TableColumnDefinition ParseTableColumnDefinition()
+        {
+            Token columnName = ConsumeIdentifierOrContextualKeyword("Expected column name");
+            DataType dataType = ParseDataType();
+
+            TableColumnDefinition col = new TableColumnDefinition(columnName, dataType);
+
+            // Optional IDENTITY [(seed, increment)]
+            if (Match(TokenType.IDENTITY, out Token identityToken))
+            {
+                col._identityToken = identityToken;
+
+                if (Match(TokenType.LEFT_PAREN, out Token identityLeftParen))
+                {
+                    Token seed = Consume(TokenType.WHOLE_NUMBER, "Expected identity seed value");
+                    Token identityComma = Consume(TokenType.COMMA, "Expected ',' after seed");
+                    Token increment = Consume(TokenType.WHOLE_NUMBER, "Expected identity increment value");
+                    Token identityRightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after increment");
+
+                    col._identityLeftParen = identityLeftParen;
+                    col._identitySeed = seed;
+                    col._identityComma = identityComma;
+                    col._identityIncrement = increment;
+                    col._identityRightParen = identityRightParen;
+                }
+            }
+
+            // Optional NULL or NOT NULL
+            if (Match(TokenType.NOT, out Token notToken))
+            {
+                Token nullToken = Consume(TokenType.NULL, "Expected NULL after NOT");
+                col._notToken = notToken;
+                col._nullToken = nullToken;
+            }
+            else if (Match(TokenType.NULL, out Token nullToken2))
+            {
+                col._nullToken = nullToken2;
+            }
+
+            return col;
         }
 
         /// <summary>

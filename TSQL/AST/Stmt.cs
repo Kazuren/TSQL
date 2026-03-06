@@ -515,6 +515,7 @@ namespace TSQL
     {
         public Token Variable { get; }
         public DataType DataType { get; }
+        public TableDefinition TableDefinition { get; }
         public Expr Initializer { get; }
 
         internal Token _equalsToken;
@@ -523,6 +524,12 @@ namespace TSQL
         {
             Variable = variable;
             DataType = dataType;
+        }
+
+        public VariableDeclaration(Token variable, TableDefinition tableDefinition)
+        {
+            Variable = variable;
+            TableDefinition = tableDefinition;
         }
 
         public VariableDeclaration(Token variable, DataType dataType, Token equalsToken, Expr initializer)
@@ -537,20 +544,113 @@ namespace TSQL
         {
             yield return Variable;
 
+            if (TableDefinition != null)
+            {
+                foreach (Token token in TableDefinition.DescendantTokens())
+                {
+                    yield return token;
+                }
+            }
+            else
+            {
+                foreach (Token token in DataType.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (_equalsToken != null)
+                {
+                    yield return _equalsToken;
+
+                    foreach (Token token in Initializer.DescendantTokens())
+                    {
+                        yield return token;
+                    }
+                }
+            }
+        }
+    }
+
+    public class TableColumnDefinition : SyntaxElement
+    {
+        internal Token _columnNameToken;
+        public DataType DataType { get; }
+        internal Token _identityToken;
+        internal Token _identityLeftParen;
+        internal Token _identitySeed;
+        internal Token _identityComma;
+        internal Token _identityIncrement;
+        internal Token _identityRightParen;
+        internal Token _notToken;
+        internal Token _nullToken;
+
+        internal TableColumnDefinition(Token columnName, DataType dataType)
+        {
+            _columnNameToken = columnName;
+            DataType = dataType;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _columnNameToken;
+
             foreach (Token token in DataType.DescendantTokens())
             {
                 yield return token;
             }
 
-            if (_equalsToken != null)
+            if (_identityToken != null)
             {
-                yield return _equalsToken;
+                yield return _identityToken;
 
-                foreach (Token token in Initializer.DescendantTokens())
+                if (_identityLeftParen != null)
                 {
-                    yield return token;
+                    yield return _identityLeftParen;
+                    yield return _identitySeed;
+                    yield return _identityComma;
+                    yield return _identityIncrement;
+                    yield return _identityRightParen;
                 }
             }
+
+            if (_notToken != null)
+            {
+                yield return _notToken;
+            }
+
+            if (_nullToken != null)
+            {
+                yield return _nullToken;
+            }
+        }
+    }
+
+    public class TableDefinition : SyntaxElement
+    {
+        internal Token _tableToken;
+        public SyntaxElementList<TableColumnDefinition> Columns { get; }
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        internal TableDefinition(Token tableToken, Token leftParen, SyntaxElementList<TableColumnDefinition> columns, Token rightParen)
+        {
+            _tableToken = tableToken;
+            _leftParen = leftParen;
+            Columns = columns;
+            _rightParen = rightParen;
+        }
+
+        public override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _tableToken;
+            yield return _leftParen;
+
+            foreach (Token token in Columns.DescendantTokens())
+            {
+                yield return token;
+            }
+
+            yield return _rightParen;
         }
     }
 

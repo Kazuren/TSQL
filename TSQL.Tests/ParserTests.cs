@@ -3884,9 +3884,94 @@ namespace TSQL.Tests
         // Script combinations
         [InlineData("DECLARE @X INT; SET @X = 1; SELECT @X")]
         [InlineData("DECLARE @SQL NVARCHAR(250) SET @SQL = N'SELECT COL1 FROM T1 WHERE ID = 1 AND TYPE = 2' IF EXISTS (SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'T1' AND COLUMN_NAME = N'COL1') BEGIN EXEC SP_EXECUTESQL @SQL END ELSE SELECT 0")]
+        // Table variable declarations
+        [InlineData("DECLARE @T TABLE (ID INT)")]
+        [InlineData("DECLARE @T TABLE (ID INT, Name NVARCHAR(50))")]
+        [InlineData("DECLARE @T TABLE (ID INT IDENTITY(1, 1) NOT NULL, Name NVARCHAR(255))")]
+        [InlineData("DECLARE @T TABLE (ID INT NOT NULL, Value FLOAT NULL)")]
+        [InlineData("DECLARE @T TABLE (ID INT IDENTITY NOT NULL)")]
         public void ProceduralStatement_RoundTrips(string source)
         {
             Assert.Equal(source, Script.Parse(source).ToSource());
+        }
+
+        [Fact]
+        public void DeclareTableVariable_SingleColumn_HasCorrectStructure()
+        {
+            Script script = Script.Parse("DECLARE @T TABLE (ID INT)");
+            Stmt.Declare declare = Assert.IsType<Stmt.Declare>(script.Statements[0]);
+            Assert.Single(declare.Declarations);
+
+            VariableDeclaration decl = declare.Declarations[0];
+            Assert.Equal("@T", decl.Variable.Lexeme);
+            Assert.Null(decl.DataType);
+            Assert.NotNull(decl.TableDefinition);
+            Assert.Single(decl.TableDefinition.Columns);
+
+            TableColumnDefinition col = decl.TableDefinition.Columns[0];
+            Assert.Equal("ID", col._columnNameToken.Lexeme);
+            Assert.Equal("INT", col.DataType.TypeName);
+            Assert.Null(col._identityToken);
+            Assert.Null(col._notToken);
+            Assert.Null(col._nullToken);
+        }
+
+        [Fact]
+        public void DeclareTableVariable_MultipleColumns_HasCorrectCount()
+        {
+            Script script = Script.Parse("DECLARE @T TABLE (ID INT, Name NVARCHAR(50), Active BIT)");
+            Stmt.Declare declare = Assert.IsType<Stmt.Declare>(script.Statements[0]);
+            VariableDeclaration decl = declare.Declarations[0];
+
+            Assert.Equal(3, decl.TableDefinition.Columns.Count);
+            Assert.Equal("ID", decl.TableDefinition.Columns[0]._columnNameToken.Lexeme);
+            Assert.Equal("Name", decl.TableDefinition.Columns[1]._columnNameToken.Lexeme);
+            Assert.Equal("Active", decl.TableDefinition.Columns[2]._columnNameToken.Lexeme);
+        }
+
+        [Fact]
+        public void DeclareTableVariable_IdentityWithParameters_ParsesCorrectly()
+        {
+            Script script = Script.Parse("DECLARE @T TABLE (ID INT IDENTITY(1, 1) NOT NULL)");
+            Stmt.Declare declare = Assert.IsType<Stmt.Declare>(script.Statements[0]);
+            TableColumnDefinition col = declare.Declarations[0].TableDefinition.Columns[0];
+
+            Assert.NotNull(col._identityToken);
+            Assert.Equal("IDENTITY", col._identityToken.Lexeme);
+            Assert.NotNull(col._identityLeftParen);
+            Assert.Equal("1", col._identitySeed.Lexeme);
+            Assert.Equal("1", col._identityIncrement.Lexeme);
+            Assert.NotNull(col._notToken);
+            Assert.NotNull(col._nullToken);
+        }
+
+        [Fact]
+        public void DeclareTableVariable_IdentityWithoutParameters_ParsesCorrectly()
+        {
+            Script script = Script.Parse("DECLARE @T TABLE (ID INT IDENTITY NOT NULL)");
+            Stmt.Declare declare = Assert.IsType<Stmt.Declare>(script.Statements[0]);
+            TableColumnDefinition col = declare.Declarations[0].TableDefinition.Columns[0];
+
+            Assert.NotNull(col._identityToken);
+            Assert.Null(col._identityLeftParen);
+            Assert.Null(col._identitySeed);
+            Assert.NotNull(col._notToken);
+            Assert.NotNull(col._nullToken);
+        }
+
+        [Fact]
+        public void DeclareTableVariable_NullAndNotNull_ParsesCorrectly()
+        {
+            Script script = Script.Parse("DECLARE @T TABLE (ID INT NOT NULL, Name NVARCHAR(50) NULL)");
+            Stmt.Declare declare = Assert.IsType<Stmt.Declare>(script.Statements[0]);
+
+            TableColumnDefinition col0 = declare.Declarations[0].TableDefinition.Columns[0];
+            Assert.NotNull(col0._notToken);
+            Assert.NotNull(col0._nullToken);
+
+            TableColumnDefinition col1 = declare.Declarations[0].TableDefinition.Columns[1];
+            Assert.Null(col1._notToken);
+            Assert.NotNull(col1._nullToken);
         }
 
         #endregion
