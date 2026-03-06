@@ -65,6 +65,7 @@ namespace TSQL
 
         public enum ArithmeticOperator { Add, Subtract, Multiply, Divide, Modulo, BitwiseAnd, BitwiseOr, BitwiseXor }
         public enum UnaryOperator { Negate, BitwiseNot }
+        public enum StringKind { Regular, Unicode }
 
         private static readonly Dictionary<ArithmeticOperator, (TokenType Type, string Lexeme)> ArithmeticOpToToken =
             new Dictionary<ArithmeticOperator, (TokenType, string)>
@@ -586,18 +587,58 @@ namespace TSQL
         public class StringLiteral : Expr
         {
             public string Value { get; }
+
+            private StringKind _kind;
+            public StringKind Kind
+            {
+                get => _kind;
+                set
+                {
+                    _kind = value;
+                    _token = ConcreteToken.WithLeadingSpace(TokenType.STRING, BuildLexeme(Value, value), Value);
+                }
+            }
+
             internal Token _token;
 
-            public StringLiteral(string value)
+            public StringLiteral(string value, StringKind kind = StringKind.Regular)
             {
                 Value = value;
-                _token = ConcreteToken.WithLeadingSpace(TokenType.STRING, "'" + value.Replace("'", "''") + "'", value);
+                _kind = kind;
+                _token = ConcreteToken.WithLeadingSpace(TokenType.STRING, BuildLexeme(value, kind), value);
             }
 
             internal StringLiteral(Token token)
             {
                 Value = (string)token.Literal;
                 _token = token;
+                _kind = DetectKind(token);
+            }
+
+            private static string BuildLexeme(string value, StringKind kind)
+            {
+                string escaped = value.Replace("'", "''");
+                if (kind == StringKind.Unicode)
+                {
+                    return "N'" + escaped + "'";
+                }
+                else
+                {
+                    return "'" + escaped + "'";
+                }
+            }
+
+            private static StringKind DetectKind(Token token)
+            {
+                char first = token.FirstChar;
+                if (first == 'N' || first == 'n')
+                {
+                    return StringKind.Unicode;
+                }
+                else
+                {
+                    return StringKind.Regular;
+                }
             }
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitStringLiteralExpr(this);

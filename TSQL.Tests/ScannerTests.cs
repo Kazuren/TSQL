@@ -58,7 +58,10 @@
                 { "'hello'", "'hello'", "hello" },
                 { "'O''Reilly'", "'O''Reilly'", "O'Reilly" },
                 { "''", "''", "" },
-                { "'multiple words'", "'multiple words'", "multiple words" }
+                { "'multiple words'", "'multiple words'", "multiple words" },
+                { "N'hello'", "N'hello'", "hello" },
+                { "n'hello'", "n'hello'", "hello" },
+                { "N'O''Reilly'", "N'O''Reilly'", "O'Reilly" }
             };
         }
 

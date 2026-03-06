@@ -2183,6 +2183,52 @@ namespace TSQL.Tests
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.StringLiteral lit = Assert.IsType<Expr.StringLiteral>(col.Expression);
             Assert.Equal("hello", lit.Value);
+            Assert.Equal(Expr.StringKind.Unicode, lit.Kind);
+        }
+
+        [Fact]
+        public void Parse_RegularString_HasRegularKind()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT 'hello'");
+            SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
+            Expr.StringLiteral lit = Assert.IsType<Expr.StringLiteral>(col.Expression);
+            Assert.Equal(Expr.StringKind.Regular, lit.Kind);
+        }
+
+        [Fact]
+        public void Construct_StringLiteral_DefaultsToRegular()
+        {
+            var lit = new Expr.StringLiteral("hello");
+            Assert.Equal(Expr.StringKind.Regular, lit.Kind);
+            Assert.Equal("'hello'", lit.ToSource().Trim());
+        }
+
+        [Fact]
+        public void Construct_UnicodeStringLiteral_ProducesNPrefix()
+        {
+            var lit = new Expr.StringLiteral("hello", Expr.StringKind.Unicode);
+            Assert.Equal(Expr.StringKind.Unicode, lit.Kind);
+            Assert.Equal("N'hello'", lit.ToSource().Trim());
+        }
+
+        [Fact]
+        public void StringLiteral_SetKindToUnicode_UpdatesSource()
+        {
+            var lit = new Expr.StringLiteral("hello");
+            Assert.Equal(Expr.StringKind.Regular, lit.Kind);
+
+            lit.Kind = Expr.StringKind.Unicode;
+            Assert.Equal(Expr.StringKind.Unicode, lit.Kind);
+            Assert.Equal("N'hello'", lit.ToSource().Trim());
+        }
+
+        [Fact]
+        public void Parse_LowercaseN_UnicodePrefix_DetectsKind()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT n'hello'");
+            SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
+            Expr.StringLiteral lit = Assert.IsType<Expr.StringLiteral>(col.Expression);
+            Assert.Equal(Expr.StringKind.Unicode, lit.Kind);
         }
 
         #endregion
