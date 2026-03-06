@@ -14,11 +14,16 @@ namespace TSQL.StandardLibrary.Visitors
         /// Parameterizes all non-NULL literals in the statement in place.
         /// Returns a dictionary mapping parameter names to their original values.
         /// </summary>
-        public static IReadOnlyDictionary<string, object> Parameterize(Stmt stmt)
+        /// <param name="stmt">The statement to parameterize.</param>
+        /// <param name="reservedNames">Parameter names to avoid even if they don't appear in the SQL text
+        /// (e.g. caller-provided parameters that will be assigned later). Compared case-insensitively.</param>
+        public static IReadOnlyDictionary<string, object> Parameterize(Stmt stmt,
+            IEnumerable<string> reservedNames = null)
         {
             // Phase 1: Collect existing variable names
             VariableNameCollector variableCollector = new VariableNameCollector();
             variableCollector.Walk(stmt);
+            AddReservedNames(variableCollector.Names, reservedNames);
 
             // Phase 2: Walk the tree and replace literals with variables
             LiteralReplacer replacer = new LiteralReplacer(variableCollector.Names);
@@ -32,7 +37,11 @@ namespace TSQL.StandardLibrary.Visitors
         /// A single parameter counter is shared across all statements, producing
         /// unique names (@P0, @P1, ...) across the whole set.
         /// </summary>
-        public static IReadOnlyDictionary<string, object> Parameterize(IReadOnlyList<Stmt> stmts)
+        /// <param name="stmts">The statements to parameterize.</param>
+        /// <param name="reservedNames">Parameter names to avoid even if they don't appear in the SQL text
+        /// (e.g. caller-provided parameters that will be assigned later). Compared case-insensitively.</param>
+        public static IReadOnlyDictionary<string, object> Parameterize(IReadOnlyList<Stmt> stmts,
+            IEnumerable<string> reservedNames = null)
         {
             // Phase 1: Collect existing variable names from ALL statements
             VariableNameCollector variableCollector = new VariableNameCollector();
@@ -40,6 +49,7 @@ namespace TSQL.StandardLibrary.Visitors
             {
                 variableCollector.Walk(stmt);
             }
+            AddReservedNames(variableCollector.Names, reservedNames);
 
             // Phase 2: Walk each statement sequentially with a shared replacer
             LiteralReplacer replacer = new LiteralReplacer(variableCollector.Names);
@@ -49,6 +59,18 @@ namespace TSQL.StandardLibrary.Visitors
             }
 
             return replacer.Parameters;
+        }
+
+        private static void AddReservedNames(HashSet<string> names, IEnumerable<string> reservedNames)
+        {
+            if (reservedNames == null)
+            {
+                return;
+            }
+            foreach (string name in reservedNames)
+            {
+                names.Add(name.ToUpperInvariant());
+            }
         }
 
         private class LiteralReplacer : SqlWalker

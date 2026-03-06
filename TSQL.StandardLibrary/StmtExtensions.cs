@@ -74,11 +74,14 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="parameters">Receives the generated parameter name-to-value mapping.</param>
+        /// <param name="reservedNames">Parameter names to avoid even if they don't appear in the SQL text
+        /// (e.g. caller-provided parameters that will be assigned later). Compared case-insensitively.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
-        public static Stmt Parameterize(this Stmt stmt, out IReadOnlyDictionary<string, object> parameters)
+        public static Stmt Parameterize(this Stmt stmt, out IReadOnlyDictionary<string, object> parameters,
+            IEnumerable<string> reservedNames = null)
         {
-            parameters = LiteralParameterizer.Parameterize(stmt);
+            parameters = LiteralParameterizer.Parameterize(stmt, reservedNames);
             return stmt;
         }
 

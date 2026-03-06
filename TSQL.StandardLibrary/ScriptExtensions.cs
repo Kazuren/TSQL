@@ -151,11 +151,14 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         /// <param name="script">The script to modify.</param>
         /// <param name="parameters">Receives the generated parameter name-to-value mapping.</param>
+        /// <param name="reservedNames">Parameter names to avoid even if they don't appear in the SQL text
+        /// (e.g. caller-provided parameters that will be assigned later). Compared case-insensitively.</param>
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
         public static Script Parameterize(this Script script,
-            out IReadOnlyDictionary<string, object> parameters)
+            out IReadOnlyDictionary<string, object> parameters,
+            IEnumerable<string> reservedNames = null)
         {
-            parameters = LiteralParameterizer.Parameterize(script.Statements);
+            parameters = LiteralParameterizer.Parameterize(script.Statements, reservedNames);
             return script;
         }
 

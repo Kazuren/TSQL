@@ -391,6 +391,21 @@ namespace TSQL.Tests
             Assert.Equal("", parameters["@P1"]);
         }
 
+        [Fact]
+        public void LiteralParameterizer_ReservedNames_SkipsReservedParameters()
+        {
+            // SQL only references @P0 and @P1, but caller has 3 params (@P0, @P1, @P2).
+            // Without reservedNames, the extracted literal would get @P2 — colliding.
+            Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE c1 = @P0 AND c2 = @P1 AND c3 = 0 AND c4 = 2");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters,
+                reservedNames: new[] { "@P0", "@P1", "@P2" });
+
+            Assert.Equal("SELECT * FROM T WHERE c1 = @P0 AND c2 = @P1 AND c3 = @P3 AND c4 = @P4", stmt.ToSource());
+            Assert.Equal(2, parameters.Count);
+            Assert.Equal(0, parameters["@P3"]);
+            Assert.Equal(2, parameters["@P4"]);
+        }
+
         #endregion
 
         #region Fluent API
