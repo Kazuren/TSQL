@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TSQL\TSQL.csproj" />
+    <ProjectReference Include="..\TSQL.StandardLibrary\TSQL.StandardLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -4,7 +4,7 @@ A T-SQL parser library targeting .NET Standard 2.0. Parse SQL into a full AST, t
 
 ## Features
 
-- **Round-trip fidelity** — whitespace and comments are preserved as trivia on tokens, so `Parse` → `ToSource` reproduces the original text exactly
+- **Exact source regeneration** — whitespace and comments are preserved as trivia on tokens, so `Parse` → `ToSource` reproduces the original text exactly
 - **Comprehensive T-SQL support** — SELECT, INSERT, CTEs, window functions, PIVOT/UNPIVOT, temporal tables, FOR XML/JSON, query hints, and more
 - **Visitor pattern** — `SqlWalker` base class for easy AST traversal; override only the node types you care about
 - **Built-in transformations** — the `TSQL.StandardLibrary` package provides ready-made operations: add WHERE conditions, parameterize literals, collect references, and materialize temp tables

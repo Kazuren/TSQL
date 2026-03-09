@@ -33,7 +33,7 @@ You will analyze recently modified code and apply refinements that:
 
 4. **Respect Parser Architecture**: When simplifying parser/scanner code:
 
-   - Preserve trivia (whitespace/comments) handling for round-trip fidelity
+   - Preserve trivia (whitespace/comments) handling for exact source regeneration
    - Maintain the recursive descent structure in `Parser.cs`
    - Keep `SyntaxElementList<T>` separator token preservation
    - Preserve the visitor pattern (`Accept<T>()`) on all AST nodes

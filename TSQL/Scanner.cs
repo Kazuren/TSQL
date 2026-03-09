@@ -274,6 +274,12 @@ namespace TSQL
                 Advance();
             }
 
+            // Don't include trailing \r in the comment — it belongs to the \r\n line ending.
+            if (_current > _start && _source[_current - 1] == '\r')
+            {
+                _current--;
+            }
+
             AddTrivia(new Comment(_source, _start, _current - _start));
         }
 

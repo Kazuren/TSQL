@@ -381,6 +381,38 @@
                 Assert.Same(Whitespace.Space, trivia);
             }
         }
+
+        [Fact]
+        public void SingleLineComment_DoesNotIncludeTrailingCarriageReturn()
+        {
+            // CRLF line endings: comment should NOT absorb the \r
+            string sql = "SELECT 1 -- comment\r\nFROM t";
+
+            var scanner = new Scanner(sql);
+            var tokens = scanner.ScanTokens();
+
+            // Find the comment trivia
+            Comment comment = null;
+            foreach (var token in tokens)
+            {
+                foreach (var trivia in token.LeadingTrivia)
+                {
+                    if (trivia is Comment c)
+                    {
+                        comment = c;
+                        break;
+                    }
+                }
+                if (comment != null)
+                {
+                    break;
+                }
+            }
+
+            Assert.NotNull(comment);
+            Assert.Equal("-- comment", comment.Content);
+            Assert.DoesNotContain("\r", comment.Content);
+        }
     }
 
     public record ExpectedToken(TokenType Type, string Lexeme, object? Literal = null);

@@ -46,7 +46,7 @@ This is a T-SQL parser library targeting .NET Standard 2.0 for broad compatibili
 - `TableSource` (`AST/TableSource.cs`) - FROM clause ecosystem: table sources (joins, subqueries, PIVOT/UNPIVOT, VALUES), table hints, temporal/sampling clauses
 - `QueryHint` (`AST/QueryHint.cs`) - OPTION clause and all query hint types
 - `Predicate` (`AST/Predicate.cs`) - WHERE clause predicates: comparison, LIKE, BETWEEN, IN, EXISTS, etc.
-- `SyntaxElementList<T>` - Generic list that preserves separator tokens for round-trip fidelity
+- `SyntaxElementList<T>` - Generic list that preserves separator tokens for exact source regeneration
 
 ### Visitor Pattern
 
