@@ -2713,6 +2713,10 @@ namespace TSQL
             {
                 return new Expr.Unary(bitwiseNot, Postfix());
             }
+            else if (Match(TokenType.PLUS, out Token plus))
+            {
+                return new Expr.Unary(plus, Postfix());
+            }
             else
             {
                 return Postfix();

@@ -64,7 +64,7 @@ namespace TSQL
         }
 
         public enum ArithmeticOperator { Add, Subtract, Multiply, Divide, Modulo, BitwiseAnd, BitwiseOr, BitwiseXor }
-        public enum UnaryOperator { Negate, BitwiseNot }
+        public enum UnaryOperator { Negate, BitwiseNot, Plus }
         public enum StringKind { Regular, Unicode }
 
         private static readonly Dictionary<ArithmeticOperator, (TokenType Type, string Lexeme)> ArithmeticOpToToken =
@@ -87,6 +87,7 @@ namespace TSQL
             {
                 { UnaryOperator.Negate, (TokenType.MINUS, "-") },
                 { UnaryOperator.BitwiseNot, (TokenType.BITWISE_NOT, "~") },
+                { UnaryOperator.Plus, (TokenType.PLUS, "+") },
             };
 
         private static readonly Dictionary<TokenType, UnaryOperator> TokenToUnaryOp = BuildReverse(UnaryOpToToken);

@@ -240,6 +240,19 @@ namespace TSQL.Tests
         }
 
         [Fact]
+        public void Parse_UnaryPlus_HasCorrectStructure()
+        {
+            // Arrange & Act
+            Stmt.Select select = Stmt.ParseSelect("SELECT +90");
+
+            // Assert
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.Unary unary = Assert.IsType<Expr.Unary>(item.Expression);
+            Assert.Equal(Expr.UnaryOperator.Plus, unary.Operator);
+            Assert.IsType<Expr.IntLiteral>(unary.Right);
+        }
+
+        [Fact]
         public void Parse_GroupedExpression_HasCorrectStructure()
         {
             // Arrange & Act
