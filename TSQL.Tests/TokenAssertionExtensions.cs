@@ -1,6 +1,6 @@
 namespace TSQL.Tests
 {
-    public static class TokenAssertionExtensions
+    internal static class TokenAssertionExtensions
     {
         public static TokenAssertion Should(this IEnumerable<Token> tokens)
         {
@@ -8,7 +8,7 @@ namespace TSQL.Tests
         }
     }
 
-    public class TokenAssertion
+    internal class TokenAssertion
     {
         private readonly List<Token> _tokens;
 

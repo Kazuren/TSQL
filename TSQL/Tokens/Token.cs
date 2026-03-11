@@ -125,7 +125,7 @@ namespace TSQL
     /// <summary>
     /// Abstract base class for tokens with shared functionality.
     /// </summary>
-    public abstract class Token : IToken, IEquatable<Token>
+    internal abstract class Token : IToken, IEquatable<Token>
     {
         private static readonly IReadOnlyList<Trivia> EmptyTrivia = Array.Empty<Trivia>();
 

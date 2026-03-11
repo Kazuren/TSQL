@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <ImplicitUsings>enable</ImplicitUsings>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\TSQL.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>

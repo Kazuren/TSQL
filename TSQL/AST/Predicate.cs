@@ -130,7 +130,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitComparisonPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
@@ -139,7 +139,7 @@ namespace TSQL.AST
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Left.WriteTo(sb);
                 _operatorToken.AppendTo(sb);
@@ -187,7 +187,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitLikePredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
@@ -204,7 +204,7 @@ namespace TSQL.AST
                 }
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Left.WriteTo(sb);
                 if (_notToken != null)
@@ -259,7 +259,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitBetweenPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Expr.DescendantTokens())
                     yield return token;
@@ -273,7 +273,7 @@ namespace TSQL.AST
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Expr.WriteTo(sb);
                 if (_notToken != null)
@@ -311,7 +311,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitNullPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Expr.DescendantTokens())
                     yield return token;
@@ -321,7 +321,7 @@ namespace TSQL.AST
                 yield return _nullToken;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Expr.WriteTo(sb);
                 _isToken.AppendTo(sb);
@@ -345,12 +345,12 @@ namespace TSQL.AST
         {
             internal Token _wildcardToken;
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 yield return _wildcardToken;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 _wildcardToken.AppendTo(sb);
             }
@@ -369,7 +369,7 @@ namespace TSQL.AST
                 Columns = columns;
             }
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 if (_leftParen != null)
                 {
@@ -383,7 +383,7 @@ namespace TSQL.AST
                 }
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 if (_leftParen != null)
                 {
@@ -427,7 +427,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitContainsPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 yield return _containsToken;
                 yield return _leftParen;
@@ -446,7 +446,7 @@ namespace TSQL.AST
                 yield return _rightParen;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 _containsToken.AppendTo(sb);
                 _leftParen.AppendTo(sb);
@@ -493,7 +493,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitFreetextPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 yield return _freetextToken;
                 yield return _leftParen;
@@ -512,7 +512,7 @@ namespace TSQL.AST
                 yield return _rightParen;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 _freetextToken.AppendTo(sb);
                 _leftParen.AppendTo(sb);
@@ -571,7 +571,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitInPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Expr.DescendantTokens())
                     yield return token;
@@ -592,7 +592,7 @@ namespace TSQL.AST
                 yield return _rightParen;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Expr.WriteTo(sb);
                 if (_notToken != null)
@@ -647,7 +647,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitQuantifierPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
@@ -657,7 +657,7 @@ namespace TSQL.AST
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Left.WriteTo(sb);
                 _operatorToken.AppendTo(sb);
@@ -688,14 +688,14 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitExistsPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 yield return _existsToken;
                 foreach (Token token in Subquery.DescendantTokens())
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 _existsToken.AppendTo(sb);
                 Subquery.WriteTo(sb);
@@ -725,7 +725,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitGroupingPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 yield return _leftParen;
                 foreach (Token token in Predicate.DescendantTokens())
@@ -733,7 +733,7 @@ namespace TSQL.AST
                 yield return _rightParen;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 _leftParen.AppendTo(sb);
                 Predicate.WriteTo(sb);
@@ -770,7 +770,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitAndPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
@@ -779,7 +779,7 @@ namespace TSQL.AST
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Left.WriteTo(sb);
                 _andToken.AppendTo(sb);
@@ -812,7 +812,7 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitOrPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
@@ -821,7 +821,7 @@ namespace TSQL.AST
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 Left.WriteTo(sb);
                 _orToken.AppendTo(sb);
@@ -847,14 +847,14 @@ namespace TSQL.AST
 
             public override T Accept<T>(Visitor<T> visitor) => visitor.VisitNotPredicate(this);
 
-            public override IEnumerable<Token> DescendantTokens()
+            internal override IEnumerable<Token> DescendantTokens()
             {
                 yield return _notToken;
                 foreach (Token token in Predicate.DescendantTokens())
                     yield return token;
             }
 
-            public override void WriteTo(StringBuilder sb)
+            internal override void WriteTo(StringBuilder sb)
             {
                 _notToken.AppendTo(sb);
                 Predicate.WriteTo(sb);

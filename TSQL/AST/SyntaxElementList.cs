@@ -63,7 +63,7 @@ namespace TSQL
             }
         }
 
-        public Token GetSeparator(int index)
+        internal Token GetSeparator(int index)
         {
             if (_separators != null && index < _separators.Count)
             {
@@ -83,7 +83,10 @@ namespace TSQL
         }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        public override IEnumerable<Token> DescendantTokens()
+        // T is constrained to ISyntaxElement (an interface) because SelectItem and Alias
+        // are interfaces, not classes — so the constraint can't be T : SyntaxElement.
+        // Every ISyntaxElement implementation is a SyntaxElement subclass, so this cast is safe.
+        internal override IEnumerable<Token> DescendantTokens()
         {
             if (_items == null)
             {
@@ -93,7 +96,8 @@ namespace TSQL
             for (int i = 0; i < _items.Count; i++)
             {
                 // Yield all tokens from the item
-                foreach (Token token in _items[i].DescendantTokens())
+                SyntaxElement element = (SyntaxElement)(object)_items[i];
+                foreach (Token token in element.DescendantTokens())
                 {
                     yield return token;
                 }
@@ -106,7 +110,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             if (_items == null)
             {
@@ -115,7 +119,7 @@ namespace TSQL
 
             for (int i = 0; i < _items.Count; i++)
             {
-                _items[i].WriteTo(sb);
+                ((SyntaxElement)(object)_items[i]).WriteTo(sb);
 
                 if (_separators != null && i < _separators.Count && _separators[i] != null)
                 {

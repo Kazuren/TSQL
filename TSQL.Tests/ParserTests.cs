@@ -3689,8 +3689,8 @@ namespace TSQL.Tests
         public void Execute_ReturnStatus_ParsedCorrectly()
         {
             Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC @ret = dbo.MyProc 1"));
-            Assert.NotNull(exec.ReturnVariable);
-            Assert.Equal("@ret", exec.ReturnVariable.Lexeme);
+            Assert.NotNull(exec.ReturnVariableName);
+            Assert.Equal("@ret", exec.ReturnVariableName);
         }
 
         [Fact]
@@ -3698,8 +3698,8 @@ namespace TSQL.Tests
         {
             Stmt.Execute exec = Assert.IsType<Stmt.Execute>(Stmt.ParseExecute("EXEC sp_Proc @p1 = 1, @p2 = 'hello'"));
             Assert.Equal(2, exec.Arguments.Count);
-            Assert.Equal("@p1", exec.Arguments[0].ParameterName.Lexeme);
-            Assert.Equal("@p2", exec.Arguments[1].ParameterName.Lexeme);
+            Assert.Equal("@p1", exec.Arguments[0].ParameterName);
+            Assert.Equal("@p2", exec.Arguments[1].ParameterName);
         }
 
         [Fact]
@@ -3964,7 +3964,7 @@ namespace TSQL.Tests
             Assert.Single(declare.Declarations);
 
             TableVariableDeclaration decl = Assert.IsType<TableVariableDeclaration>(declare.Declarations[0]);
-            Assert.Equal("@T", decl.Variable.Lexeme);
+            Assert.Equal("@T", decl.VariableName);
             Assert.NotNull(decl.TableDefinition);
             Assert.Single(decl.TableDefinition.Columns);
 

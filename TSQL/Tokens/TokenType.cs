@@ -1,6 +1,6 @@
 namespace TSQL
 {
-    public enum TokenType
+    internal enum TokenType
     {
         INVALID_TOKEN,
         IDENTIFIER,

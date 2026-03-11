@@ -51,7 +51,7 @@ namespace TSQL
             _variableToken = variable;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _variableToken;
             if (LiteralValue != null)
@@ -66,7 +66,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _variableToken.AppendTo(sb);
             if (LiteralValue != null)
@@ -103,7 +103,7 @@ namespace TSQL
 
         public SimpleQueryHint(QueryHintType hintType) : base(hintType) { }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             if (_hintToken2 != null)
@@ -112,7 +112,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             if (_hintToken2 != null)
@@ -136,7 +136,7 @@ namespace TSQL
             Value = value;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             if (_equalsToken != null)
@@ -149,7 +149,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             if (_equalsToken != null)
@@ -174,13 +174,13 @@ namespace TSQL
             _modeToken = modeToken;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _modeToken;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _modeToken.AppendTo(sb);
@@ -202,7 +202,7 @@ namespace TSQL
             OptimizeForVariables = optimizeForVariables;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _forToken;
@@ -214,7 +214,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _forToken.AppendTo(sb);
@@ -234,14 +234,14 @@ namespace TSQL
 
         public OptimizeForUnknownQueryHint() : base(QueryHintType.OptimizeForUnknown) { }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _forToken;
             yield return _unknownToken;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _forToken.AppendTo(sb);
@@ -264,7 +264,7 @@ namespace TSQL
             UseHintNames = useHintNames;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _hintToken2;
@@ -276,7 +276,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _hintToken2.AppendTo(sb);
@@ -299,7 +299,7 @@ namespace TSQL
             Value = value;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _planToken;
@@ -309,7 +309,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _planToken.AppendTo(sb);
@@ -335,7 +335,7 @@ namespace TSQL
             TableHints = tableHints;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _hintToken2;
@@ -355,7 +355,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _hintToken2.AppendTo(sb);
@@ -385,7 +385,7 @@ namespace TSQL
             Value = value;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
             yield return _timestampToken;
@@ -397,7 +397,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
             _timestampToken.AppendTo(sb);
@@ -427,7 +427,7 @@ namespace TSQL
             Hints = hints;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _optionToken;
             yield return _leftParen;
@@ -436,7 +436,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _optionToken.AppendTo(sb);
             _leftParen.AppendTo(sb);

@@ -2,7 +2,7 @@
 {
     public class ScannerTests
     {
-        public static TheoryData<string, TokenType> SingleCharacterTokens()
+        internal static TheoryData<string, TokenType> SingleCharacterTokens()
         {
             return new TheoryData<string, TokenType>
             {
@@ -25,7 +25,7 @@
             };
         }
 
-        public static TheoryData<string, TokenType> MultiCharacterOperators()
+        internal static TheoryData<string, TokenType> MultiCharacterOperators()
         {
             return new TheoryData<string, TokenType>
             {
@@ -38,7 +38,7 @@
             };
         }
 
-        public static TheoryData<string, TokenType, object> NumberTokens()
+        internal static TheoryData<string, TokenType, object> NumberTokens()
         {
             return new TheoryData<string, TokenType, object>
             {
@@ -107,8 +107,10 @@
         }
 
         [Theory]
-        [MemberData(nameof(SingleCharacterTokens))]
-        public void ScanTokens_SingleCharacterToken_ReturnsCorrectType(string input, TokenType expectedType)
+#pragma warning disable xUnit1016 // MemberData is internal because TokenType is internal
+        [MemberData(nameof(SingleCharacterTokens), DisableDiscoveryEnumeration = true)]
+#pragma warning restore xUnit1016
+        internal void ScanTokens_SingleCharacterToken_ReturnsCorrectType(string input, TokenType expectedType)
         {
             var scanner = new Scanner(input);
             var tokens = scanner.ScanTokens();
@@ -119,8 +121,10 @@
         }
 
         [Theory]
-        [MemberData(nameof(MultiCharacterOperators))]
-        public void ScanTokens_MultiCharacterOperator_ReturnsCorrectType(string input, TokenType expectedType)
+#pragma warning disable xUnit1016
+        [MemberData(nameof(MultiCharacterOperators), DisableDiscoveryEnumeration = true)]
+#pragma warning restore xUnit1016
+        internal void ScanTokens_MultiCharacterOperator_ReturnsCorrectType(string input, TokenType expectedType)
         {
             var scanner = new Scanner(input);
             var tokens = scanner.ScanTokens();
@@ -131,8 +135,10 @@
         }
 
         [Theory]
-        [MemberData(nameof(NumberTokens))]
-        public void ScanTokens_Number_ParsesCorrectly(string input, TokenType expectedType, object expectedLiteral)
+#pragma warning disable xUnit1016
+        [MemberData(nameof(NumberTokens), DisableDiscoveryEnumeration = true)]
+#pragma warning restore xUnit1016
+        internal void ScanTokens_Number_ParsesCorrectly(string input, TokenType expectedType, object expectedLiteral)
         {
             var scanner = new Scanner(input);
             var tokens = scanner.ScanTokens();
@@ -430,5 +436,5 @@
         }
     }
 
-    public record ExpectedToken(TokenType Type, string Lexeme, object? Literal = null);
+    internal record ExpectedToken(TokenType Type, string Lexeme, object? Literal = null);
 }

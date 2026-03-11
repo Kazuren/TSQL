@@ -31,7 +31,7 @@ namespace TSQL
             _fromToken = fromToken;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _fromToken;
 
@@ -41,7 +41,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _fromToken.AppendTo(sb);
             TableSources.WriteTo(sb);
@@ -96,7 +96,7 @@ namespace TSQL
             return visitor.VisitTableReference(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in TableName.DescendantTokens())
                 yield return token;
@@ -104,7 +104,7 @@ namespace TSQL
                 foreach (Token token in ForSystemTime.DescendantTokens())
                     yield return token;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
             if (Tablesample != null)
                 foreach (Token token in Tablesample.DescendantTokens())
@@ -114,13 +114,13 @@ namespace TSQL
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             TableName.WriteTo(sb);
             if (ForSystemTime != null)
                 ForSystemTime.WriteTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
             if (Tablesample != null)
                 Tablesample.WriteTo(sb);
             if (TableHints != null)
@@ -148,23 +148,23 @@ namespace TSQL
             return visitor.VisitSubqueryReference(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Subquery.DescendantTokens())
                 yield return token;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
             if (ColumnAliases != null)
                 foreach (Token token in ColumnAliases.DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             Subquery.WriteTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
             if (ColumnAliases != null)
                 ColumnAliases.WriteTo(sb);
         }
@@ -180,7 +180,7 @@ namespace TSQL
 
         internal Token _variableToken;
 
-        public TableVariableReference(Token variableToken)
+        internal TableVariableReference(Token variableToken)
         {
             _variableToken = variableToken;
         }
@@ -190,19 +190,19 @@ namespace TSQL
             return visitor.VisitTableVariableReference(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _variableToken;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _variableToken.AppendTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
         }
     }
 
@@ -249,7 +249,7 @@ namespace TSQL
             return visitor.VisitQualifiedJoin(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Left.DescendantTokens())
                 yield return token;
@@ -267,7 +267,7 @@ namespace TSQL
                 yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             Left.WriteTo(sb);
             if (_joinTypeToken != null)
@@ -312,7 +312,7 @@ namespace TSQL
             return visitor.VisitCrossJoin(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Left.DescendantTokens())
                 yield return token;
@@ -322,7 +322,7 @@ namespace TSQL
                 yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             Left.WriteTo(sb);
             _crossToken.AppendTo(sb);
@@ -362,7 +362,7 @@ namespace TSQL
             return visitor.VisitApplyJoin(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Left.DescendantTokens())
                 yield return token;
@@ -372,7 +372,7 @@ namespace TSQL
                 yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             Left.WriteTo(sb);
             _applyTypeToken.AppendTo(sb);
@@ -403,24 +403,24 @@ namespace TSQL
             return visitor.VisitParenthesizedTableSource(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _leftParen;
             foreach (Token token in Inner.DescendantTokens())
                 yield return token;
             yield return _rightParen;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _leftParen.AppendTo(sb);
             Inner.WriteTo(sb);
             _rightParen.AppendTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
         }
     }
 
@@ -474,7 +474,7 @@ namespace TSQL
             return visitor.VisitPivotTableSource(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Source.DescendantTokens())
                 yield return token;
@@ -492,11 +492,11 @@ namespace TSQL
             yield return _inRightParen;
             yield return _rightParen;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             Source.WriteTo(sb);
             _pivotToken.AppendTo(sb);
@@ -510,7 +510,7 @@ namespace TSQL
             _inRightParen.AppendTo(sb);
             _rightParen.AppendTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
         }
     }
 
@@ -564,7 +564,7 @@ namespace TSQL
             return visitor.VisitUnpivotTableSource(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in Source.DescendantTokens())
                 yield return token;
@@ -582,11 +582,11 @@ namespace TSQL
             yield return _inRightParen;
             yield return _rightParen;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             Source.WriteTo(sb);
             _unpivotToken.AppendTo(sb);
@@ -600,7 +600,7 @@ namespace TSQL
             _inRightParen.AppendTo(sb);
             _rightParen.AppendTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
         }
     }
 
@@ -623,7 +623,7 @@ namespace TSQL
             return visitor.VisitValuesTableSource(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _outerLeftParen;
             yield return _valuesToken;
@@ -631,21 +631,21 @@ namespace TSQL
                 yield return token;
             yield return _outerRightParen;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
             if (ColumnAliases != null)
                 foreach (Token token in ColumnAliases.DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _outerLeftParen.AppendTo(sb);
             _valuesToken.AppendTo(sb);
             Rows.WriteTo(sb);
             _outerRightParen.AppendTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
             if (ColumnAliases != null)
                 ColumnAliases.WriteTo(sb);
         }
@@ -665,20 +665,20 @@ namespace TSQL
             return visitor.VisitRowsetFunctionReference(this);
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             foreach (Token token in FunctionCall.DescendantTokens())
                 yield return token;
             if (Alias != null)
-                foreach (Token token in Alias.DescendantTokens())
+                foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             FunctionCall.WriteTo(sb);
             if (Alias != null)
-                Alias.WriteTo(sb);
+                ((SyntaxElement)Alias).WriteTo(sb);
         }
     }
 
@@ -698,7 +698,7 @@ namespace TSQL
             Values = values;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _leftParen;
             foreach (Token token in Values.DescendantTokens())
@@ -706,7 +706,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _leftParen.AppendTo(sb);
             Values.WriteTo(sb);
@@ -726,7 +726,7 @@ namespace TSQL
             ColumnNames = columnNames;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _leftParen;
             foreach (Token token in ColumnNames.DescendantTokens())
@@ -734,7 +734,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _leftParen.AppendTo(sb);
             ColumnNames.WriteTo(sb);
@@ -763,7 +763,7 @@ namespace TSQL
             EndTime = endTime;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _forToken;
             yield return _systemTimeToken;
@@ -809,7 +809,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _forToken.AppendTo(sb);
             _systemTimeToken.AppendTo(sb);
@@ -871,7 +871,7 @@ namespace TSQL
             RepeatSeed = repeatSeed;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _tablesampleToken;
             if (_systemToken != null)
@@ -891,7 +891,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _tablesampleToken.AppendTo(sb);
             if (_systemToken != null)
@@ -935,7 +935,7 @@ namespace TSQL
             Hints = hints;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _withToken;
             yield return _leftParen;
@@ -944,7 +944,7 @@ namespace TSQL
             yield return _rightParen;
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _withToken.AppendTo(sb);
             _leftParen.AppendTo(sb);
@@ -992,7 +992,7 @@ namespace TSQL
             SpatialMaxCellsValue = spatialMaxCellsValue;
         }
 
-        public override IEnumerable<Token> DescendantTokens()
+        internal override IEnumerable<Token> DescendantTokens()
         {
             yield return _hintToken;
 
@@ -1034,7 +1034,7 @@ namespace TSQL
             }
         }
 
-        public override void WriteTo(StringBuilder sb)
+        internal override void WriteTo(StringBuilder sb)
         {
             _hintToken.AppendTo(sb);
 

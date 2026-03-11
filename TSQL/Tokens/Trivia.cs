@@ -2,7 +2,7 @@ using System.Text;
 
 namespace TSQL
 {
-    public interface Trivia
+    internal interface Trivia
     {
         string Content { get; }
 
@@ -13,7 +13,7 @@ namespace TSQL
         void AppendTo(StringBuilder sb);
     }
 
-    public abstract class TriviaBase : Trivia
+    internal abstract class TriviaBase : Trivia
     {
         private readonly string _source;
         private readonly int _start;
@@ -53,7 +53,7 @@ namespace TSQL
         }
     }
 
-    public class Whitespace : TriviaBase
+    internal class Whitespace : TriviaBase
     {
         internal static readonly Whitespace Space = new Whitespace(" ");
 
@@ -61,7 +61,7 @@ namespace TSQL
         public Whitespace(string content) : base(content) { }
     }
 
-    public class Comment : TriviaBase
+    internal class Comment : TriviaBase
     {
         public Comment(string source, int start, int length) : base(source, start, length) { }
         public Comment(string content) : base(content) { }

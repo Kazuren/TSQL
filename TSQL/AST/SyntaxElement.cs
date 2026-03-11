@@ -5,9 +5,7 @@ namespace TSQL
 {
     public interface ISyntaxElement
     {
-        IEnumerable<Token> DescendantTokens();
         string ToSource();
-        void WriteTo(StringBuilder sb);
     }
 
     public abstract class SyntaxElement : ISyntaxElement
@@ -16,7 +14,7 @@ namespace TSQL
         /// Returns all tokens under this node in document order.
         /// This is the single source of truth for source text.
         /// </summary>
-        public abstract IEnumerable<Token> DescendantTokens();
+        internal abstract IEnumerable<Token> DescendantTokens();
 
         /// <summary>
         /// Appends this node's source text directly to a StringBuilder.
@@ -30,7 +28,7 @@ namespace TSQL
         /// BuildTokenChain, and SpliceTokenChain need structured access to
         /// individual tokens — not a flat string.
         /// </summary>
-        public virtual void WriteTo(StringBuilder sb)
+        internal virtual void WriteTo(StringBuilder sb)
         {
             foreach (Token token in DescendantTokens())
             {
@@ -51,7 +49,7 @@ namespace TSQL
             return null;
         }
 
-        internal static Token FirstTokenOf(ISyntaxElement element)
+        internal static Token FirstTokenOf(SyntaxElement element)
         {
             foreach (Token t in element.DescendantTokens()) return t;
             return null;
@@ -64,7 +62,7 @@ namespace TSQL
             return last;
         }
 
-        internal static Token LastTokenOf(ISyntaxElement element)
+        internal static Token LastTokenOf(SyntaxElement element)
         {
             Token last = null;
             foreach (Token t in element.DescendantTokens()) last = t;
@@ -104,7 +102,7 @@ namespace TSQL
         /// <summary>
         /// Builds a doubly-linked list of tokens in document order. Called once after parsing.
         /// </summary>
-        internal static void BuildTokenChain(ISyntaxElement root)
+        internal static void BuildTokenChain(SyntaxElement root)
         {
             Token prev = null;
             foreach (Token token in root.DescendantTokens())
@@ -148,7 +146,7 @@ namespace TSQL
         /// replacing any existing leading trivia on the target.
         /// Used by property setters to preserve whitespace when replacing child nodes.
         /// </summary>
-        internal static void TransferLeadingTrivia(ISyntaxElement from, ISyntaxElement to)
+        internal static void TransferLeadingTrivia(SyntaxElement from, SyntaxElement to)
         {
             Token fromToken = FirstTokenOf(from);
             Token toToken = FirstTokenOf(to);
@@ -167,12 +165,15 @@ namespace TSQL
         /// maintains the token linked list, and ensures adjacent tokens don't merge.
         /// This is the single source of truth for trivia-aware replacement.
         /// </summary>
+        // T is constrained to ISyntaxElement (an interface) because SelectItem and Alias
+        // are interfaces, not classes — so the constraint can't be T : SyntaxElement.
+        // Every ISyntaxElement implementation is a SyntaxElement subclass, so the cast is safe.
         internal static T SetWithTrivia<T>(T oldValue, T newValue) where T : class, ISyntaxElement
         {
             if (oldValue != null && newValue != null)
             {
-                TransferLeadingTrivia(oldValue, newValue);
-                SpliceTokenChain(oldValue, newValue);
+                TransferLeadingTrivia((SyntaxElement)(object)oldValue, (SyntaxElement)(object)newValue);
+                SpliceTokenChain((SyntaxElement)(object)oldValue, (SyntaxElement)(object)newValue);
             }
             return newValue;
         }
@@ -182,7 +183,7 @@ namespace TSQL
         /// Builds internal prev/next links for the new tokens and splices them in place,
         /// then ensures adjacent tokens at the boundaries don't merge.
         /// </summary>
-        private static void SpliceTokenChain(ISyntaxElement oldValue, ISyntaxElement newValue)
+        private static void SpliceTokenChain(SyntaxElement oldValue, SyntaxElement newValue)
         {
             // Find the first and last tokens of the old element in a single pass
             Token oldFirst = null;
@@ -251,7 +252,7 @@ namespace TSQL
         /// <summary>
         /// Convenience overload that assigns directly to a backing field.
         /// </summary>
-        internal static void SetWithTrivia<T>(ref T field, T value) where T : class, ISyntaxElement
+        internal static void SetWithTrivia<T>(ref T field, T value) where T : SyntaxElement
         {
             field = SetWithTrivia(field, value);
         }
