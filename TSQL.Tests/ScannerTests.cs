@@ -223,6 +223,21 @@
         }
 
         [Fact]
+        public void ScanTokens_GlobalVariable_ScannedAsSingleToken()
+        {
+            Scanner scanner = new Scanner("SELECT @@SERVERNAME AS SERVERNAME");
+            List<SourceToken> tokens = scanner.ScanTokens();
+            tokens.Should().MatchExpectedTokens(new[]
+            {
+                new ExpectedToken(TokenType.SELECT, "SELECT"),
+                new ExpectedToken(TokenType.VARIABLE, "@@SERVERNAME"),
+                new ExpectedToken(TokenType.AS, "AS"),
+                new ExpectedToken(TokenType.IDENTIFIER, "SERVERNAME"),
+                new ExpectedToken(TokenType.EOF, "")
+            });
+        }
+
+        [Fact]
         public void ScanTokens_MultilineString_TracksLineNumbers()
         {
             var scanner = new Scanner("'line1\nline2'");

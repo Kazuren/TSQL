@@ -214,6 +214,11 @@ namespace TSQL
 
         private void Variable()
         {
+            if (Peek() == '@')
+            {
+                Advance();
+            }
+
             while (IsAlphaNumeric(Peek()))
             {
                 Advance();

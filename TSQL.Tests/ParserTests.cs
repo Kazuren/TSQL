@@ -709,6 +709,8 @@ namespace TSQL.Tests
         [InlineData("SELECT RIGHT(FILENAME, CHARINDEX('.', REVERSE(FILENAME)) - 1) FROM T")]
         [InlineData("SELECT LEFT(Name, 3) AS Prefix, RIGHT(Name, 3) AS Suffix FROM T")]
         [InlineData("SELECT @P0 FROM T")]
+        [InlineData("SELECT @@SERVERNAME AS SERVERNAME")]
+        [InlineData("SELECT @@ROWCOUNT")]
         // FROM clause - qualified names
         [InlineData("SELECT a FROM dbo.T")]
         [InlineData("SELECT a FROM MyDb.dbo.T")]
