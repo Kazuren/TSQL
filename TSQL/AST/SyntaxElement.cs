@@ -18,6 +18,18 @@ namespace TSQL
         /// </summary>
         public abstract IEnumerable<Token> DescendantTokens();
 
+        /// <summary>
+        /// Appends this node's source text directly to a StringBuilder.
+        /// Each AST node overrides this to write its tokens and children
+        /// without allocating enumerator state machines — DescendantTokens()
+        /// uses yield return, which boxes a state machine at every nesting
+        /// level. For a simple SELECT query, that overhead is ~4x the cost
+        /// of the actual string. WriteTo duplicates the traversal logic of
+        /// DescendantTokens but writes directly, eliminating those allocations.
+        /// DescendantTokens cannot be removed because FirstToken, LastToken,
+        /// BuildTokenChain, and SpliceTokenChain need structured access to
+        /// individual tokens — not a flat string.
+        /// </summary>
         public virtual void WriteTo(StringBuilder sb)
         {
             foreach (Token token in DescendantTokens())
