@@ -2213,7 +2213,7 @@ namespace TSQL.Tests
         [Fact]
         public void Construct_StringLiteral_DefaultsToRegular()
         {
-            var lit = new Expr.StringLiteral("hello");
+            Expr.StringLiteral lit = new Expr.StringLiteral("hello");
             Assert.Equal(Expr.StringKind.Regular, lit.Kind);
             Assert.Equal("'hello'", lit.ToSource().Trim());
         }
@@ -2221,7 +2221,7 @@ namespace TSQL.Tests
         [Fact]
         public void Construct_UnicodeStringLiteral_ProducesNPrefix()
         {
-            var lit = new Expr.StringLiteral("hello", Expr.StringKind.Unicode);
+            Expr.StringLiteral lit = new Expr.StringLiteral("hello", Expr.StringKind.Unicode);
             Assert.Equal(Expr.StringKind.Unicode, lit.Kind);
             Assert.Equal("N'hello'", lit.ToSource().Trim());
         }
@@ -2229,7 +2229,7 @@ namespace TSQL.Tests
         [Fact]
         public void StringLiteral_SetKindToUnicode_UpdatesSource()
         {
-            var lit = new Expr.StringLiteral("hello");
+            Expr.StringLiteral lit = new Expr.StringLiteral("hello");
             Assert.Equal(Expr.StringKind.Regular, lit.Kind);
 
             lit.Kind = Expr.StringKind.Unicode;
