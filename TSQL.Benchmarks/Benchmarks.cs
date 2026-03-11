@@ -75,31 +75,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT Id, (SELECT COUNT(*) FROM Orders WHERE UserId = u.Id) AS OrderCount, a + b * c, COALESCE(x, y, z) FROM Users u";
 
         [Benchmark(Description = "2 columns")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "Aliases + qualified identifiers")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "Subquery + expressions + COALESCE")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -123,31 +105,13 @@ namespace TSQL.Benchmarks
             FROM SalesData";
 
         [Benchmark(Description = "ROW_NUMBER() simple")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "PARTITION BY + frame clause")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "6 window functions")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -163,31 +127,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT dbo.MyFunction(a, b), sys.fn_listextendedproperty(NULL, NULL, NULL, NULL, NULL, NULL, NULL) FROM T";
 
         [Benchmark(Description = "No-args + single arg")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "Multi-arg + nested calls")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "Schema-qualified functions")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -203,31 +149,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT Id FROM T WHERE (A = 1 OR B = 2) AND NOT EXISTS (SELECT 1 FROM Orders o WHERE o.UserId = T.Id AND o.Total > 100) AND (C > 3 OR (D < 4 AND E = 5))";
 
         [Benchmark(Description = "Comparison + AND")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "IN + BETWEEN + LIKE")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "EXISTS + complex boolean")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -243,31 +171,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT d.Name, e.TopSalary FROM Departments d CROSS APPLY (SELECT TOP 1 Salary AS TopSalary FROM Employees WHERE DeptId = d.Id ORDER BY Salary DESC) e FULL OUTER JOIN Summary s ON d.Id = s.DeptId";
 
         [Benchmark(Description = "Single INNER JOIN")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "4-table join chain")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "CROSS APPLY + FULL OUTER JOIN")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -283,31 +193,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT CASE WHEN A = 1 THEN CASE WHEN B = 2 THEN 'X' ELSE 'Y' END ELSE CASE WHEN C = 3 THEN 'Z' ELSE 'W' END END, IIF(Score >= 90, 'A', IIF(Score >= 80, 'B', IIF(Score >= 70, 'C', 'F'))), TRY_CAST(Value AS INT), TRY_CONVERT(DATE, DateStr, 101) FROM T";
 
         [Benchmark(Description = "Simple CASE + CAST")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "Searched CASE + CONVERT + IIF")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "Nested CASE + nested IIF + TRY variants")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -323,31 +215,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "WITH ranked(Id, Name, Rnk) AS (SELECT Id, Name, ROW_NUMBER() OVER (ORDER BY Id) FROM Users) SELECT Id, Name FROM ranked WHERE Rnk <= 10";
 
         [Benchmark(Description = "Single CTE")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "3 CTEs with joins")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "CTE with column list + window function")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -363,31 +237,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT Id, Name FROM Users UNION ALL SELECT Id, Name FROM Customers ORDER BY Name OFFSET 10 ROWS FETCH NEXT 20 ROWS ONLY";
 
         [Benchmark(Description = "Single UNION ALL")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "Mixed set operations chain")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "UNION + ORDER BY + OFFSET")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -403,31 +259,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT Id FROM Users u WITH (NOLOCK) INNER JOIN Orders o WITH (ROWLOCK) ON u.Id = o.UserId OPTION (HASH JOIN, MAXDOP 4, OPTIMIZE FOR UNKNOWN, USE HINT ('FORCE_LEGACY_CARDINALITY_ESTIMATION'))";
 
         [Benchmark(Description = "Single table hint")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "Table + query hint")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "Multi-table + complex query hints")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     /// <summary>
@@ -443,31 +281,13 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT Year, [Q1], [Q2], [Q3], [Q4] FROM SalesData PIVOT (SUM(Amount) FOR Quarter IN ([Q1], [Q2], [Q3], [Q4])) AS pvt FOR XML PATH('Year'), ROOT('Sales'), ELEMENTS, TYPE";
 
         [Benchmark(Description = "ROLLUP + OFFSET/FETCH")]
-        public Stmt Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Simple() { return Stmt.Parse(SimpleQuery); }
 
         [Benchmark(Description = "GROUPING SETS + FOR JSON")]
-        public Stmt Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Medium() { return Stmt.Parse(MediumQuery); }
 
         [Benchmark(Description = "PIVOT + FOR XML")]
-        public Stmt Complex()
-        {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt Complex() { return Stmt.Parse(ComplexQuery); }
     }
 
     #endregion
@@ -487,34 +307,47 @@ namespace TSQL.Benchmarks
         private const string ComplexQuery = "SELECT SUM(Amount) OVER (ORDER BY Date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RunningTotal FROM Orders";
 
         [Benchmark(Description = "Simple query")]
-        public string Simple()
-        {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            var stmt = parser.Parse();
-            return stmt.ToSource();
-        }
+        public string Simple() { return Stmt.Parse(SimpleQuery).ToSource(); }
 
         [Benchmark(Description = "Window function")]
-        public string Medium()
-        {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            var stmt = parser.Parse();
-            return stmt.ToSource();
-        }
+        public string Medium() { return Stmt.Parse(MediumQuery).ToSource(); }
 
         [Benchmark(Description = "Window with frame clause")]
-        public string Complex()
+        public string Complex() { return Stmt.Parse(ComplexQuery).ToSource(); }
+    }
+
+    /// <summary>
+    /// Benchmarks for isolated ToSource (AST → string) without parsing overhead
+    /// </summary>
+    [CPUUsageDiagnoser]
+    [MemoryDiagnoser]
+    [BenchmarkCategory("ToSource")]
+    public class ToSourceBenchmarks
+    {
+        private const string SimpleQuery = "SELECT Id, Name, Email FROM Users";
+        private const string MediumQuery = "SELECT ROW_NUMBER() OVER (PARTITION BY Dept ORDER BY Salary DESC) AS Rank FROM Employees";
+        private const string ComplexQuery = "SELECT SUM(Amount) OVER (ORDER BY Date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RunningTotal FROM Orders";
+
+        private Stmt _simpleStmt;
+        private Stmt _mediumStmt;
+        private Stmt _complexStmt;
+
+        [GlobalSetup]
+        public void Setup()
         {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            var stmt = parser.Parse();
-            return stmt.ToSource();
+            _simpleStmt = Stmt.Parse(SimpleQuery);
+            _mediumStmt = Stmt.Parse(MediumQuery);
+            _complexStmt = Stmt.Parse(ComplexQuery);
         }
+
+        [Benchmark(Description = "Simple query")]
+        public string Simple() { return _simpleStmt.ToSource(); }
+
+        [Benchmark(Description = "Window function")]
+        public string Medium() { return _mediumStmt.ToSource(); }
+
+        [Benchmark(Description = "Window with frame clause")]
+        public string Complex() { return _complexStmt.ToSource(); }
     }
 
     /// <summary>
@@ -536,13 +369,7 @@ namespace TSQL.Benchmarks
         }
 
         [Benchmark(Description = "Full pipeline (scan + parse)", Baseline = true)]
-        public Stmt FullPipeline()
-        {
-            Scanner scanner = new Scanner(Query);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            return parser.Parse();
-        }
+        public Stmt FullPipeline() { return Stmt.Parse(Query); }
 
         [Benchmark(Description = "Parse only (pre-tokenized)")]
         public Stmt ParseOnly()
@@ -580,10 +407,7 @@ namespace TSQL.Benchmarks
             Stmt[] results = new Stmt[Queries.Length];
             for (int i = 0; i < Queries.Length; i++)
             {
-                Scanner scanner = new Scanner(Queries[i]);
-                var tokens = scanner.ScanTokens();
-                Parser parser = new Parser(tokens);
-                results[i] = parser.Parse();
+                results[i] = Stmt.Parse(Queries[i]);
             }
             return results;
         }
@@ -595,10 +419,7 @@ namespace TSQL.Benchmarks
             Stmt[] results = new Stmt[100];
             for (int i = 0; i < 100; i++)
             {
-                Scanner scanner = new Scanner(query);
-                var tokens = scanner.ScanTokens();
-                Parser parser = new Parser(tokens);
-                results[i] = parser.Parse();
+                results[i] = Stmt.Parse(query);
             }
             return results;
         }
@@ -623,10 +444,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "No existing WHERE")]
         public string Simple()
         {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(SimpleQuery);
             stmt.AddCondition("Active = 1");
             return stmt.ToSource();
         }
@@ -634,10 +452,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Existing WHERE + compound condition")]
         public string Medium()
         {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(MediumQuery);
             stmt.AddCondition("u.Active = 1 AND u.Status = 'verified'");
             return stmt.ToSource();
         }
@@ -645,10 +460,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "CTE + UNION with WhereClauseTarget.All")]
         public string Complex()
         {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(ComplexQuery);
             stmt.AddCondition("CreatedDate > '2024-01-01'", WhereClauseTarget.All);
             return stmt.ToSource();
         }
@@ -709,10 +521,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Single table, single column")]
         public string Simple()
         {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(SimpleQuery);
             stmt.AddSchemaAwareCondition("I_ID = 0", SimpleChecker);
             return stmt.ToSource();
         }
@@ -720,10 +529,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Multi-table JOIN with alias resolution")]
         public string Medium()
         {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(MediumQuery);
             stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", MediumChecker);
             return stmt.ToSource();
         }
@@ -731,10 +537,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "CTE + JOIN with mixed prefixed/unprefixed columns")]
         public string Complex()
         {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(ComplexQuery);
             stmt.AddSchemaAwareCondition("T2.STATUS = 1 AND I_ID = 0", ComplexChecker, WhereClauseTarget.All);
             return stmt.ToSource();
         }
@@ -760,10 +563,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "No collision, single param")]
         public string Simple()
         {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(SimpleQuery);
             stmt.AddCondition("Active = @Active", SimpleValues, out _);
             return stmt.ToSource();
         }
@@ -771,10 +571,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "@P0 collision + multiple params")]
         public string Medium()
         {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(MediumQuery);
             stmt.AddCondition("Active = @P0 AND Age > @P1", MediumValues, out _);
             return stmt.ToSource();
         }
@@ -782,10 +579,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "Chained calls with cascading collisions")]
         public string Complex()
         {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(ComplexQuery);
             stmt.AddCondition("Active = @P0", ComplexValues1, out _);
             stmt.AddCondition("Region = @P0", ComplexValues2, out _);
             return stmt.ToSource();
@@ -815,10 +609,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "1 literal")]
         public string Simple()
         {
-            Scanner scanner = new Scanner(SimpleQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(SimpleQuery);
             stmt.Parameterize(out _);
             return stmt.ToSource();
         }
@@ -826,10 +617,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "6 literals across WHERE + IN")]
         public string Medium()
         {
-            Scanner scanner = new Scanner(MediumQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(MediumQuery);
             stmt.Parameterize(out _);
             return stmt.ToSource();
         }
@@ -837,10 +625,7 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "10+ literals with CASE + BETWEEN + IN + collision")]
         public string Complex()
         {
-            Scanner scanner = new Scanner(ComplexQuery);
-            var tokens = scanner.ScanTokens();
-            Parser parser = new Parser(tokens);
-            Stmt stmt = parser.Parse();
+            Stmt stmt = Stmt.Parse(ComplexQuery);
             stmt.Parameterize(out _);
             return stmt.ToSource();
         }
@@ -884,9 +669,9 @@ namespace TSQL.Benchmarks
         [GlobalSetup]
         public void Setup()
         {
-            _simpleStmt = new Parser(new Scanner(SimpleQuery).ScanTokens()).Parse();
-            _mediumStmt = new Parser(new Scanner(MediumQuery).ScanTokens()).Parse();
-            _complexStmt = new Parser(new Scanner(ComplexQuery).ScanTokens()).Parse();
+            _simpleStmt = Stmt.Parse(SimpleQuery);
+            _mediumStmt = Stmt.Parse(MediumQuery);
+            _complexStmt = Stmt.Parse(ComplexQuery);
         }
 
         [Benchmark(Description = "1 table")]
@@ -946,9 +731,9 @@ namespace TSQL.Benchmarks
         [GlobalSetup]
         public void Setup()
         {
-            _simpleStmt = new Parser(new Scanner(SimpleQuery).ScanTokens()).Parse();
-            _mediumStmt = new Parser(new Scanner(MediumQuery).ScanTokens()).Parse();
-            _complexStmt = new Parser(new Scanner(ComplexQuery).ScanTokens()).Parse();
+            _simpleStmt = Stmt.Parse(SimpleQuery);
+            _mediumStmt = Stmt.Parse(MediumQuery);
+            _complexStmt = Stmt.Parse(ComplexQuery);
         }
 
         [Benchmark(Description = "3 columns, SELECT only")]
