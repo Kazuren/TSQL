@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 
 namespace TSQL
 {
@@ -38,6 +39,12 @@ namespace TSQL
             {
                 yield return token;
             }
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _fromToken.AppendTo(sb);
+            TableSources.WriteTo(sb);
         }
     }
 
@@ -106,6 +113,19 @@ namespace TSQL
                 foreach (Token token in TableHints.DescendantTokens())
                     yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            TableName.WriteTo(sb);
+            if (ForSystemTime != null)
+                ForSystemTime.WriteTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
+            if (Tablesample != null)
+                Tablesample.WriteTo(sb);
+            if (TableHints != null)
+                TableHints.WriteTo(sb);
+        }
     }
 
     public class SubqueryReference : TableSource
@@ -139,6 +159,15 @@ namespace TSQL
                 foreach (Token token in ColumnAliases.DescendantTokens())
                     yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            Subquery.WriteTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
+            if (ColumnAliases != null)
+                ColumnAliases.WriteTo(sb);
+        }
     }
 
     public class TableVariableReference : TableSource
@@ -167,6 +196,13 @@ namespace TSQL
             if (Alias != null)
                 foreach (Token token in Alias.DescendantTokens())
                     yield return token;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _variableToken.AppendTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
         }
     }
 
@@ -230,6 +266,21 @@ namespace TSQL
             foreach (Token token in OnCondition.DescendantTokens())
                 yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            Left.WriteTo(sb);
+            if (_joinTypeToken != null)
+                _joinTypeToken.AppendTo(sb);
+            if (_outerToken != null)
+                _outerToken.AppendTo(sb);
+            if (_joinHintToken != null)
+                _joinHintToken.AppendTo(sb);
+            _joinToken.AppendTo(sb);
+            Right.WriteTo(sb);
+            _onToken.AppendTo(sb);
+            OnCondition.WriteTo(sb);
+        }
     }
 
     public class CrossJoin : TableSource
@@ -269,6 +320,14 @@ namespace TSQL
             yield return _joinToken;
             foreach (Token token in Right.DescendantTokens())
                 yield return token;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            Left.WriteTo(sb);
+            _crossToken.AppendTo(sb);
+            _joinToken.AppendTo(sb);
+            Right.WriteTo(sb);
         }
     }
 
@@ -312,6 +371,14 @@ namespace TSQL
             foreach (Token token in Right.DescendantTokens())
                 yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            Left.WriteTo(sb);
+            _applyTypeToken.AppendTo(sb);
+            _applyToken.AppendTo(sb);
+            Right.WriteTo(sb);
+        }
     }
 
     public class ParenthesizedTableSource : TableSource
@@ -345,6 +412,15 @@ namespace TSQL
             if (Alias != null)
                 foreach (Token token in Alias.DescendantTokens())
                     yield return token;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _leftParen.AppendTo(sb);
+            Inner.WriteTo(sb);
+            _rightParen.AppendTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
         }
     }
 
@@ -419,6 +495,23 @@ namespace TSQL
                 foreach (Token token in Alias.DescendantTokens())
                     yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            Source.WriteTo(sb);
+            _pivotToken.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            AggregateFunction.WriteTo(sb);
+            _forToken.AppendTo(sb);
+            PivotColumn.WriteTo(sb);
+            _inToken.AppendTo(sb);
+            _inLeftParen.AppendTo(sb);
+            ValueList.WriteTo(sb);
+            _inRightParen.AppendTo(sb);
+            _rightParen.AppendTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
+        }
     }
 
     public class UnpivotTableSource : TableSource
@@ -492,6 +585,23 @@ namespace TSQL
                 foreach (Token token in Alias.DescendantTokens())
                     yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            Source.WriteTo(sb);
+            _unpivotToken.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            ValueColumn.WriteTo(sb);
+            _forToken.AppendTo(sb);
+            PivotColumn.WriteTo(sb);
+            _inToken.AppendTo(sb);
+            _inLeftParen.AppendTo(sb);
+            ColumnList.WriteTo(sb);
+            _inRightParen.AppendTo(sb);
+            _rightParen.AppendTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
+        }
     }
 
     public class ValuesTableSource : TableSource
@@ -527,6 +637,18 @@ namespace TSQL
                 foreach (Token token in ColumnAliases.DescendantTokens())
                     yield return token;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _outerLeftParen.AppendTo(sb);
+            _valuesToken.AppendTo(sb);
+            Rows.WriteTo(sb);
+            _outerRightParen.AppendTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
+            if (ColumnAliases != null)
+                ColumnAliases.WriteTo(sb);
+        }
     }
 
     public class RowsetFunctionReference : TableSource
@@ -550,6 +672,13 @@ namespace TSQL
             if (Alias != null)
                 foreach (Token token in Alias.DescendantTokens())
                     yield return token;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            FunctionCall.WriteTo(sb);
+            if (Alias != null)
+                Alias.WriteTo(sb);
         }
     }
 
@@ -576,6 +705,13 @@ namespace TSQL
                 yield return token;
             yield return _rightParen;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _leftParen.AppendTo(sb);
+            Values.WriteTo(sb);
+            _rightParen.AppendTo(sb);
+        }
     }
 
     public class DerivedColumnAliases : SyntaxElement
@@ -596,6 +732,13 @@ namespace TSQL
             foreach (Token token in ColumnNames.DescendantTokens())
                 yield return token;
             yield return _rightParen;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _leftParen.AppendTo(sb);
+            ColumnNames.WriteTo(sb);
+            _rightParen.AppendTo(sb);
         }
     }
 
@@ -665,6 +808,45 @@ namespace TSQL
                     break;
             }
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _forToken.AppendTo(sb);
+            _systemTimeToken.AppendTo(sb);
+
+            switch (TimeType)
+            {
+                case SystemTimeType.AsOf:
+                    _typeKeyword1.AppendTo(sb);
+                    _typeKeyword2.AppendTo(sb);
+                    StartTime.WriteTo(sb);
+                    break;
+                case SystemTimeType.FromTo:
+                    _typeKeyword1.AppendTo(sb);
+                    StartTime.WriteTo(sb);
+                    _typeKeyword2.AppendTo(sb);
+                    EndTime.WriteTo(sb);
+                    break;
+                case SystemTimeType.BetweenAnd:
+                    _typeKeyword1.AppendTo(sb);
+                    StartTime.WriteTo(sb);
+                    _typeKeyword2.AppendTo(sb);
+                    EndTime.WriteTo(sb);
+                    break;
+                case SystemTimeType.ContainedIn:
+                    _typeKeyword1.AppendTo(sb);
+                    _typeKeyword2.AppendTo(sb);
+                    _leftParen.AppendTo(sb);
+                    StartTime.WriteTo(sb);
+                    _comma.AppendTo(sb);
+                    EndTime.WriteTo(sb);
+                    _rightParen.AppendTo(sb);
+                    break;
+                case SystemTimeType.All:
+                    _typeKeyword1.AppendTo(sb);
+                    break;
+            }
+        }
     }
 
     public class TablesampleClause : SyntaxElement
@@ -708,6 +890,24 @@ namespace TSQL
                 yield return _repeatRightParen;
             }
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _tablesampleToken.AppendTo(sb);
+            if (_systemToken != null)
+                _systemToken.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            SampleSize.WriteTo(sb);
+            _unitToken.AppendTo(sb);
+            _rightParen.AppendTo(sb);
+            if (RepeatSeed != null)
+            {
+                _repeatableToken.AppendTo(sb);
+                _repeatLeftParen.AppendTo(sb);
+                RepeatSeed.WriteTo(sb);
+                _repeatRightParen.AppendTo(sb);
+            }
+        }
     }
 
     #endregion
@@ -742,6 +942,14 @@ namespace TSQL
             foreach (Token token in Hints.DescendantTokens())
                 yield return token;
             yield return _rightParen;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _withToken.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            Hints.WriteTo(sb);
+            _rightParen.AppendTo(sb);
         }
     }
 
@@ -822,6 +1030,43 @@ namespace TSQL
                     yield return _equalsToken;
                     foreach (Token token in SpatialMaxCellsValue.DescendantTokens())
                         yield return token;
+                    break;
+            }
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+
+            switch (HintType)
+            {
+                case TableHintType.Index:
+                    if (_equalsToken != null)
+                    {
+                        _equalsToken.AppendTo(sb);
+                        IndexValues.WriteTo(sb);
+                    }
+                    else
+                    {
+                        _leftParen.AppendTo(sb);
+                        IndexValues.WriteTo(sb);
+                        _rightParen.AppendTo(sb);
+                    }
+                    break;
+                case TableHintType.ForceSeek:
+                    if (ForceSeekIndexValue != null)
+                    {
+                        _leftParen.AppendTo(sb);
+                        ForceSeekIndexValue.WriteTo(sb);
+                        _innerLeftParen.AppendTo(sb);
+                        ForceSeekColumns.WriteTo(sb);
+                        _innerRightParen.AppendTo(sb);
+                        _rightParen.AppendTo(sb);
+                    }
+                    break;
+                case TableHintType.SpatialWindowMaxCells:
+                    _equalsToken.AppendTo(sb);
+                    SpatialMaxCellsValue.WriteTo(sb);
                     break;
             }
         }

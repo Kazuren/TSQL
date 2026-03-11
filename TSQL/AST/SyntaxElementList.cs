@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 
 namespace TSQL
 {
@@ -101,6 +102,24 @@ namespace TSQL
                 if (_separators != null && i < _separators.Count && _separators[i] != null)
                 {
                     yield return _separators[i];
+                }
+            }
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            if (_items == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _items.Count; i++)
+            {
+                _items[i].WriteTo(sb);
+
+                if (_separators != null && i < _separators.Count && _separators[i] != null)
+                {
+                    _separators[i].AppendTo(sb);
                 }
             }
         }

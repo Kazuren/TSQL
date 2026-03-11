@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 
 namespace TSQL
 {
@@ -64,6 +65,20 @@ namespace TSQL
                 yield return _unknownToken;
             }
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _variableToken.AppendTo(sb);
+            if (LiteralValue != null)
+            {
+                _equalsToken.AppendTo(sb);
+                LiteralValue.WriteTo(sb);
+            }
+            else
+            {
+                _unknownToken.AppendTo(sb);
+            }
+        }
     }
 
     public abstract class QueryHint : SyntaxElement
@@ -96,6 +111,15 @@ namespace TSQL
                 yield return _hintToken2;
             }
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            if (_hintToken2 != null)
+            {
+                _hintToken2.AppendTo(sb);
+            }
+        }
     }
 
     /// <summary>
@@ -124,6 +148,16 @@ namespace TSQL
                 yield return token;
             }
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            if (_equalsToken != null)
+            {
+                _equalsToken.AppendTo(sb);
+            }
+            Value.WriteTo(sb);
+        }
     }
 
     /// <summary>
@@ -144,6 +178,12 @@ namespace TSQL
         {
             yield return _hintToken;
             yield return _modeToken;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _modeToken.AppendTo(sb);
         }
     }
 
@@ -173,6 +213,15 @@ namespace TSQL
             }
             yield return _rightParen;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _forToken.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            OptimizeForVariables.WriteTo(sb);
+            _rightParen.AppendTo(sb);
+        }
     }
 
     /// <summary>
@@ -190,6 +239,13 @@ namespace TSQL
             yield return _hintToken;
             yield return _forToken;
             yield return _unknownToken;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _forToken.AppendTo(sb);
+            _unknownToken.AppendTo(sb);
         }
     }
 
@@ -219,6 +275,15 @@ namespace TSQL
             }
             yield return _rightParen;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _hintToken2.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            UseHintNames.WriteTo(sb);
+            _rightParen.AppendTo(sb);
+        }
     }
 
     /// <summary>
@@ -242,6 +307,13 @@ namespace TSQL
             {
                 yield return token;
             }
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _planToken.AppendTo(sb);
+            Value.WriteTo(sb);
         }
     }
 
@@ -282,6 +354,20 @@ namespace TSQL
             }
             yield return _rightParen;
         }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _hintToken2.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            TableHintObjectName.WriteTo(sb);
+            if (TableHints != null && TableHints.Count > 0)
+            {
+                _commaAfterObjectName.AppendTo(sb);
+                TableHints.WriteTo(sb);
+            }
+            _rightParen.AppendTo(sb);
+        }
     }
 
     /// <summary>
@@ -309,6 +395,15 @@ namespace TSQL
             {
                 yield return token;
             }
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _hintToken.AppendTo(sb);
+            _timestampToken.AppendTo(sb);
+            _asToken.AppendTo(sb);
+            _ofToken.AppendTo(sb);
+            Value.WriteTo(sb);
         }
     }
 
@@ -339,6 +434,14 @@ namespace TSQL
             foreach (Token token in Hints.DescendantTokens())
                 yield return token;
             yield return _rightParen;
+        }
+
+        public override void WriteTo(StringBuilder sb)
+        {
+            _optionToken.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            Hints.WriteTo(sb);
+            _rightParen.AppendTo(sb);
         }
     }
 

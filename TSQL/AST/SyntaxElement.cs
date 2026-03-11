@@ -7,6 +7,7 @@ namespace TSQL
     {
         IEnumerable<Token> DescendantTokens();
         string ToSource();
+        void WriteTo(StringBuilder sb);
     }
 
     public abstract class SyntaxElement : ISyntaxElement
@@ -17,13 +18,18 @@ namespace TSQL
         /// </summary>
         public abstract IEnumerable<Token> DescendantTokens();
 
-        public string ToSource()
+        public virtual void WriteTo(StringBuilder sb)
         {
-            StringBuilder sb = new StringBuilder();
             foreach (Token token in DescendantTokens())
             {
                 token.AppendTo(sb);
             }
+        }
+
+        public string ToSource()
+        {
+            StringBuilder sb = new StringBuilder();
+            WriteTo(sb);
             return sb.ToString();
         }
 

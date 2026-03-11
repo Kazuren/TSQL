@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Text;
 
 namespace TSQL.AST
 {
@@ -137,6 +138,13 @@ namespace TSQL.AST
                 foreach (Token token in Right.DescendantTokens())
                     yield return token;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Left.WriteTo(sb);
+                _operatorToken.AppendTo(sb);
+                Right.WriteTo(sb);
+            }
         }
 
         #endregion
@@ -195,6 +203,20 @@ namespace TSQL.AST
                         yield return token;
                 }
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Left.WriteTo(sb);
+                if (_notToken != null)
+                    _notToken.AppendTo(sb);
+                _likeToken.AppendTo(sb);
+                Pattern.WriteTo(sb);
+                if (_escapeToken != null)
+                {
+                    _escapeToken.AppendTo(sb);
+                    EscapeExpr.WriteTo(sb);
+                }
+            }
         }
 
         #endregion
@@ -250,6 +272,17 @@ namespace TSQL.AST
                 foreach (Token token in HighRangeExpr.DescendantTokens())
                     yield return token;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Expr.WriteTo(sb);
+                if (_notToken != null)
+                    _notToken.AppendTo(sb);
+                _betweenToken.AppendTo(sb);
+                LowRangeExpr.WriteTo(sb);
+                _andToken.AppendTo(sb);
+                HighRangeExpr.WriteTo(sb);
+            }
         }
 
         #endregion
@@ -287,6 +320,15 @@ namespace TSQL.AST
                     yield return _notToken;
                 yield return _nullToken;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Expr.WriteTo(sb);
+                _isToken.AppendTo(sb);
+                if (_notToken != null)
+                    _notToken.AppendTo(sb);
+                _nullToken.AppendTo(sb);
+            }
         }
 
         #endregion
@@ -306,6 +348,11 @@ namespace TSQL.AST
             public override IEnumerable<Token> DescendantTokens()
             {
                 yield return _wildcardToken;
+            }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                _wildcardToken.AppendTo(sb);
             }
         }
 
@@ -333,6 +380,19 @@ namespace TSQL.AST
                 if (_rightParen != null)
                 {
                     yield return _rightParen;
+                }
+            }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                if (_leftParen != null)
+                {
+                    _leftParen.AppendTo(sb);
+                }
+                Columns.WriteTo(sb);
+                if (_rightParen != null)
+                {
+                    _rightParen.AppendTo(sb);
                 }
             }
         }
@@ -385,6 +445,22 @@ namespace TSQL.AST
                 }
                 yield return _rightParen;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                _containsToken.AppendTo(sb);
+                _leftParen.AppendTo(sb);
+                Columns.WriteTo(sb);
+                _comma.AppendTo(sb);
+                SearchCondition.WriteTo(sb);
+                if (Language != null)
+                {
+                    _languageComma.AppendTo(sb);
+                    _languageKeyword.AppendTo(sb);
+                    Language.WriteTo(sb);
+                }
+                _rightParen.AppendTo(sb);
+            }
         }
 
         #endregion
@@ -434,6 +510,22 @@ namespace TSQL.AST
                         yield return token;
                 }
                 yield return _rightParen;
+            }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                _freetextToken.AppendTo(sb);
+                _leftParen.AppendTo(sb);
+                Columns.WriteTo(sb);
+                _comma.AppendTo(sb);
+                SearchCondition.WriteTo(sb);
+                if (Language != null)
+                {
+                    _languageComma.AppendTo(sb);
+                    _languageKeyword.AppendTo(sb);
+                    Language.WriteTo(sb);
+                }
+                _rightParen.AppendTo(sb);
             }
         }
 
@@ -499,6 +591,24 @@ namespace TSQL.AST
                 }
                 yield return _rightParen;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Expr.WriteTo(sb);
+                if (_notToken != null)
+                    _notToken.AppendTo(sb);
+                _inToken.AppendTo(sb);
+                _leftParen.AppendTo(sb);
+                if (Subquery != null)
+                {
+                    Subquery.Query.WriteTo(sb);
+                }
+                else
+                {
+                    ValueList.WriteTo(sb);
+                }
+                _rightParen.AppendTo(sb);
+            }
         }
 
         #endregion
@@ -546,6 +656,14 @@ namespace TSQL.AST
                 foreach (Token token in Subquery.DescendantTokens())
                     yield return token;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Left.WriteTo(sb);
+                _operatorToken.AppendTo(sb);
+                _quantifierToken.AppendTo(sb);
+                Subquery.WriteTo(sb);
+            }
         }
 
         #endregion
@@ -575,6 +693,12 @@ namespace TSQL.AST
                 yield return _existsToken;
                 foreach (Token token in Subquery.DescendantTokens())
                     yield return token;
+            }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                _existsToken.AppendTo(sb);
+                Subquery.WriteTo(sb);
             }
         }
 
@@ -607,6 +731,13 @@ namespace TSQL.AST
                 foreach (Token token in Predicate.DescendantTokens())
                     yield return token;
                 yield return _rightParen;
+            }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                _leftParen.AppendTo(sb);
+                Predicate.WriteTo(sb);
+                _rightParen.AppendTo(sb);
             }
         }
 
@@ -647,6 +778,13 @@ namespace TSQL.AST
                 foreach (Token token in Right.DescendantTokens())
                     yield return token;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Left.WriteTo(sb);
+                _andToken.AppendTo(sb);
+                Right.WriteTo(sb);
+            }
         }
 
         public class Or : Predicate
@@ -682,6 +820,13 @@ namespace TSQL.AST
                 foreach (Token token in Right.DescendantTokens())
                     yield return token;
             }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                Left.WriteTo(sb);
+                _orToken.AppendTo(sb);
+                Right.WriteTo(sb);
+            }
         }
 
         public class Not : Predicate
@@ -707,6 +852,12 @@ namespace TSQL.AST
                 yield return _notToken;
                 foreach (Token token in Predicate.DescendantTokens())
                     yield return token;
+            }
+
+            public override void WriteTo(StringBuilder sb)
+            {
+                _notToken.AppendTo(sb);
+                Predicate.WriteTo(sb);
             }
         }
 
