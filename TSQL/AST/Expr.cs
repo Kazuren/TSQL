@@ -1582,6 +1582,12 @@ namespace TSQL
         #region CAST and CONVERT
 
         /// <summary>
+        /// Distinguishes standard conversion functions from their TRY variants.
+        /// TRY variants return NULL on failure instead of raising an error.
+        /// </summary>
+        public enum ConversionKind { Standard, Try }
+
+        /// <summary>
         /// CAST(expr AS type) or TRY_CAST(expr AS type)
         /// </summary>
         public class CastExpression : Expr
@@ -1593,16 +1599,18 @@ namespace TSQL
                 set => SetWithTrivia(ref _expression, value);
             }
             public DataType DataType { get; set; }
+            public ConversionKind Kind { get; internal set; }
 
             internal Token _castKeyword;
             internal Token _leftParen;
             internal Token _asToken;
             internal Token _rightParen;
 
-            public CastExpression(Expr expression, DataType dataType)
+            public CastExpression(Expr expression, DataType dataType, ConversionKind kind = ConversionKind.Standard)
             {
                 _expression = expression;
                 DataType = dataType;
+                Kind = kind;
             }
 
             public override T Accept<T>(Visitor<T> visitor)
@@ -1651,6 +1659,7 @@ namespace TSQL
                 get => _style;
                 set => SetWithTrivia(ref _style, value);
             }
+            public ConversionKind Kind { get; internal set; }
 
             internal Token _convertKeyword;
             internal Token _leftParen;
@@ -1658,11 +1667,12 @@ namespace TSQL
             internal Token _commaAfterExpr;
             internal Token _rightParen;
 
-            public ConvertExpression(DataType dataType, Expr expression, Expr style)
+            public ConvertExpression(DataType dataType, Expr expression, Expr style, ConversionKind kind = ConversionKind.Standard)
             {
                 DataType = dataType;
                 _expression = expression;
                 _style = style;
+                Kind = kind;
             }
 
             public override T Accept<T>(Visitor<T> visitor)

@@ -1977,7 +1977,7 @@ namespace TSQL.Tests
             Assert.IsType<Expr.ColumnIdentifier>(cast.Expression);
             Assert.Equal("VARCHAR", cast.DataType.TypeName);
             Assert.Single(cast.DataType.Parameters);
-            Assert.Equal(TokenType.CAST, cast._castKeyword.Type);
+            Assert.Equal(Expr.ConversionKind.Standard, cast.Kind);
         }
 
         [Fact]
@@ -1986,7 +1986,7 @@ namespace TSQL.Tests
             Stmt.Select stmt = Stmt.ParseSelect("SELECT TRY_CAST(x AS INT)");
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.CastExpression cast = Assert.IsType<Expr.CastExpression>(col.Expression);
-            Assert.Equal(TokenType.TRY_CAST, cast._castKeyword.Type);
+            Assert.Equal(Expr.ConversionKind.Try, cast.Kind);
             Assert.Null(cast.DataType.Parameters);
         }
 
@@ -2016,7 +2016,7 @@ namespace TSQL.Tests
             Assert.Single(conv.DataType.Parameters);
             Assert.IsType<Expr.ColumnIdentifier>(conv.Expression);
             Assert.NotNull(conv.Style);
-            Assert.Equal(TokenType.CONVERT, conv._convertKeyword.Type);
+            Assert.Equal(Expr.ConversionKind.Standard, conv.Kind);
         }
 
         [Fact]
@@ -2034,7 +2034,7 @@ namespace TSQL.Tests
             Stmt.Select stmt = Stmt.ParseSelect("SELECT TRY_CONVERT(DATE, x, 103)");
             SelectColumn col = Assert.IsType<SelectColumn>(SelectExpressionOf(stmt).Columns[0]);
             Expr.ConvertExpression conv = Assert.IsType<Expr.ConvertExpression>(col.Expression);
-            Assert.Equal(TokenType.TRY_CONVERT, conv._convertKeyword.Type);
+            Assert.Equal(Expr.ConversionKind.Try, conv.Kind);
         }
 
         #endregion

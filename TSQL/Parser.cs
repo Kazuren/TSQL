@@ -3523,6 +3523,7 @@ namespace TSQL
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after " + keyword.Lexeme + " expression");
 
             Expr.CastExpression cast = new Expr.CastExpression(expression, dataType);
+            cast.Kind = keyword.Type == TokenType.TRY_CAST ? Expr.ConversionKind.Try : Expr.ConversionKind.Standard;
             cast._castKeyword = keyword;
             cast._leftParen = leftParen;
             cast._asToken = asToken;
@@ -3551,6 +3552,7 @@ namespace TSQL
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after " + keyword.Lexeme + " expression");
 
             Expr.ConvertExpression convert = new Expr.ConvertExpression(dataType, expression, style);
+            convert.Kind = keyword.Type == TokenType.TRY_CONVERT ? Expr.ConversionKind.Try : Expr.ConversionKind.Standard;
             convert._convertKeyword = keyword;
             convert._leftParen = leftParen;
             convert._commaAfterType = commaAfterType;
