@@ -16,7 +16,7 @@ namespace TSQL
         // Keywords - This comment is used by a source generator to mark the keywords section, do not delete it.
         ADD, ALL, ALTER, AND, ANY, AS, ASC, AUTHORIZATION,
         BACKUP, BEGIN, BETWEEN, BREAK, BROWSE, BULK, BY,
-        CASCADE, CASE, CAST, CHECK, CHECKPOINT, CLOSE, CLUSTERED, COALESCE, COLLATE, COLUMN, COMMIT, COMPUTE,
+        CASCADE, CASE, CHECK, CHECKPOINT, CLOSE, CLUSTERED, COALESCE, COLLATE, COLUMN, COMMIT, COMPUTE,
         CONSTRAINT, CONTAINS, CONTAINSTABLE, CONTINUE, CONVERT, CREATE, CROSS, CURRENT, CURRENT_DATE,
         CURRENT_TIME, CURRENT_TIMESTAMP, CURRENT_USER, CURSOR,
         DATABASE, DBCC, DEALLOCATE, DECLARE, DEFAULT, DELETE, DENY, DESC, DISK, DISTINCT, DISTRIBUTED,
@@ -38,50 +38,55 @@ namespace TSQL
         SAVE, SCHEMA, SECURITYAUDIT, SELECT,
         SEMANTICKEYPHRASETABLE, SEMANTICSIMILARITYDETAILSTABLE, SEMANTICSIMILARITYTABLE,
         SESSION_USER, SET, SETUSER, SHUTDOWN, SOME, STATISTICS, SYSTEM_USER,
-        TABLE, TABLESAMPLE, TEXTSIZE, THEN, TO, TOP, TRAN, TRANSACTION, TRIGGER, TRUNCATE, TRY_CAST, TRY_CONVERT, TSEQUAL,
+        TABLE, TABLESAMPLE, TEXTSIZE, THEN, TO, TOP, TRAN, TRANSACTION, TRIGGER, TRUNCATE, TRY_CONVERT, TSEQUAL,
         UNION, UNIQUE, UNPIVOT, UPDATE, UPDATETEXT, USE, USER,
         VALUES, VARYING, VIEW,
-        WAITFOR, WHEN, WHERE, WHILE, WITH, WITHIN /*WITHIN = WITHIN GROUP*/, WRITETEXT,
+        WAITFOR, WHEN, WHERE, WHILE, WITH, WRITETEXT,
 
-        // Window function keywords (contextual - can also be used as identifiers)
+        // Contextual keywords — can also be used as identifiers.
+        // The parser uses a range check (CONTEXTUAL_KEYWORD_START..CONTEXTUAL_KEYWORD_END)
+        // instead of a set lookup. New contextual keywords must be added within this block.
+        CONTEXTUAL_KEYWORD_START,
+
+        // Window function keywords
         PARTITION, ROWS, RANGE, UNBOUNDED, PRECEDING, FOLLOWING, ROW,
 
-        // Ranking functions (contextual - can also be used as identifiers)
+        // Ranking functions
         ROW_NUMBER, RANK, DENSE_RANK, NTILE,
 
-        // FROM clause keywords (contextual - can also be used as identifiers)
+        // FROM clause keywords
         APPLY, LOOP, HASH, REMOTE, SYSTEM, CONTAINED, REPEATABLE,
 
-        // GROUP BY keywords (contextual - can also be used as identifiers)
+        // GROUP BY keywords
         ROLLUP, CUBE, GROUPING, SETS,
 
-        // Full-text search keywords (contextual - can also be used as identifiers)
+        // Full-text search keywords
         LANGUAGE,
 
-        // Built-in function keywords (contextual - can also be used as identifiers)
-        IIF,
+        // Built-in function keywords
+        IIF, CAST, TRY_CAST,
 
-        // AT TIME ZONE keywords (contextual - can also be used as identifiers)
+        // AT TIME ZONE keywords
         AT, TIME, ZONE,
 
-        // TOP clause keywords (contextual - can also be used as identifiers)
+        // TOP clause keywords
         TIES,
 
-        // OFFSET/FETCH keywords (contextual - can also be used as identifiers)
+        // OFFSET/FETCH keywords
         OFFSET, FIRST, NEXT, ONLY,
 
-        // FOR clause keywords (contextual - can also be used as identifiers)
+        // FOR clause keywords
         XML, JSON, RAW, AUTO, EXPLICIT, PATH, ROOT, ELEMENTS, TYPE,
         BINARY, BASE64, XMLDATA, XMLSCHEMA, XSINIL, ABSENT,
         INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER,
 
-        // Table hint keywords (contextual - can also be used as identifiers)
+        // Table hint keywords
         NOEXPAND, FORCESCAN, FORCESEEK, NOLOCK, NOWAIT, PAGLOCK,
         READCOMMITTED, READCOMMITTEDLOCK, READPAST, READUNCOMMITTED,
         REPEATABLEREAD, ROWLOCK, SERIALIZABLE, SNAPSHOT,
         SPATIAL_WINDOW_MAX_CELLS, TABLOCK, TABLOCKX, UPDLOCK, XLOCK,
 
-        // Query hint keywords (contextual - can also be used as identifiers)
+        // Query hint keywords
         CONCAT, DISABLE, DISABLE_OPTIMIZED_PLAN_FORCING, EXPAND,
         EXTERNALPUSHDOWN, FAST, FORCE, FORCED, HINT,
         IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX, KEEP, KEEPFIXED, LABEL,
@@ -89,14 +94,15 @@ namespace TSQL
         NO_PERFORMANCE_SPOOL, OPTIMIZE, PARAMETERIZATION, QUERYTRACEON,
         RECOMPILE, ROBUST, SCALEOUTEXECUTION, SIMPLE, UNKNOWN, VIEWS,
 
-        // Temporal table keywords (contextual - can also be used as identifiers)
+        // Temporal table keywords
         SYSTEM_TIME,
 
-        // Miscellaneous keywords (contextual - can also be used as identifiers)
-        TIMESTAMP,
-        PRECISION,
+        // Miscellaneous keywords
+        TIMESTAMP, PRECISION, WITHIN,
 
-        // EXECUTE statement keywords (contextual - can also be used as identifiers)
-        OUTPUT, OUT, LOGIN, RESULT, NONE, UNDEFINED, OBJECT
+        // EXECUTE statement keywords
+        OUTPUT, OUT, LOGIN, RESULT, NONE, UNDEFINED, OBJECT,
+
+        CONTEXTUAL_KEYWORD_END
     }
 }

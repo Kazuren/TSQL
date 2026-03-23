@@ -282,119 +282,15 @@ namespace TSQL
         /// Non-reserved keywords that can be used as identifiers.
         /// These are contextual keywords - they act as keywords only in specific contexts.
         /// </summary>
-        private static readonly HashSet<TokenType> ContextualKeywords = new HashSet<TokenType>
+        /// <summary>
+        /// Returns true if the token type is a contextual keyword.
+        /// Contextual keywords occupy a contiguous range in the TokenType enum
+        /// between the CONTEXTUAL_KEYWORD_START and CONTEXTUAL_KEYWORD_END sentinels.
+        /// </summary>
+        private static bool IsContextualKeyword(TokenType type)
         {
-            TokenType.ROWS,
-            TokenType.RANGE,
-            TokenType.PARTITION,
-            TokenType.UNBOUNDED,
-            TokenType.PRECEDING,
-            TokenType.FOLLOWING,
-            TokenType.ROW,
-            TokenType.ROW_NUMBER,
-            TokenType.RANK,
-            TokenType.DENSE_RANK,
-            TokenType.NTILE,
-            TokenType.APPLY,
-            TokenType.LOOP,
-            TokenType.HASH,
-            TokenType.REMOTE,
-            TokenType.SYSTEM,
-            TokenType.CONTAINED,
-            TokenType.REPEATABLE,
-            TokenType.ROLLUP,
-            TokenType.CUBE,
-            TokenType.GROUPING,
-            TokenType.SETS,
-            TokenType.LANGUAGE,
-            TokenType.IIF,
-            TokenType.AT,
-            TokenType.TIME,
-            TokenType.ZONE,
-            TokenType.TIES,
-            TokenType.OFFSET,
-            TokenType.FIRST,
-            TokenType.NEXT,
-            TokenType.ONLY,
-            TokenType.XML,
-            TokenType.JSON,
-            TokenType.RAW,
-            TokenType.AUTO,
-            TokenType.EXPLICIT,
-            TokenType.PATH,
-            TokenType.ROOT,
-            TokenType.ELEMENTS,
-            TokenType.TYPE,
-            TokenType.BINARY,
-            TokenType.BASE64,
-            TokenType.XMLDATA,
-            TokenType.XMLSCHEMA,
-            TokenType.XSINIL,
-            TokenType.ABSENT,
-            TokenType.INCLUDE_NULL_VALUES,
-            TokenType.WITHOUT_ARRAY_WRAPPER,
-            // Table hint keywords
-            TokenType.NOEXPAND,
-            TokenType.FORCESCAN,
-            TokenType.FORCESEEK,
-            TokenType.NOLOCK,
-            TokenType.NOWAIT,
-            TokenType.PAGLOCK,
-            TokenType.READCOMMITTED,
-            TokenType.READCOMMITTEDLOCK,
-            TokenType.READPAST,
-            TokenType.READUNCOMMITTED,
-            TokenType.REPEATABLEREAD,
-            TokenType.ROWLOCK,
-            TokenType.SERIALIZABLE,
-            TokenType.SNAPSHOT,
-            TokenType.SPATIAL_WINDOW_MAX_CELLS,
-            TokenType.TABLOCK,
-            TokenType.TABLOCKX,
-            TokenType.UPDLOCK,
-            TokenType.XLOCK,
-            // Query hint keywords
-            TokenType.CONCAT,
-            TokenType.DISABLE,
-            TokenType.DISABLE_OPTIMIZED_PLAN_FORCING,
-            TokenType.EXPAND,
-            TokenType.EXTERNALPUSHDOWN,
-            TokenType.FAST,
-            TokenType.FORCE,
-            TokenType.HINT,
-            TokenType.IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX,
-            TokenType.KEEP,
-            TokenType.KEEPFIXED,
-            TokenType.LABEL,
-            TokenType.MAX_GRANT_PERCENT,
-            TokenType.MAXDOP,
-            TokenType.MAXRECURSION,
-            TokenType.MIN_GRANT_PERCENT,
-            TokenType.NO_PERFORMANCE_SPOOL,
-            TokenType.OPTIMIZE,
-            TokenType.PARAMETERIZATION,
-            TokenType.QUERYTRACEON,
-            TokenType.RECOMPILE,
-            TokenType.ROBUST,
-            TokenType.SCALEOUTEXECUTION,
-            TokenType.UNKNOWN,
-            TokenType.VIEWS,
-            // Temporal table keywords
-            TokenType.SYSTEM_TIME,
-            // Miscellaneous keywords
-            TokenType.TIMESTAMP,
-            TokenType.PRECISION,
-            // EXECUTE statement keywords
-            TokenType.OUTPUT,
-            TokenType.OUT,
-            TokenType.LOGIN,
-            TokenType.RESULT,
-            TokenType.NONE,
-            TokenType.UNDEFINED,
-            TokenType.OBJECT,
-            TokenType.SIMPLE,
-            TokenType.FORCED
-        };
+            return type > TokenType.CONTEXTUAL_KEYWORD_START && type < TokenType.CONTEXTUAL_KEYWORD_END;
+        }
 
         public Parser(IReadOnlyList<Token> tokens)
         {
@@ -2794,7 +2690,7 @@ namespace TSQL
             }
 
             // CAST(expr AS type) or TRY_CAST(expr AS type)
-            if (Check(TokenType.CAST) || Check(TokenType.TRY_CAST))
+            if ((Check(TokenType.CAST) || Check(TokenType.TRY_CAST)) && CheckNext(TokenType.LEFT_PAREN))
             {
                 return ParseCast();
             }
@@ -4374,7 +4270,7 @@ namespace TSQL
         {
             if (IsAtEnd()) return false;
             TokenType type = Peek().Type;
-            return type == TokenType.IDENTIFIER || ContextualKeywords.Contains(type);
+            return type == TokenType.IDENTIFIER || IsContextualKeyword(type);
         }
 
         /// <summary>
@@ -4384,7 +4280,7 @@ namespace TSQL
         {
             if (IsAtEnd()) return false;
             TokenType type = Peek().Type;
-            return type == TokenType.IDENTIFIER || type == TokenType.STRING || ContextualKeywords.Contains(type);
+            return type == TokenType.IDENTIFIER || type == TokenType.STRING || IsContextualKeyword(type);
         }
 
         /// <summary>

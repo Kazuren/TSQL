@@ -41,6 +41,10 @@ namespace TSQL.Generators
                 if (inKeywordsSection && member is EnumMemberDeclarationSyntax enumMember)
                 {
                     var name = enumMember.Identifier.Text;
+                    // Sentinel tokens that mark the contextual keyword range boundaries
+                    // are not actual keywords — they exist only for the parser's range check.
+                    if (name.StartsWith("CONTEXTUAL_KEYWORD_"))
+                        continue;
                     keywords.Add(name);
                 }
             }
