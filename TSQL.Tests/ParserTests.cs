@@ -177,6 +177,30 @@ namespace TSQL.Tests
         }
 
         [Fact]
+        public void Parse_StringLiteralAliasWithoutAs_HasCorrectStructure()
+        {
+            // Arrange & Act
+            Stmt.Select select = Stmt.ParseSelect("SELECT a 'MyAlias' FROM T");
+
+            // Assert
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Assert.NotNull(item.Alias);
+            Assert.Equal("MyAlias", item.Alias.Name);
+        }
+
+        [Fact]
+        public void Parse_StringLiteralAliasWithAs_HasCorrectStructure()
+        {
+            // Arrange & Act
+            Stmt.Select select = Stmt.ParseSelect("SELECT a AS 'MyAlias' FROM T");
+
+            // Assert
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Assert.NotNull(item.Alias);
+            Assert.Equal("MyAlias", item.Alias.Name);
+        }
+
+        [Fact]
         public void Parse_PrefixAlias_HasCorrectAliasType()
         {
             // Arrange & Act

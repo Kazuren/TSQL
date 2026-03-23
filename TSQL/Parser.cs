@@ -2350,15 +2350,12 @@ namespace TSQL
         {
             if (Match(TokenType.AS, out Token asToken))
             {
-                // After AS, expect an identifier or contextual keyword
-                SuffixAlias alias = new SuffixAlias(ConsumeIdentifierOrContextualKeyword("Expected alias"));
+                SuffixAlias alias = new SuffixAlias(ConsumeAlias("Expected alias"));
                 alias._asKeyword = asToken;
-
                 return alias;
             }
-            else if (IsIdentifierOrContextualKeyword())
+            else if (IsAlias())
             {
-                // Contextual keywords can be used as aliases without AS
                 SuffixAlias alias = new SuffixAlias(Advance());
                 alias._asKeyword = null;
                 return alias;
@@ -4381,11 +4378,33 @@ namespace TSQL
         }
 
         /// <summary>
+        /// Checks if the current token can serve as an alias: identifier, contextual keyword, or string literal.
+        /// </summary>
+        private bool IsAlias()
+        {
+            if (IsAtEnd()) return false;
+            TokenType type = Peek().Type;
+            return type == TokenType.IDENTIFIER || type == TokenType.STRING || ContextualKeywords.Contains(type);
+        }
+
+        /// <summary>
         /// Consumes an identifier or contextual keyword token.
         /// </summary>
         private Token ConsumeIdentifierOrContextualKeyword(string message)
         {
             if (IsIdentifierOrContextualKeyword())
+            {
+                return Advance();
+            }
+            throw Error(Peek(), message);
+        }
+
+        /// <summary>
+        /// Consumes an alias token: identifier, contextual keyword, or string literal.
+        /// </summary>
+        private Token ConsumeAlias(string message)
+        {
+            if (IsAlias())
             {
                 return Advance();
             }
