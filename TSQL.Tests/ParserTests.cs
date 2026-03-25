@@ -797,6 +797,9 @@ namespace TSQL.Tests
         // FROM clause - combined suffixes
         [InlineData("SELECT a FROM T AS t TABLESAMPLE (10 PERCENT) WITH (NOLOCK)")]
         [InlineData("SELECT a FROM T1 WITH (NOLOCK) INNER JOIN T2 WITH (NOLOCK) ON T1.id = T2.id")]
+        // Scientific notation
+        [InlineData("SELECT dbo.fn(8.4E-05, N'', 1, 2) AS result")]
+        [InlineData("SELECT * FROM T WHERE x > 1E5")]
 
         public void Parse_ValidSql_RoundTripsCorrectly(string source)
         {
