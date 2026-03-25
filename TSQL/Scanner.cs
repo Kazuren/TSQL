@@ -317,24 +317,59 @@ namespace TSQL
 
         private void Number()
         {
+            // Phase 1: Consume integer and optional fractional digits
             while (IsDigit(Peek()))
             {
                 Advance();
             }
 
+            bool hasDecimalPoint = false;
             if (Peek() == '.' && IsDigit(PeekNext()))
             {
+                hasDecimalPoint = true;
                 Advance();
 
                 while (IsDigit(Peek()))
                 {
                     Advance();
                 }
+            }
 
+            // Phase 2: Check for exponent (E/e followed by optional sign and digits).
+            // Only consume if a valid exponent pattern is confirmed by lookahead.
+            bool hasExponent = false;
+            char peek = Peek();
+            if (peek == 'E' || peek == 'e')
+            {
+                char afterE = PeekNext();
+                if (IsDigit(afterE))
+                {
+                    hasExponent = true;
+                    Advance(); // consume E/e
+                    while (IsDigit(Peek()))
+                    {
+                        Advance();
+                    }
+                }
+                else if ((afterE == '+' || afterE == '-') && IsDigit(PeekAt(2)))
+                {
+                    hasExponent = true;
+                    Advance(); // consume E/e
+                    Advance(); // consume +/-
+                    while (IsDigit(Peek()))
+                    {
+                        Advance();
+                    }
+                }
+            }
+
+            // Phase 3: Create token
+            if (hasDecimalPoint || hasExponent)
+            {
                 string literal = _source.Substring(_start, _current - _start);
                 try
                 {
-                    AddToken(TokenType.DECIMAL, Double.Parse(literal));
+                    AddToken(TokenType.DECIMAL, Double.Parse(literal, CultureInfo.InvariantCulture));
                 }
                 catch (OverflowException ex)
                 {
@@ -513,6 +548,17 @@ namespace TSQL
             }
 
             return _source[_current + 1];
+        }
+
+        private char PeekAt(int offset)
+        {
+            int index = _current + offset;
+            if ((uint)index >= (uint)_source.Length)
+            {
+                return '\0';
+            }
+
+            return _source[index];
         }
 
         private bool Match(char expected)

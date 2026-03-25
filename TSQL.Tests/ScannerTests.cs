@@ -47,7 +47,13 @@
                 { "999999", TokenType.WHOLE_NUMBER, 999999 },
                 { "19.99", TokenType.DECIMAL, 19.99 },
                 { "0.5", TokenType.DECIMAL, 0.5 },
-                { "100.001", TokenType.DECIMAL, 100.001 }
+                { "100.001", TokenType.DECIMAL, 100.001 },
+                { "8.4E-05", TokenType.DECIMAL, 8.4E-05 },
+                { "2.5e+10", TokenType.DECIMAL, 2.5e+10 },
+                { "1.0E3", TokenType.DECIMAL, 1.0E3 },
+                { "1E5", TokenType.DECIMAL, 1E5 },
+                { "5e-3", TokenType.DECIMAL, 5e-3 },
+                { "3E+2", TokenType.DECIMAL, 3E+2 }
             };
         }
 
@@ -146,6 +152,31 @@
             tokens.Should()
                 .HaveToken(0, expectedType, input, expectedLiteral)
                 .HaveToken(1, TokenType.EOF, "");
+        }
+
+        [Fact]
+        internal void ScanTokens_NumberFollowedByE_NotScientificNotation()
+        {
+            var scanner = new Scanner("1E");
+            var tokens = scanner.ScanTokens();
+
+            tokens.Should()
+                .HaveToken(0, TokenType.WHOLE_NUMBER, "1", 1)
+                .HaveToken(1, TokenType.IDENTIFIER, "E")
+                .HaveToken(2, TokenType.EOF, "");
+        }
+
+        [Fact]
+        internal void ScanTokens_NumberFollowedByEPlus_NotScientificNotation()
+        {
+            var scanner = new Scanner("1E+");
+            var tokens = scanner.ScanTokens();
+
+            tokens.Should()
+                .HaveToken(0, TokenType.WHOLE_NUMBER, "1", 1)
+                .HaveToken(1, TokenType.IDENTIFIER, "E")
+                .HaveToken(2, TokenType.PLUS, "+")
+                .HaveToken(3, TokenType.EOF, "");
         }
 
         [Theory]
