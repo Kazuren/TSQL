@@ -21,7 +21,9 @@ namespace TSQL
     /// </summary>
     internal class ConcreteToken : Token
     {
-        internal static readonly ConcreteToken Comma = new ConcreteToken(TokenType.COMMA, ",", null);
+        // Fresh instance each time because tokens have mutable trivia fields —
+        // sharing a singleton would let one mutation corrupt all lists.
+        internal static ConcreteToken Comma => new ConcreteToken(TokenType.COMMA, ",", null);
 
         private readonly string _lexeme;
 

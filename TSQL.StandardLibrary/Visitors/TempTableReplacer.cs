@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using TSQL.AST;
 
 namespace TSQL.StandardLibrary.Visitors
 {
@@ -50,7 +52,7 @@ namespace TSQL.StandardLibrary.Visitors
                 return new Script(new[] { stmt });
             }
 
-            var targetSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> targetSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string name in tableNames)
             {
                 targetSet.Add(name);
@@ -58,7 +60,7 @@ namespace TSQL.StandardLibrary.Visitors
 
             // Index CTE names so we can distinguish CTE references from regular tables
             // when they share a name with a target.
-            var cteNameToIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> cteNameToIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             Stmt.Select selectStmt = stmt as Stmt.Select;
             if (selectStmt?.CteStmt != null)
             {
@@ -74,7 +76,7 @@ namespace TSQL.StandardLibrary.Visitors
             //   - SubqueryReferences (derived tables) whose alias matches a target
             //   - RowsetFunctionReferences whose alias matches a target
             //   - All column identifiers, wildcards, and qualified wildcards (for phase 2)
-            var collector = new Collector(targetSet);
+            Collector collector = new Collector(targetSet);
             collector.Walk(stmt);
 
             if (!collector.HasMatches)
@@ -84,8 +86,8 @@ namespace TSQL.StandardLibrary.Visitors
 
             // Classify TableReference matches: if the name appears in the CTE list,
             // it's a CTE reference; otherwise it's a regular table.
-            var regularMatches = new List<TableReference>();
-            var cteMatchedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<TableReference> regularMatches = new List<TableReference>();
+            HashSet<string> cteMatchedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (TableReference tableRef in collector.MatchedTables)
             {
@@ -109,7 +111,7 @@ namespace TSQL.StandardLibrary.Visitors
             //   - The query uses a bare * (SELECT *)
             //   - The query uses a qualified wildcard (SELECT u.*)
             //   - No qualified column references were found for that table
-            var qualifierToTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> qualifierToTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (TableReference tableRef in regularMatches)
             {
                 string objName = tableRef.TableName.ObjectName.Name;
@@ -133,9 +135,9 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            var starTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var tableColumnList = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-            var tableColumnDedup = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> starTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, List<string>> tableColumnList = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, HashSet<string>> tableColumnDedup = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
             if (!collector.HasBareStar)
             {
@@ -151,7 +153,7 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     if (col.ObjectName != null && qualifierToTable.TryGetValue(col.ObjectName.Name, out string tableKey))
                     {
-                        if (!tableColumnDedup.TryGetValue(tableKey, out var seen))
+                        if (!tableColumnDedup.TryGetValue(tableKey, out HashSet<string> seen))
                         {
                             seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                             tableColumnDedup[tableKey] = seen;
@@ -171,16 +173,16 @@ namespace TSQL.StandardLibrary.Visitors
             // qualified, resolve to T via qualifierToTable, and T is not self-joined.
             SelectExpression outerSelect = selectStmt?.Query as SelectExpression;
 
-            var pushedPredicates = new Dictionary<string, List<AST.Predicate>>(StringComparer.OrdinalIgnoreCase);
-            var remainingPredicates = new List<AST.Predicate>();
+            Dictionary<string, List<Predicate>> pushedPredicates = new Dictionary<string, List<AST.Predicate>>(StringComparer.OrdinalIgnoreCase);
+            List<Predicate> remainingPredicates = new List<AST.Predicate>();
 
             if (outerSelect?.Where != null && regularMatches.Count > 0)
             {
                 // Detect self-joined tables (same base table appearing multiple times).
                 // Different aliases may need different row subsets, so pushing predicates
                 // would incorrectly filter both aliases with one predicate.
-                var selfJoinedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var keyCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> selfJoinedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, int> keyCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 foreach (TableReference tableRef in regularMatches)
                 {
                     string key = tableRef.TableName.ObjectName.Name.ToUpperInvariant();
@@ -193,7 +195,7 @@ namespace TSQL.StandardLibrary.Visitors
                         keyCounts[key] = 1;
                     }
                 }
-                foreach (var kvp in keyCounts)
+                foreach (KeyValuePair<string, int> kvp in keyCounts)
                 {
                     if (kvp.Value > 1)
                     {
@@ -205,7 +207,7 @@ namespace TSQL.StandardLibrary.Visitors
 
                 foreach (AST.Predicate conjunct in conjuncts)
                 {
-                    var predCollector = new PredicateColumnCollector();
+                    PredicateColumnCollector predCollector = new PredicateColumnCollector();
                     predCollector.Walk(conjunct);
 
                     string targetKey = null;
@@ -246,7 +248,7 @@ namespace TSQL.StandardLibrary.Visitors
 
                     if (canPush)
                     {
-                        if (!pushedPredicates.TryGetValue(targetKey, out var list))
+                        if (!pushedPredicates.TryGetValue(targetKey, out List<Predicate> list))
                         {
                             list = new List<AST.Predicate>();
                             pushedPredicates[targetKey] = list;
@@ -264,8 +266,8 @@ namespace TSQL.StandardLibrary.Visitors
             // Save original table name identifiers before mutation rewrites them.
             // The SELECT INTO statements need "FROM Users" (original), but after
             // mutation the AST will say "FROM #Users".
-            var regularInfo = new Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName, Alias Alias)>(StringComparer.OrdinalIgnoreCase);
-            var regularOrder = new List<string>();
+            Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName, Alias Alias)> regularInfo = new Dictionary<string, (Expr.ObjectIdentifier OriginalTableName, string ObjectName, Alias Alias)>(StringComparer.OrdinalIgnoreCase);
+            List<string> regularOrder = new List<string>();
 
             foreach (TableReference tableRef in regularMatches)
             {
@@ -282,7 +284,7 @@ namespace TSQL.StandardLibrary.Visitors
             // each CTE's materialization query includes the CTE definitions up to and
             // including itself (e.g., "WITH A AS (...), B AS (...) SELECT * INTO #B FROM B").
             // These definitions reference the original CTE list which mutation will modify.
-            var cteSelectIntos = new List<Stmt>();
+            List<Stmt> cteSelectIntos = new List<Stmt>();
             if (selectStmt?.CteStmt != null && cteMatchedNames.Count > 0)
             {
                 for (int i = 0; i < selectStmt.CteStmt.Ctes.Count; i++)
@@ -293,13 +295,13 @@ namespace TSQL.StandardLibrary.Visitors
                         continue;
                     }
 
-                    var cte = new Cte();
+                    Cte cte = new Cte();
                     for (int j = 0; j <= i; j++)
                     {
-                        cte.Ctes.Add(selectStmt.CteStmt.Ctes[j]);
+                        cte.Ctes.Append(selectStmt.CteStmt.Ctes[j]);
                     }
 
-                    var cteSelect = SelectStarInto(cteDef.Name,
+                    Stmt.Select cteSelect = SelectStarInto(cteDef.Name,
                         new TableReference(new Expr.ObjectIdentifier(new ObjectName(cteDef.Name))));
                     cteSelect.CteStmt = cte;
                     cteSelectIntos.Add(cteSelect);
@@ -335,12 +337,12 @@ namespace TSQL.StandardLibrary.Visitors
                 }
                 else
                 {
-                    var newCtes = new SyntaxElementList<CteDefinition>();
+                    SyntaxElementList<CteDefinition> newCtes = new SyntaxElementList<CteDefinition>();
                     for (int i = 0; i < selectStmt.CteStmt.Ctes.Count; i++)
                     {
                         if (!cteMatchedNames.Contains(selectStmt.CteStmt.Ctes[i].Name))
                         {
-                            newCtes.Add(selectStmt.CteStmt.Ctes[i]);
+                            newCtes.Append(selectStmt.CteStmt.Ctes[i]);
                         }
                     }
                     selectStmt.CteStmt.Ctes = newCtes;
@@ -364,12 +366,12 @@ namespace TSQL.StandardLibrary.Visitors
             // qualifiers must match.
             // Skip column identifiers inside pushed predicates — they reference the
             // original table in the SELECT INTO statement.
-            var pushedColumnIds = new HashSet<Expr.ColumnIdentifier>();
-            foreach (var kvp in pushedPredicates)
+            HashSet<Expr.ColumnIdentifier> pushedColumnIds = new HashSet<Expr.ColumnIdentifier>();
+            foreach (KeyValuePair<string, List<Predicate>> kvp in pushedPredicates)
             {
                 foreach (AST.Predicate pred in kvp.Value)
                 {
-                    var pc = new PredicateColumnCollector();
+                    PredicateColumnCollector pc = new PredicateColumnCollector();
                     pc.Walk(pred);
                     foreach (Expr.ColumnIdentifier col in pc.Columns)
                     {
@@ -378,7 +380,7 @@ namespace TSQL.StandardLibrary.Visitors
                 }
             }
 
-            var matchedTableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> matchedTableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string key in regularOrder)
             {
                 matchedTableNames.Add(regularInfo[key].ObjectName);
@@ -397,15 +399,15 @@ namespace TSQL.StandardLibrary.Visitors
             // ── Phase 4: EMIT ─────────────────────────────────────────────────
             // Assemble the output Script. Statement order matters — each SELECT INTO
             // must appear before any query that references its temp table.
-            var allStatements = new List<Stmt>();
+            List<Stmt> allStatements = new List<Stmt>();
 
             // 4a. Regular tables: SELECT [columns] INTO #Table FROM Table
             //     Uses the narrowed column list from phase 2 when possible.
             //     Attaches pushed WHERE predicates and the table alias when needed.
             foreach (string key in regularOrder)
             {
-                var (originalTableName, objectName, alias) = regularInfo[key];
-                var tableRef = new TableReference(originalTableName);
+                (Expr.ObjectIdentifier originalTableName, string objectName, Alias alias) = regularInfo[key];
+                TableReference tableRef = new TableReference(originalTableName);
 
                 // Add alias so pushed predicate column references resolve
                 // (e.g., "FROM Users u WHERE u.Active = 1" needs the "u" alias).
@@ -426,7 +428,7 @@ namespace TSQL.StandardLibrary.Visitors
                     selectIntoStmt = SelectColumnsInto(objectName, tableRef, tableColumnList[key]);
                 }
 
-                if (pushedPredicates.TryGetValue(key, out var predicatesToPush))
+                if (pushedPredicates.TryGetValue(key, out List<Predicate> predicatesToPush))
                 {
                     SelectExpression selectIntoExpr = (SelectExpression)selectIntoStmt.Query;
                     foreach (AST.Predicate pred in predicatesToPush)
@@ -463,7 +465,7 @@ namespace TSQL.StandardLibrary.Visitors
 
                 if (outerSelect?.From != null)
                 {
-                    var tempRef = new TableReference(TempTableIdentifier(aliasName));
+                    TableReference tempRef = new TableReference(TempTableIdentifier(aliasName));
                     ReplaceTableSource(outerSelect.From, subqRef, tempRef);
                 }
             }
@@ -510,7 +512,7 @@ namespace TSQL.StandardLibrary.Visitors
                     tvfSelectInto = SelectColumnsInto(tempName, rowsetRef, tableColumnList[key]);
                 }
 
-                if (pushedPredicates.TryGetValue(key, out var tvfPredicatesToPush))
+                if (pushedPredicates.TryGetValue(key, out List<Predicate> tvfPredicatesToPush))
                 {
                     SelectExpression tvfSelectExpr = (SelectExpression)tvfSelectInto.Query;
                     foreach (AST.Predicate pred in tvfPredicatesToPush)
@@ -523,7 +525,7 @@ namespace TSQL.StandardLibrary.Visitors
 
                 if (outerSelect?.From != null)
                 {
-                    var tempRef = new TableReference(TempTableIdentifier(tempName));
+                    TableReference tempRef = new TableReference(TempTableIdentifier(tempName));
                     tempRef.Alias = preservedAlias;
                     ReplaceTableSource(outerSelect.From, rowsetRef, tempRef);
                 }
@@ -541,26 +543,26 @@ namespace TSQL.StandardLibrary.Visitors
         // Builds: SELECT * INTO #tempName FROM source
         private static Stmt.Select SelectStarInto(string tempName, TableSource source)
         {
-            var selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new Expr.Wildcard());
+            SelectExpression selectExpr = new SelectExpression();
+            selectExpr.Columns.Append(new Expr.Wildcard());
             selectExpr.Into = TempTableIdentifier(tempName);
             selectExpr.From = new FromClause();
-            selectExpr.From.TableSources.Add(source);
+            selectExpr.From.TableSources.Append(source);
             return new Stmt.Select(selectExpr);
         }
 
         // Builds: SELECT col1, col2, ... INTO #tempName FROM source
         private static Stmt.Select SelectColumnsInto(string tempName, TableSource source, List<string> columns)
         {
-            var selectExpr = new SelectExpression();
+            SelectExpression selectExpr = new SelectExpression();
             for (int i = 0; i < columns.Count; i++)
             {
-                selectExpr.Columns.Add(new SelectColumn(
+                selectExpr.Columns.Append(new SelectColumn(
                     new Expr.ColumnIdentifier(new ColumnName(columns[i])), null));
             }
             selectExpr.Into = TempTableIdentifier(tempName);
             selectExpr.From = new FromClause();
-            selectExpr.From.TableSources.Add(source);
+            selectExpr.From.TableSources.Append(source);
             return new Stmt.Select(selectExpr);
         }
 
@@ -649,8 +651,8 @@ namespace TSQL.StandardLibrary.Visitors
         // etc.) are returned as a single-element list.
         private static List<AST.Predicate> FlattenAndConjuncts(AST.Predicate predicate)
         {
-            var result = new List<AST.Predicate>();
-            var stack = new Stack<AST.Predicate>();
+            List<Predicate> result = new List<AST.Predicate>();
+            Stack<Predicate> stack = new Stack<AST.Predicate>();
             stack.Push(predicate);
             while (stack.Count > 0)
             {

@@ -21,47 +21,120 @@ namespace TSQL
         private List<T> _items;
         private List<Token> _separators;
 
+
         /// <summary>
-        /// Adds an item to the list, automatically inserting a comma separator if the list is non-empty.
+        /// Inserts an item at the specified position, automatically inserting a comma separator.
+        /// Out-of-range indices are clamped to the valid range.
         /// </summary>
-        public void Add(T item)
+        public void Insert(int index, T item)
         {
             if (_items == null)
             {
                 _items = new List<T>();
             }
 
-            if (_items.Count > 0)
+            index = Math.Max(0, Math.Min(index, _items.Count));
+
+            if (_items.Count == 0)
             {
-                if (_separators == null)
-                {
-                    _separators = new List<Token>();
-                }
-                _separators.Add(ConcreteToken.Comma);
+                _items.Add(item);
+                return;
             }
 
-            _items.Add(item);
+            _items.Insert(index, item);
+
+            if (_separators == null)
+            {
+                _separators = new List<Token>();
+            }
+
+            int sepIndex = Math.Min(index, _separators.Count);
+            _separators.Insert(sepIndex, ConcreteToken.Comma);
         }
 
         /// <summary>
-        /// Add an item with its trailing separator token (if any).
+        /// Parses a SQL source fragment and inserts the resulting item at the specified position.
+        /// Out-of-range indices are clamped to the valid range.
         /// </summary>
-        internal void Add(T item, Token separator)
+        /// <exception cref="ParseError">Thrown when the source is not valid SQL.</exception>
+        public void Insert(int index, string source)
+        {
+            if (typeof(T) == typeof(SelectItem))
+            {
+                SelectItem item = Parser.CreateParser(source).ParseSelectItem();
+
+                // Parsed fragments start at position 0 so their first token has no
+                // leading whitespace. Add one to prevent merging with the preceding
+                // token (e.g. SELECT keyword) when inserted into an existing list.
+                SyntaxElement element = (SyntaxElement)(object)item;
+                Token first = element.FirstToken();
+                if (first != null && first.LeadingTrivia.Count == 0)
+                {
+                    first.AddLeadingTrivia(Whitespace.Space);
+                }
+
+                Insert(index, (T)(object)item);
+            }
+            else
+            {
+                throw new NotSupportedException("String parsing is not supported for " + typeof(T).Name);
+            }
+        }
+
+        /// <summary>
+        /// Inserts an item at the beginning of the list.
+        /// </summary>
+        public void Prepend(T item) => Insert(0, item);
+
+        /// <summary>
+        /// Parses a SQL source fragment and inserts the resulting item at the beginning of the list.
+        /// </summary>
+        /// <exception cref="ParseError">Thrown when the source is not valid SQL.</exception>
+        public void Prepend(string source) => Insert(0, source);
+
+        /// <summary>
+        /// Adds an item to the end of the list, automatically inserting a comma separator if the list is non-empty.
+        /// </summary>
+        public void Append(T item) => Insert(Count, item);
+
+        /// <summary>
+        /// Parses a SQL source fragment and inserts the resulting item at the end of the list.
+        /// </summary>
+        /// <exception cref="ParseError">Thrown when the source is not valid SQL.</exception>
+        public void Append(string source) => Insert(Count, source);
+
+        /// <summary>
+        /// Inserts an item at the specified position with a specific separator token.
+        /// If separator is null, no separator is added (used for the first item in a list).
+        /// Out-of-range indices are clamped to the valid range.
+        /// </summary>
+        internal void Insert(int index, T item, Token separator)
         {
             if (_items == null)
             {
                 _items = new List<T>();
             }
-            _items.Add(item);
+
+            index = Math.Max(0, Math.Min(index, _items.Count));
+
+            _items.Insert(index, item);
+
             if (separator != null)
             {
                 if (_separators == null)
                 {
                     _separators = new List<Token>();
                 }
-                _separators.Add(separator);
+
+                int sepIndex = Math.Min(index, _separators.Count);
+                _separators.Insert(sepIndex, separator);
             }
         }
+
+        /// <summary>
+        /// Appends an item to the end of the list with a specific separator token.
+        /// </summary>
+        internal void Append(T item, Token separator) => Insert(Count, item, separator);
 
         internal Token GetSeparator(int index)
         {

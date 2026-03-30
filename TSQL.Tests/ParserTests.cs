@@ -3056,10 +3056,10 @@ namespace TSQL.Tests
         public void Construct_SelectStarFromTable_ProducesValidSql()
         {
             SelectExpression selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new Expr.Wildcard());
+            selectExpr.Columns.Append(new Expr.Wildcard());
 
             FromClause from = new FromClause();
-            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("Users"))));
+            from.TableSources.Append(new TableReference(new Expr.ObjectIdentifier(new ObjectName("Users"))));
             selectExpr.From = from;
 
             Stmt.Select stmt = new Stmt.Select(selectExpr);
@@ -3070,13 +3070,13 @@ namespace TSQL.Tests
         public void Construct_SelectMultipleColumns_ProducesValidSql()
         {
             SelectExpression selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new SelectColumn(
+            selectExpr.Columns.Append(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("a")), null));
-            selectExpr.Columns.Add(new SelectColumn(
+            selectExpr.Columns.Append(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("b")), null));
 
             FromClause from = new FromClause();
-            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
+            from.TableSources.Append(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
             selectExpr.From = from;
 
             Stmt.Select stmt = new Stmt.Select(selectExpr);
@@ -3087,12 +3087,12 @@ namespace TSQL.Tests
         public void Construct_SelectWithAlias_ProducesValidSql()
         {
             SelectExpression selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new SelectColumn(
+            selectExpr.Columns.Append(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("a")),
                 new SuffixAlias("alias")));
 
             FromClause from = new FromClause();
-            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
+            from.TableSources.Append(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
             selectExpr.From = from;
 
             Stmt.Select stmt = new Stmt.Select(selectExpr);
@@ -3108,7 +3108,7 @@ namespace TSQL.Tests
                 new Expr.ColumnIdentifier(new ColumnName("b")));
 
             SelectExpression selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new SelectColumn(binary, null));
+            selectExpr.Columns.Append(new SelectColumn(binary, null));
 
             Stmt.Select stmt = new Stmt.Select(selectExpr);
             Assert.Equal("SELECT a + b", stmt.ToSource());
@@ -3123,11 +3123,11 @@ namespace TSQL.Tests
                 new Expr.IntLiteral(10));
 
             SelectExpression selectExpr = new SelectExpression();
-            selectExpr.Columns.Add(new SelectColumn(
+            selectExpr.Columns.Append(new SelectColumn(
                 new Expr.ColumnIdentifier(new ColumnName("a")), null));
 
             FromClause from = new FromClause();
-            from.TableSources.Add(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
+            from.TableSources.Append(new TableReference(new Expr.ObjectIdentifier(new ObjectName("T"))));
             selectExpr.From = from;
             selectExpr.AddWhere(comparison);
 

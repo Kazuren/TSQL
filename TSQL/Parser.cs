@@ -345,6 +345,14 @@ namespace TSQL
             return insertStmt;
         }
 
+        internal SelectItem ParseSelectItem()
+        {
+            Reset();
+            SelectItem item = SelectItem();
+            ExpectEnd();
+            return item;
+        }
+
         public Stmt.Drop ParseDrop()
         {
             Reset();
@@ -457,11 +465,11 @@ namespace TSQL
             Token declareToken = Consume(TokenType.DECLARE, "Expected DECLARE");
 
             SyntaxElementList<VariableDeclaration> declarations = new SyntaxElementList<VariableDeclaration>();
-            declarations.Add(ParseVariableDeclaration());
+            declarations.Append(ParseVariableDeclaration());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                declarations.Add(ParseVariableDeclaration(), comma);
+                declarations.Append(ParseVariableDeclaration(), comma);
             }
 
             Stmt.Declare stmt = new Stmt.Declare(declarations);
@@ -500,11 +508,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after TABLE");
 
             SyntaxElementList<TableColumnDefinition> columns = new SyntaxElementList<TableColumnDefinition>();
-            columns.Add(ParseTableColumnDefinition());
+            columns.Append(ParseTableColumnDefinition());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                columns.Add(ParseTableColumnDefinition(), comma);
+                columns.Append(ParseTableColumnDefinition(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after column definitions");
@@ -701,12 +709,12 @@ namespace TSQL
             // Parse comma-separated target list
             SyntaxElementList<Expr.ObjectIdentifier> targets = new SyntaxElementList<Expr.ObjectIdentifier>();
             IdentifierPartsBuffer parts = CollectIdentifierParts();
-            targets.Add(ObjectIdentifier(parts));
+            targets.Append(ObjectIdentifier(parts));
 
             while (Match(TokenType.COMMA, out Token comma))
             {
                 parts = CollectIdentifierParts();
-                targets.Add(ObjectIdentifier(parts), comma);
+                targets.Append(ObjectIdentifier(parts), comma);
             }
 
             Stmt.Drop dropStmt = new Stmt.Drop(ObjectType.Table, ifExists, targets);
@@ -757,11 +765,11 @@ namespace TSQL
             SyntaxElementList<ExecuteArgument> arguments = new SyntaxElementList<ExecuteArgument>();
             if (!IsAtStatementBoundary())
             {
-                arguments.Add(ParseExecuteArgument());
+                arguments.Append(ParseExecuteArgument());
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
-                    arguments.Add(ParseExecuteArgument(), comma);
+                    arguments.Append(ParseExecuteArgument(), comma);
                 }
             }
 
@@ -834,11 +842,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '('");
 
             SyntaxElementList<Expr> expressions = new SyntaxElementList<Expr>();
-            expressions.Add(Expression());
+            expressions.Append(Expression());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                expressions.Add(Expression(), comma);
+                expressions.Append(Expression(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
@@ -974,11 +982,11 @@ namespace TSQL
             Token outerLeft = Consume(TokenType.LEFT_PAREN, "Expected '('");
 
             SyntaxElementList<ResultSetDefinition> definitions = new SyntaxElementList<ResultSetDefinition>();
-            definitions.Add(ParseResultSetDefinition());
+            definitions.Append(ParseResultSetDefinition());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                definitions.Add(ParseResultSetDefinition(), comma);
+                definitions.Append(ParseResultSetDefinition(), comma);
             }
 
             Token outerRight = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
@@ -1036,11 +1044,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' for column result set definition");
 
             SyntaxElementList<ResultSetColumn> columns = new SyntaxElementList<ResultSetColumn>();
-            columns.Add(ParseResultSetColumn());
+            columns.Append(ParseResultSetColumn());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                columns.Add(ParseResultSetColumn(), comma);
+                columns.Append(ParseResultSetColumn(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
@@ -1096,11 +1104,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '('");
 
             SyntaxElementList<ColumnName> columns = new SyntaxElementList<ColumnName>();
-            columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+            columns.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                columns.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
@@ -1131,11 +1139,11 @@ namespace TSQL
                 Token valuesToken = Advance();
 
                 SyntaxElementList<ValuesRow> rows = new SyntaxElementList<ValuesRow>();
-                rows.Add(ParseValuesRow());
+                rows.Append(ParseValuesRow());
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
-                    rows.Add(ParseValuesRow(), comma);
+                    rows.Append(ParseValuesRow(), comma);
                 }
 
                 ValuesSource source = new ValuesSource(rows);
@@ -1157,11 +1165,11 @@ namespace TSQL
                 // Check if there's something that looks like an expression argument.
                 if (!IsAtStatementBoundary())
                 {
-                    arguments.Add(Expression());
+                    arguments.Append(Expression());
 
                     while (Match(TokenType.COMMA, out Token comma))
                     {
-                        arguments.Add(Expression(), comma);
+                        arguments.Append(Expression(), comma);
                     }
                 }
 
@@ -1346,11 +1354,11 @@ namespace TSQL
                 selectExpr.Top = ParseTopClause(topKeyword);
             }
 
-            selectExpr.Columns.Add(SelectItem());
+            selectExpr.Columns.Append(SelectItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                selectExpr.Columns.Add(SelectItem(), comma);
+                selectExpr.Columns.Append(SelectItem(), comma);
             }
 
             // SELECT INTO (between column list and FROM)
@@ -1489,11 +1497,11 @@ namespace TSQL
 
             FromClause fromClause = new FromClause(fromToken);
 
-            fromClause.TableSources.Add(ParseTableSourceItem());
+            fromClause.TableSources.Append(ParseTableSourceItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                fromClause.TableSources.Add(ParseTableSourceItem(), comma);
+                fromClause.TableSources.Append(ParseTableSourceItem(), comma);
             }
 
             return fromClause;
@@ -1931,11 +1939,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
 
             SyntaxElementList<TableHint> hints = new SyntaxElementList<TableHint>();
-            hints.Add(ParseTableHint());
+            hints.Append(ParseTableHint());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                hints.Add(ParseTableHint(), comma);
+                hints.Append(ParseTableHint(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -1969,7 +1977,7 @@ namespace TSQL
                 {
                     // INDEX = value
                     SyntaxElementList<Expr> indexValues = new SyntaxElementList<Expr>();
-                    indexValues.Add(Expression());
+                    indexValues.Append(Expression());
                     hint = new TableHint(TableHintType.Index, indexValues);
                     hint._equalsToken = equalsToken;
                 }
@@ -1978,10 +1986,10 @@ namespace TSQL
                     // INDEX(value, ...)
                     Token indexLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
                     SyntaxElementList<Expr> indexValues = new SyntaxElementList<Expr>();
-                    indexValues.Add(Expression());
+                    indexValues.Append(Expression());
                     while (Match(TokenType.COMMA, out Token comma))
                     {
-                        indexValues.Add(Expression(), comma);
+                        indexValues.Append(Expression(), comma);
                     }
                     Token indexRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
                     hint = new TableHint(TableHintType.Index, indexValues);
@@ -2012,10 +2020,10 @@ namespace TSQL
                     Expr indexValue = Expression();
                     Token innerLeftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
                     SyntaxElementList<ColumnName> columns = new SyntaxElementList<ColumnName>();
-                    columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+                    columns.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
                     while (Match(TokenType.COMMA, out Token comma))
                     {
-                        columns.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                        columns.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
                     }
                     Token innerRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
                     Token fsRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -2080,11 +2088,11 @@ namespace TSQL
             Token valuesToken = Consume(TokenType.VALUES, "Expected VALUES");
 
             SyntaxElementList<ValuesRow> rows = new SyntaxElementList<ValuesRow>();
-            rows.Add(ParseValuesRow());
+            rows.Append(ParseValuesRow());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                rows.Add(ParseValuesRow(), comma);
+                rows.Append(ParseValuesRow(), comma);
             }
 
             Token outerRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -2109,11 +2117,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
 
             SyntaxElementList<Expr> values = new SyntaxElementList<Expr>();
-            values.Add(Expression());
+            values.Append(Expression());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                values.Add(Expression(), comma);
+                values.Append(Expression(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -2159,10 +2167,10 @@ namespace TSQL
 
             // PIVOT IN values are identifiers that become output column names
             SyntaxElementList<ColumnName> valueList = new SyntaxElementList<ColumnName>();
-            valueList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected identifier for PIVOT value")));
+            valueList.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected identifier for PIVOT value")));
             while (Match(TokenType.COMMA, out Token comma))
             {
-                valueList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected identifier for PIVOT value")), comma);
+                valueList.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected identifier for PIVOT value")), comma);
             }
 
             Token inRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -2201,10 +2209,10 @@ namespace TSQL
 
             // Parse column list
             SyntaxElementList<ColumnName> columnList = new SyntaxElementList<ColumnName>();
-            columnList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+            columnList.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
             while (Match(TokenType.COMMA, out Token comma))
             {
-                columnList.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                columnList.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
             }
 
             Token inRightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -2228,10 +2236,10 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected (");
 
             SyntaxElementList<ColumnName> columnNames = new SyntaxElementList<ColumnName>();
-            columnNames.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+            columnNames.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
             while (Match(TokenType.COMMA, out Token comma))
             {
-                columnNames.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                columnNames.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
@@ -2277,12 +2285,12 @@ namespace TSQL
             {
                 SyntaxElementList<Expr.ColumnIdentifier> columns = new SyntaxElementList<Expr.ColumnIdentifier>();
                 IdentifierPartsBuffer parts = CollectIdentifierParts();
-                columns.Add(ColumnIdentifier(parts));
+                columns.Append(ColumnIdentifier(parts));
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
                     parts = CollectIdentifierParts();
-                    columns.Add(ColumnIdentifier(parts), comma);
+                    columns.Append(ColumnIdentifier(parts), comma);
                 }
 
                 Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after column list");
@@ -2296,7 +2304,7 @@ namespace TSQL
             {
                 SyntaxElementList<Expr.ColumnIdentifier> columns = new SyntaxElementList<Expr.ColumnIdentifier>();
                 IdentifierPartsBuffer parts = CollectIdentifierParts();
-                columns.Add(ColumnIdentifier(parts));
+                columns.Append(ColumnIdentifier(parts));
 
                 Predicate.FullTextColumnNames columnNames = new Predicate.FullTextColumnNames(columns);
                 return columnNames;
@@ -2472,7 +2480,7 @@ namespace TSQL
             // [NOT] LIKE expression [ESCAPE string]
             if (Check(TokenType.LIKE) || (Check(TokenType.NOT) && CheckNext(TokenType.LIKE)))
             {
-                var (notToken, negated) = TryConsumeNot();
+                (Token notToken, Negation negated) = TryConsumeNot();
                 Token likeToken = Consume(TokenType.LIKE, "Expected LIKE");
                 Expr pattern = Expression();
 
@@ -2493,7 +2501,7 @@ namespace TSQL
             // [NOT] BETWEEN expression AND expression
             if (Check(TokenType.BETWEEN) || (Check(TokenType.NOT) && CheckNext(TokenType.BETWEEN)))
             {
-                var (notToken, negated) = TryConsumeNot();
+                (Token notToken, Negation negated) = TryConsumeNot();
                 Token betweenToken = Consume(TokenType.BETWEEN, "Expected BETWEEN");
                 Expr low = Expression();
                 Token andToken = Consume(TokenType.AND, "Expected AND in BETWEEN");
@@ -2510,7 +2518,7 @@ namespace TSQL
             if (Check(TokenType.IS))
             {
                 Token isToken = Advance();
-                var (notToken, negated) = TryConsumeNot();
+                (Token notToken, Negation negated) = TryConsumeNot();
                 Token nullToken = Consume(TokenType.NULL, "Expected NULL after IS");
 
                 Predicate.Null nullPred = new Predicate.Null(leftExpr, negated);
@@ -2523,7 +2531,7 @@ namespace TSQL
             // [NOT] IN (select_expression | expression_list)
             if (Check(TokenType.IN) || (Check(TokenType.NOT) && CheckNext(TokenType.IN)))
             {
-                var (notToken, negated) = TryConsumeNot();
+                (Token notToken, Negation negated) = TryConsumeNot();
                 Token inToken = Consume(TokenType.IN, "Expected IN");
                 Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected ( after IN");
 
@@ -2831,11 +2839,11 @@ namespace TSQL
             try
             {
                 SyntaxElementList<Expr.OpenXmlColumnDef> columns = new SyntaxElementList<Expr.OpenXmlColumnDef>();
-                columns.Add(ParseOpenXmlColumnDef());
+                columns.Append(ParseOpenXmlColumnDef());
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
-                    columns.Add(ParseOpenXmlColumnDef(), comma);
+                    columns.Append(ParseOpenXmlColumnDef(), comma);
                 }
 
                 // If we get here without error, it's a schema declaration
@@ -2903,14 +2911,14 @@ namespace TSQL
                 Expr first = Check(TokenType.STAR)
                     ? (Expr)new Wildcard(Advance())
                     : Expression();
-                arguments.Add(first);
+                arguments.Append(first);
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
                     Expr expr = Check(TokenType.STAR)
                         ? (Expr)new Wildcard(Advance())
                         : Expression();
-                    arguments.Add(expr, comma);
+                    arguments.Append(expr, comma);
                 }
             }
 
@@ -2948,11 +2956,11 @@ namespace TSQL
             Token byToken = Consume(TokenType.BY, "Expected BY after ORDER");
 
             SyntaxElementList<OrderByItem> orderBy = new SyntaxElementList<OrderByItem>();
-            orderBy.Add(ParseOrderByItem());
+            orderBy.Append(ParseOrderByItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                orderBy.Add(ParseOrderByItem(), comma);
+                orderBy.Append(ParseOrderByItem(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after WITHIN GROUP clause");
@@ -3120,11 +3128,11 @@ namespace TSQL
         private SyntaxElementList<Expr> ParseExpressionList()
         {
             SyntaxElementList<Expr> list = new SyntaxElementList<Expr>();
-            list.Add(Expression());
+            list.Append(Expression());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                list.Add(Expression(), comma);
+                list.Append(Expression(), comma);
             }
 
             return list;
@@ -3136,11 +3144,11 @@ namespace TSQL
         private SyntaxElementList<OrderByItem> ParseOrderByList()
         {
             SyntaxElementList<OrderByItem> list = new SyntaxElementList<OrderByItem>();
-            list.Add(ParseOrderByItem());
+            list.Append(ParseOrderByItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                list.Add(ParseOrderByItem(), comma);
+                list.Append(ParseOrderByItem(), comma);
             }
 
             return list;
@@ -3177,11 +3185,11 @@ namespace TSQL
         {
             Cte cte = new Cte(Consume(TokenType.WITH, "Expected WITH"));
 
-            cte.Ctes.Add(ParseCteDefinition());
+            cte.Ctes.Append(ParseCteDefinition());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                cte.Ctes.Add(ParseCteDefinition(), comma);
+                cte.Ctes.Append(ParseCteDefinition(), comma);
             }
 
             return cte;
@@ -3216,11 +3224,11 @@ namespace TSQL
             colNames._leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' for CTE column list");
 
             SyntaxElementList<ColumnName> names = new SyntaxElementList<ColumnName>();
-            names.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
+            names.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")));
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                names.Add(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
+                names.Append(new ColumnName(ConsumeIdentifierOrContextualKeyword("Expected column name")), comma);
             }
 
             colNames.ColumnNames = names;
@@ -3242,11 +3250,11 @@ namespace TSQL
             Token byKeyword = Consume(TokenType.BY, "Expected BY after GROUP");
 
             SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            items.Add(GroupByItem());
+            items.Append(GroupByItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                items.Add(GroupByItem(), comma);
+                items.Append(GroupByItem(), comma);
             }
 
             return new GroupByClause(groupKeyword, byKeyword, items);
@@ -3320,11 +3328,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after GROUPING SETS");
 
             SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            items.Add(ParseGroupingSetItem());
+            items.Append(ParseGroupingSetItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                items.Add(ParseGroupingSetItem(), comma);
+                items.Append(ParseGroupingSetItem(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after GROUPING SETS arguments");
@@ -3337,11 +3345,11 @@ namespace TSQL
         private SyntaxElementList<GroupByItem> ParseGroupByExpressionList()
         {
             SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            items.Add(ParseGroupByExpressionListItem());
+            items.Append(ParseGroupByExpressionListItem());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                items.Add(ParseGroupByExpressionListItem(), comma);
+                items.Append(ParseGroupByExpressionListItem(), comma);
             }
 
             return items;
@@ -3699,11 +3707,11 @@ namespace TSQL
 
             if (Match(TokenType.COMMA, out firstComma))
             {
-                directives.Add(ParseForXmlDirective());
+                directives.Append(ParseForXmlDirective());
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
-                    directives.Add(ParseForXmlDirective(), comma);
+                    directives.Append(ParseForXmlDirective(), comma);
                 }
             }
 
@@ -3822,11 +3830,11 @@ namespace TSQL
 
             if (Match(TokenType.COMMA, out firstComma))
             {
-                directives.Add(ParseForJsonDirective());
+                directives.Append(ParseForJsonDirective());
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
-                    directives.Add(ParseForJsonDirective(), comma);
+                    directives.Append(ParseForJsonDirective(), comma);
                 }
             }
 
@@ -3881,11 +3889,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after OPTION");
 
             SyntaxElementList<QueryHint> hints = new SyntaxElementList<QueryHint>();
-            hints.Add(ParseQueryHint());
+            hints.Append(ParseQueryHint());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                hints.Add(ParseQueryHint(), comma);
+                hints.Append(ParseQueryHint(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after query hints");
@@ -4043,7 +4051,7 @@ namespace TSQL
             }
 
             // Data-driven: two-token hints (LOOP JOIN, KEEP PLAN, EXPAND VIEWS, etc.)
-            if (TwoTokenQueryHints.TryGetValue(Peek().Type, out var twoToken))
+            if (TwoTokenQueryHints.TryGetValue(Peek().Type, out (QueryHintType Type, TokenType Second) twoToken))
             {
                 return ParseTwoTokenQueryHint(twoToken.Type, twoToken.Second);
             }
@@ -4150,11 +4158,11 @@ namespace TSQL
 
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after OPTIMIZE FOR");
             SyntaxElementList<OptimizeForVariable> vars = new SyntaxElementList<OptimizeForVariable>();
-            vars.Add(ParseOptimizeForVariable());
+            vars.Append(ParseOptimizeForVariable());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                vars.Add(ParseOptimizeForVariable(), comma);
+                vars.Append(ParseOptimizeForVariable(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
@@ -4198,11 +4206,11 @@ namespace TSQL
             Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected '(' after USE HINT");
 
             SyntaxElementList<Expr> names = new SyntaxElementList<Expr>();
-            names.Add(Expression());
+            names.Append(Expression());
 
             while (Match(TokenType.COMMA, out Token comma))
             {
-                names.Add(Expression(), comma);
+                names.Append(Expression(), comma);
             }
 
             Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')'");
@@ -4231,11 +4239,11 @@ namespace TSQL
 
             if (Match(TokenType.COMMA, out commaAfterObjectName))
             {
-                tableHints.Add(ParseTableHint());
+                tableHints.Append(ParseTableHint());
 
                 while (Match(TokenType.COMMA, out Token comma))
                 {
-                    tableHints.Add(ParseTableHint(), comma);
+                    tableHints.Append(ParseTableHint(), comma);
                 }
             }
 
@@ -4435,21 +4443,21 @@ namespace TSQL
         private bool Check(TokenType type1, TokenType type2)
         {
             if (IsAtEnd()) return false;
-            var currentType = Peek().Type;
+            TokenType currentType = Peek().Type;
             return currentType == type1 || currentType == type2;
         }
 
         private bool Check(TokenType type1, TokenType type2, TokenType type3)
         {
             if (IsAtEnd()) return false;
-            var currentType = Peek().Type;
+            TokenType currentType = Peek().Type;
             return currentType == type1 || currentType == type2 || currentType == type3;
         }
 
         private bool Check(TokenType type1, TokenType type2, TokenType type3, TokenType type4)
         {
             if (IsAtEnd()) return false;
-            var currentType = Peek().Type;
+            TokenType currentType = Peek().Type;
             return currentType == type1 || currentType == type2 || currentType == type3 || currentType == type4;
         }
 
