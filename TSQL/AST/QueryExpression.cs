@@ -1184,6 +1184,13 @@ namespace TSQL
         public string Lexeme { get => _token.Lexeme; }
         private readonly Token _token;
 
+        // TODO: The leading space belongs to the insertion context, not the token itself.
+        // Ideally SqlName would create bare tokens and spacing would be handled at
+        // rendering time. This requires a way to distinguish "needs formatting" tokens
+        // from parsed tokens that should preserve their original spacing — neither
+        // ConcreteToken/SourceToken type nor the token chain is sufficient for this.
+        // Multi-part constructors (ColumnIdentifier, ObjectIdentifier) undo this space
+        // via ClearLeadingTrivia() for parts that come after dots.
         protected SqlName(string name)
         {
             Name = name;
