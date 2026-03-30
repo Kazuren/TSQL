@@ -190,6 +190,22 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         /// <summary>
+        /// Collects the SELECT columns from this statement in declaration order.
+        /// Returns all <see cref="SelectItem"/> entries: <see cref="SelectColumn"/> (with expression and alias),
+        /// <see cref="Expr.Wildcard"/> (<c>*</c>), and <see cref="Expr.QualifiedWildcard"/> (<c>T.*</c>).
+        /// </summary>
+        /// <param name="stmt">The statement to inspect.</param>
+        /// <param name="scope">Which query levels to traverse (outermost, CTEs, subqueries).</param>
+        /// <returns>The collected SELECT items in declaration order.</returns>
+        /// <remarks>This method does not modify the statement.</remarks>
+        public static IReadOnlyList<SelectItem> CollectSelectColumns(
+            this Stmt stmt,
+            ColumnReferenceScope scope = ColumnReferenceScope.OutermostQuery)
+        {
+            return SelectColumnCollector.Collect(stmt, scope);
+        }
+
+        /// <summary>
         /// Collects column references found in this statement.
         /// Use <paramref name="scope"/> to control which query levels are traversed
         /// and <paramref name="clauses"/> to control which SQL clauses are collected from.
