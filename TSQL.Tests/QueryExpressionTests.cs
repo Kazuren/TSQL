@@ -280,5 +280,187 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region ReplaceColumns
+
+        [Fact]
+        public void ReplaceColumns_SimpleSelect_ReplacesAllColumns()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b FROM T");
+
+            stmt.Query.ReplaceColumns("COUNT(*)");
+
+            Assert.Equal("SELECT COUNT(*) FROM T", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ReplaceColumns_PreservesWhereClause()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T WHERE x = 1");
+
+            stmt.Query.ReplaceColumns("COUNT(*)");
+
+            Assert.Equal("SELECT COUNT(*) FROM T WHERE x = 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ReplaceColumns_PreservesGroupByClause()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, COUNT(*) FROM T GROUP BY a");
+
+            stmt.Query.ReplaceColumns("COUNT(*)");
+
+            Assert.Equal("SELECT COUNT(*) FROM T GROUP BY a", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ReplaceColumns_WithCustomExpression()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T WHERE x = 1");
+
+            stmt.Query.ReplaceColumns("COUNT(DISTINCT T.ID)");
+
+            Assert.Equal("SELECT COUNT(DISTINCT T.ID) FROM T WHERE x = 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ReplaceColumns_PreservesDistinct()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT DISTINCT a FROM T");
+
+            stmt.Query.ReplaceColumns("COUNT(*)");
+
+            Assert.Equal("SELECT DISTINCT COUNT(*) FROM T", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ReplaceColumns_Union_ReplacesBothSides()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2");
+
+            stmt.Query.ReplaceColumns("COUNT(*)");
+
+            Assert.Equal("SELECT COUNT(*) FROM T1 UNION SELECT COUNT(*) FROM T2", stmt.ToSource());
+        }
+
+        [Fact]
+        public void ReplaceColumns_UnionAll_ReplacesBothSides()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION ALL SELECT b FROM T2");
+
+            stmt.Query.ReplaceColumns("COUNT(*)");
+
+            Assert.Equal("SELECT COUNT(*) FROM T1 UNION ALL SELECT COUNT(*) FROM T2", stmt.ToSource());
+        }
+
+        #endregion
+
+        #region ContainsTableReference
+
+        [Fact]
+        public void ContainsTableReference_ReturnsTrueForMatchingTable()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T WHERE x = 1");
+
+            Assert.True(stmt.Query.ContainsTableReference("T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_IsCaseInsensitive()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM MyTable WHERE x = 1");
+
+            Assert.True(stmt.Query.ContainsTableReference("MYTABLE"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_ReturnsFalseWhenAbsent()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T WHERE x = 1");
+
+            Assert.False(stmt.Query.ContainsTableReference("OTHER"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_WorksWithoutWhereClause()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T");
+
+            Assert.True(stmt.Query.ContainsTableReference("T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_FindsInJoin()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 JOIN T2 ON T1.ID = T2.ID");
+
+            Assert.True(stmt.Query.ContainsTableReference("T2"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_FindsLeftSideOfJoin()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 JOIN T2 ON T1.ID = T2.ID");
+
+            Assert.True(stmt.Query.ContainsTableReference("T1"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_SetOperation_FindsInEitherSide()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T1 UNION SELECT b FROM T2");
+
+            Assert.True(stmt.Query.ContainsTableReference("T2"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_UnqualifiedSearch_MatchesDboQualifiedTable()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM dbo.T");
+
+            Assert.True(stmt.Query.ContainsTableReference("T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_DboQualifiedSearch_MatchesUnqualifiedTable()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T");
+
+            Assert.True(stmt.Query.ContainsTableReference("dbo.T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_DboQualifiedSearch_MatchesDboQualifiedTable()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM dbo.T");
+
+            Assert.True(stmt.Query.ContainsTableReference("dbo.T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_NonDboSchema_DoesNotMatchUnqualified()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM staging.T");
+
+            Assert.False(stmt.Query.ContainsTableReference("T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_NonDboSchema_MatchesWhenSchemaMatches()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM staging.T");
+
+            Assert.True(stmt.Query.ContainsTableReference("staging.T"));
+        }
+
+        [Fact]
+        public void ContainsTableReference_ReturnsFalseWithNoFromClause()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT 1");
+
+            Assert.False(stmt.Query.ContainsTableReference("T"));
+        }
+
+        #endregion
     }
 }

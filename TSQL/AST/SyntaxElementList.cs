@@ -116,6 +116,15 @@ namespace TSQL
         public void Append(string source) => Insert(Count, source);
 
         /// <summary>
+        /// Removes all items and separators from the list.
+        /// </summary>
+        public void Clear()
+        {
+            _items?.Clear();
+            _separators?.Clear();
+        }
+
+        /// <summary>
         /// Inserts an item at the specified position with a specific separator token.
         /// If separator is null, no separator is added (used for the first item in a list).
         /// Out-of-range indices are clamped to the valid range.

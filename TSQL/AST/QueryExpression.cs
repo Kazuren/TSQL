@@ -919,6 +919,19 @@ namespace TSQL
             }
             return false;
         }
+
+        /// <summary>
+        /// Replaces all columns in the SELECT list with a single column parsed from a SQL fragment.
+        /// For set operations (UNION, INTERSECT, EXCEPT), recurses to both sides.
+        /// </summary>
+        /// <exception cref="ParseError">Thrown when the source is not valid SQL.</exception>
+        public abstract void ReplaceColumns(string source);
+
+        /// <summary>
+        /// Returns true if any table in the FROM clause matches the specified table name.
+        /// Walks through joins to check both sides. Comparison is case-insensitive.
+        /// </summary>
+        public abstract bool ContainsTableReference(string tableName);
     }
 
     public class SelectExpression : QueryExpression
@@ -970,6 +983,94 @@ namespace TSQL
         public override void PrependColumn(string source)
         {
             _columns.Prepend(source);
+        }
+
+        public override void ReplaceColumns(string source)
+        {
+            _columns.Clear();
+            _columns.Append(source);
+        }
+
+        public override bool ContainsTableReference(string tableName)
+        {
+            if (From == null)
+            {
+                return false;
+            }
+            foreach (TableSource ts in From.TableSources)
+            {
+                if (ContainsTableReferenceIn(ts, tableName))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool ContainsTableReferenceIn(TableSource source, string tableName)
+        {
+            if (source is TableReference tr)
+            {
+                return MatchesTableName(tr.TableName, tableName);
+            }
+            else if (source is QualifiedJoin qj)
+            {
+                return ContainsTableReferenceIn(qj.Left, tableName) || ContainsTableReferenceIn(qj.Right, tableName);
+            }
+            else if (source is CrossJoin cj)
+            {
+                return ContainsTableReferenceIn(cj.Left, tableName) || ContainsTableReferenceIn(cj.Right, tableName);
+            }
+            else if (source is ApplyJoin aj)
+            {
+                return ContainsTableReferenceIn(aj.Left, tableName) || ContainsTableReferenceIn(aj.Right, tableName);
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Checks whether the given ObjectIdentifier matches a search name.
+        /// Supports dotted names (e.g. "dbo.T") and treats the dbo schema
+        /// as equivalent to no schema (SQL Server default).
+        /// </summary>
+        private static bool MatchesTableName(Expr.ObjectIdentifier tableId, string searchName)
+        {
+            string searchSchema = null;
+            string searchTable = searchName;
+
+            int dotIndex = searchName.IndexOf('.');
+            if (dotIndex >= 0)
+            {
+                searchSchema = searchName.Substring(0, dotIndex);
+                searchTable = searchName.Substring(dotIndex + 1);
+            }
+
+            if (!tableId.ObjectName.Name.Equals(searchTable, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string actualSchema = tableId.SchemaName?.Name;
+
+            bool actualIsDbo = actualSchema == null
+                || actualSchema.Equals("dbo", System.StringComparison.OrdinalIgnoreCase);
+            bool searchIsDbo = searchSchema == null
+                || searchSchema.Equals("dbo", System.StringComparison.OrdinalIgnoreCase);
+
+            if (actualIsDbo && searchIsDbo)
+            {
+                return true;
+            }
+
+            if (actualSchema != null && searchSchema != null)
+            {
+                return actualSchema.Equals(searchSchema, System.StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
         }
         internal Token _quantifierKeyword;
         internal Token _whereKeyword;
@@ -1217,6 +1318,17 @@ namespace TSQL
         {
             Left.PrependColumn(source);
             Right.PrependColumn(source);
+        }
+
+        public override void ReplaceColumns(string source)
+        {
+            Left.ReplaceColumns(source);
+            Right.ReplaceColumns(source);
+        }
+
+        public override bool ContainsTableReference(string tableName)
+        {
+            return Left.ContainsTableReference(tableName) || Right.ContainsTableReference(tableName);
         }
 
         internal override IEnumerable<Token> DescendantTokens()

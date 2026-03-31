@@ -172,5 +172,55 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Clear
+
+        [Fact]
+        public void Clear_RemovesAllItems()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, c FROM T");
+            SelectExpression selectExpr = (SelectExpression)stmt.Query;
+
+            selectExpr.Columns.Clear();
+
+            Assert.Equal(0, selectExpr.Columns.Count);
+        }
+
+        [Fact]
+        public void Clear_ThenAppend_ProducesValidOutput()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b FROM T");
+            SelectExpression selectExpr = (SelectExpression)stmt.Query;
+
+            selectExpr.Columns.Clear();
+            selectExpr.Columns.Append("COUNT(*)");
+
+            Assert.Equal("SELECT COUNT(*) FROM T", stmt.ToSource());
+        }
+
+        [Fact]
+        public void Clear_OnEmptyList_DoesNotThrow()
+        {
+            SyntaxElementList<SelectItem> columns = new SyntaxElementList<SelectItem>();
+
+            columns.Clear();
+
+            Assert.Equal(0, columns.Count);
+        }
+
+        [Fact]
+        public void Clear_ThenAppendMultiple_ProducesCommaSeparatedOutput()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT a, b, c FROM T");
+            SelectExpression selectExpr = (SelectExpression)stmt.Query;
+
+            selectExpr.Columns.Clear();
+            selectExpr.Columns.Append("x");
+            selectExpr.Columns.Append("y");
+
+            Assert.Equal("SELECT x, y FROM T", stmt.ToSource());
+        }
+
+        #endregion
     }
 }
