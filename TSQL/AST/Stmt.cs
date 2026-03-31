@@ -1801,6 +1801,56 @@ namespace TSQL
             _alias = alias;
         }
 
+        /// <summary>
+        /// Returns the name this column will have in the result set:
+        /// the alias name if aliased, or the column name if a simple column reference.
+        /// Returns null for complex expressions without an alias.
+        /// </summary>
+        public string OutputName
+        {
+            get
+            {
+                if (Alias != null)
+                {
+                    return Alias.Name;
+                }
+                if (Expression is Expr.ColumnIdentifier colId)
+                {
+                    return colId.ColumnName.Name;
+                }
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Returns true if this column's expression is a function call with the specified name.
+        /// Comparison is case-insensitive.
+        /// </summary>
+        public bool IsFunctionCall(string functionName)
+        {
+            if (Expression is Expr.FunctionCall func)
+            {
+                return func.Callee.ObjectName.Name.Equals(functionName, System.StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Returns true if this column's expression is a reference to the specified table.column.
+        /// Comparison is case-insensitive.
+        /// </summary>
+        public bool IsColumnReference(string objectName, string columnName)
+        {
+            if (Expression is Expr.ColumnIdentifier colId
+                && colId.ObjectName != null
+                && colId.ObjectName.Name.Equals(objectName, System.StringComparison.OrdinalIgnoreCase)
+                && colId.ColumnName.Name.Equals(columnName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
+        }
+
         internal override IEnumerable<Token> DescendantTokens()
         {
             if (Alias is PrefixAlias prefixAlias)

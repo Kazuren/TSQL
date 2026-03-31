@@ -864,13 +864,71 @@ namespace TSQL
     {
         public OrderByClause OrderBy { get; set; }
         public ForClause For { get; set; }
+
+        /// <summary>
+        /// Returns a read-only view of the columns in this query expression.
+        /// For SelectExpression, returns its column list.
+        /// For SetOperation, returns a merged snapshot of columns from both sides.
+        /// </summary>
+        public IReadOnlySyntaxElementList<SelectItem> Columns => GetColumnsCore();
+        internal abstract IReadOnlySyntaxElementList<SelectItem> GetColumnsCore();
+
+        /// <summary>
+        /// Prepends a column (parsed from a SQL source fragment) to the SELECT list.
+        /// For set operations (UNION, INTERSECT, EXCEPT), recurses to both sides.
+        /// </summary>
+        /// <exception cref="ParseError">Thrown when the source is not valid SQL.</exception>
+        public abstract void PrependColumn(string source);
+
+        /// <summary>
+        /// Returns true if any column in the SELECT list is a wildcard (* or table.*).
+        /// </summary>
+        public bool ContainsWildcard()
+        {
+            return Columns.Any<Expr.Wildcard>() || Columns.Any<Expr.QualifiedWildcard>();
+        }
+
+        /// <summary>
+        /// Returns true if any column's expression is a function call with the specified name.
+        /// Comparison is case-insensitive.
+        /// </summary>
+        public bool ContainsFunctionCall(string functionName)
+        {
+            foreach (SelectItem item in Columns)
+            {
+                if (item is SelectColumn col && col.IsFunctionCall(functionName))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Returns true if any column's expression is a reference to the specified table.column.
+        /// Comparison is case-insensitive.
+        /// </summary>
+        public bool ContainsColumnReference(string objectName, string columnName)
+        {
+            foreach (SelectItem item in Columns)
+            {
+                if (item is SelectColumn col && col.IsColumnReference(objectName, columnName))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     public class SelectExpression : QueryExpression
     {
         public SetQuantifier Quantifier { get; set; }
         public TopClause Top { get; set; }
-        public SyntaxElementList<SelectItem> Columns { get; set; }
+
+        private SyntaxElementList<SelectItem> _columns;
+        public new SyntaxElementList<SelectItem> Columns => _columns;
+        internal override IReadOnlySyntaxElementList<SelectItem> GetColumnsCore() => _columns;
         private Expr.ObjectIdentifier _into;
         public Expr.ObjectIdentifier Into
         {
@@ -906,7 +964,12 @@ namespace TSQL
         public SelectExpression()
         {
             _selectKeyword = new ConcreteToken(TokenType.SELECT, "SELECT", null);
-            Columns = new SyntaxElementList<SelectItem>();
+            _columns = new SyntaxElementList<SelectItem>();
+        }
+
+        public override void PrependColumn(string source)
+        {
+            _columns.Prepend(source);
         }
         internal Token _quantifierKeyword;
         internal Token _whereKeyword;
@@ -1129,6 +1192,31 @@ namespace TSQL
             _left = left;
             _right = right;
             OperationType = operationType;
+        }
+
+        /// <summary>
+        /// Returns a merged snapshot of columns from both sides of the set operation.
+        /// This is a read-only view for inspection — mutations do not propagate
+        /// to the underlying SELECT expressions. Use PrependColumn() for mutations.
+        /// </summary>
+        internal override IReadOnlySyntaxElementList<SelectItem> GetColumnsCore()
+        {
+            var merged = new SyntaxElementList<SelectItem>();
+            foreach (SelectItem item in Left.Columns)
+            {
+                merged.Insert(merged.Count, item, null);
+            }
+            foreach (SelectItem item in Right.Columns)
+            {
+                merged.Insert(merged.Count, item, null);
+            }
+            return merged;
+        }
+
+        public override void PrependColumn(string source)
+        {
+            Left.PrependColumn(source);
+            Right.PrependColumn(source);
         }
 
         internal override IEnumerable<Token> DescendantTokens()

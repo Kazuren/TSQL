@@ -6,10 +6,22 @@ using System.Text;
 namespace TSQL
 {
     /// <summary>
+    /// Read-only view of a syntax element list. Exposes inspection methods
+    /// but no mutation operations (Insert, Prepend, Append).
+    /// </summary>
+    public interface IReadOnlySyntaxElementList<out T> : IEnumerable<T>
+    {
+        int Count { get; }
+        T this[int index] { get; }
+        bool Any<TResult>() where TResult : class;
+        IEnumerable<TResult> OfType<TResult>() where TResult : class;
+    }
+
+    /// <summary>
     /// A list of syntax nodes separated by tokens (like commas).
     /// Preserves the separator tokens to maintain trivia.
     /// </summary>
-    public class SyntaxElementList<T> : SyntaxElement, IEnumerable<T> where T : class, ISyntaxElement
+    public class SyntaxElementList<T> : SyntaxElement, IReadOnlySyntaxElementList<T>, IEnumerable<T> where T : class, ISyntaxElement
     {
         public int Count => _items != null ? _items.Count : 0;
         public T this[int index]
@@ -144,6 +156,39 @@ namespace TSQL
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Returns true if any item in the list is of the specified type.
+        /// </summary>
+        public bool Any<TResult>() where TResult : class
+        {
+            if (_items == null) return false;
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (_items[i] is TResult)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Returns all items in the list that are of the specified type.
+        /// </summary>
+        public IEnumerable<TResult> OfType<TResult>() where TResult : class
+        {
+            if (_items != null)
+            {
+                for (int i = 0; i < _items.Count; i++)
+                {
+                    if (_items[i] is TResult result)
+                    {
+                        yield return result;
+                    }
+                }
+            }
         }
 
         public IEnumerator<T> GetEnumerator()
