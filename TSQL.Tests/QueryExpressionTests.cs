@@ -484,11 +484,21 @@ namespace TSQL.Tests
         }
 
         [Fact]
-        public void SetQuantifier_AllRemovesDistinct()
+        public void SetQuantifier_AllReplacesDistinctWithAll()
         {
             Stmt.Select stmt = Stmt.ParseSelect("SELECT DISTINCT 1");
 
             stmt.Query.Quantifier = SetQuantifier.All;
+
+            Assert.Equal("SELECT ALL 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void SetQuantifier_NoneRemovesDistinct()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT DISTINCT 1");
+
+            stmt.Query.Quantifier = SetQuantifier.None;
 
             Assert.Equal("SELECT 1", stmt.ToSource());
         }

@@ -858,7 +858,7 @@ namespace TSQL
     #region Query Expressions
 
     public enum SetOperationType { Union, UnionAll, Intersect, Except }
-    public enum SetQuantifier { All, Distinct }
+    public enum SetQuantifier { None, All, Distinct }
 
     public abstract class QueryExpression : SyntaxElement
     {
@@ -946,8 +946,11 @@ namespace TSQL
 
             switch (quantifier)
             {
-                case SetQuantifier.All:
+                case SetQuantifier.None:
                     _quantifierKeyword = null;
+                    break;
+                case SetQuantifier.All:
+                    _quantifierKeyword = ConcreteToken.WithLeadingSpace(TokenType.ALL, "ALL");
                     break;
                 case SetQuantifier.Distinct:
                     _quantifierKeyword = ConcreteToken.WithLeadingSpace(TokenType.DISTINCT, "DISTINCT");
