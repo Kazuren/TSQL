@@ -1,4 +1,3 @@
-using System.Linq;
 using static TSQL.Expr;
 
 namespace TSQL.Tests
@@ -459,6 +458,59 @@ namespace TSQL.Tests
             Stmt.Select stmt = Stmt.ParseSelect("SELECT 1");
 
             Assert.False(stmt.Query.ContainsTableReference("T"));
+        }
+
+        #endregion
+
+        #region Quantifier
+        [Fact]
+        public void SetQuantifier_SetsQuantifierOnSimpleQuery()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT 1");
+
+            stmt.Query.Quantifier = SetQuantifier.Distinct;
+
+            Assert.Equal("SELECT DISTINCT 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void SetQuantifier_SetsQuantifierOnSetQuery()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT 1 UNION SELECT 2");
+
+            stmt.Query.Quantifier = SetQuantifier.Distinct;
+
+            Assert.Equal("SELECT DISTINCT 1 UNION SELECT DISTINCT 2", stmt.ToSource());
+        }
+
+        [Fact]
+        public void SetQuantifier_AllRemovesDistinct()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT DISTINCT 1");
+
+            stmt.Query.Quantifier = SetQuantifier.All;
+
+            Assert.Equal("SELECT 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void SetQuantifier_AllOnAllPreservesOutput()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT ALL 1");
+
+            stmt.Query.Quantifier = SetQuantifier.All;
+
+            Assert.Equal("SELECT ALL 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void SetQuantifier_SetsQuantifierOnNestedSetQuery()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("SELECT 1 UNION SELECT 2 UNION SELECT 3");
+
+            stmt.Query.Quantifier = SetQuantifier.Distinct;
+
+            Assert.Equal("SELECT DISTINCT 1 UNION SELECT DISTINCT 2 UNION SELECT DISTINCT 3", stmt.ToSource());
         }
 
         #endregion

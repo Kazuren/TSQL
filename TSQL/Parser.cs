@@ -1340,12 +1340,12 @@ namespace TSQL
 
             if (Match(TokenType.DISTINCT))
             {
-                selectExpr.Quantifier = SetQuantifier.Distinct;
+                selectExpr._quantifier = SetQuantifier.Distinct;
                 selectExpr._quantifierKeyword = Previous();
             }
             else if (Match(TokenType.ALL))
             {
-                selectExpr.Quantifier = SetQuantifier.All;
+                selectExpr._quantifier = SetQuantifier.All;
                 selectExpr._quantifierKeyword = Previous();
             }
 

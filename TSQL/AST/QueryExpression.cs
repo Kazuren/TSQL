@@ -864,6 +864,8 @@ namespace TSQL
     {
         public OrderByClause OrderBy { get; set; }
         public ForClause For { get; set; }
+        public SetQuantifier Quantifier { set => SetSetQuantifier(value); }
+        internal abstract void SetSetQuantifier(SetQuantifier quantifier);
 
         /// <summary>
         /// Returns a read-only view of the columns in this query expression.
@@ -936,7 +938,27 @@ namespace TSQL
 
     public class SelectExpression : QueryExpression
     {
-        public SetQuantifier Quantifier { get; set; }
+        internal SetQuantifier _quantifier;
+        public new SetQuantifier Quantifier { get => _quantifier; set => SetSetQuantifier(value); }
+        internal override void SetSetQuantifier(SetQuantifier quantifier)
+        {
+            if (quantifier == _quantifier) return;
+
+            switch (quantifier)
+            {
+                case SetQuantifier.All:
+                    _quantifierKeyword = null;
+                    break;
+                case SetQuantifier.Distinct:
+                    _quantifierKeyword = ConcreteToken.WithLeadingSpace(TokenType.DISTINCT, "DISTINCT");
+                    break;
+                default:
+                    throw new System.ArgumentOutOfRangeException(nameof(quantifier), quantifier, null);
+            }
+
+            _quantifier = quantifier;
+        }
+
         public TopClause Top { get; set; }
 
         private SyntaxElementList<SelectItem> _columns;
@@ -1293,6 +1315,13 @@ namespace TSQL
             _left = left;
             _right = right;
             OperationType = operationType;
+        }
+
+
+        internal override void SetSetQuantifier(SetQuantifier quantifier)
+        {
+            Left.Quantifier = quantifier;
+            Right.Quantifier = quantifier;
         }
 
         /// <summary>
