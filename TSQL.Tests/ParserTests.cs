@@ -716,6 +716,7 @@ namespace TSQL.Tests
         #region Round-Trip Theory Tests
 
         [Theory]
+        [InlineData("(SELECT 1)")]
         [InlineData("SELECT a FROM T")]
         [InlineData("SELECT a, b, c FROM T")]
         [InlineData("SELECT * FROM T")]
@@ -2918,6 +2919,50 @@ namespace TSQL.Tests
             Stmt.Select stmt = Stmt.ParseSelect("SELECT a FROM T ORDER BY a");
             Assert.IsType<SelectExpression>(stmt.Query);
             Assert.Equal(1, stmt.Query.OrderBy.Items.Count);
+        }
+
+        // ---- Parenthesized query expressions ----
+
+        [Theory]
+        [InlineData("(SELECT 1) UNION (SELECT 2)")]
+        [InlineData("((SELECT 1))")]
+        [InlineData("(SELECT 1 UNION SELECT 2) INTERSECT SELECT 3")]
+        [InlineData("(SELECT a FROM T) ORDER BY a")]
+        [InlineData("(SELECT a FROM T1) UNION ALL (SELECT b FROM T2)")]
+        public void Parse_ParenthesizedQuery_RoundTrips(string source)
+        {
+            Assert.Equal(source, RoundTrip(source));
+        }
+
+        [Fact]
+        public void Parse_ParenthesizedSelect_ReturnsParenthesizedQuery()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("(SELECT 1)");
+            ParenthesizedQuery pq = Assert.IsType<ParenthesizedQuery>(stmt.Query);
+            Assert.IsType<SelectExpression>(pq.Inner);
+        }
+
+        [Fact]
+        public void Parse_ParenthesizedQuery_ColumnsDelegateToInner()
+        {
+            Stmt.Select stmt = Stmt.ParseSelect("(SELECT a, b FROM T)");
+            Assert.Equal(2, stmt.Query.Columns.Count);
+        }
+
+        [Fact]
+        public void Parse_ParenthesizedUnion_OverridesDefaultPrecedence()
+        {
+            // Without parens: A UNION B INTERSECT C → A UNION (B INTERSECT C)
+            // With parens: (A UNION B) INTERSECT C → (A UNION B) INTERSECT C
+            Stmt.Select stmt = Stmt.ParseSelect("(SELECT 1 UNION SELECT 2) INTERSECT SELECT 3");
+            SetOperation outerOp = Assert.IsType<SetOperation>(stmt.Query);
+            Assert.Equal(SetOperationType.Intersect, outerOp.OperationType);
+
+            ParenthesizedQuery pq = Assert.IsType<ParenthesizedQuery>(outerOp.Left);
+            SetOperation innerOp = Assert.IsType<SetOperation>(pq.Inner);
+            Assert.Equal(SetOperationType.Union, innerOp.OperationType);
+
+            Assert.IsType<SelectExpression>(outerOp.Right);
         }
 
         #endregion

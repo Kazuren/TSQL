@@ -488,6 +488,10 @@ namespace TSQL
                 WalkQueryExpression(setOp.Left);
                 WalkQueryExpression(setOp.Right);
             }
+            else if (queryExpr is ParenthesizedQuery parenQuery)
+            {
+                WalkQueryExpression(parenQuery.Inner);
+            }
 
             if (queryExpr.OrderBy != null)
             {

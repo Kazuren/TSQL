@@ -1311,15 +1311,15 @@ namespace TSQL
         }
 
         /// <summary>
-        /// intersect -> select_core (INTERSECT select_core)*
+        /// intersect -> select_primary (INTERSECT select_primary)*
         /// </summary>
         private QueryExpression Intersect()
         {
-            QueryExpression left = SelectCore();
+            QueryExpression left = SelectPrimary();
 
             while (Match(TokenType.INTERSECT, out Token opToken))
             {
-                QueryExpression right = SelectCore();
+                QueryExpression right = SelectPrimary();
 
                 SetOperation setOp = new SetOperation(left, right, SetOperationType.Intersect);
                 setOp._operatorToken = opToken;
@@ -1327,6 +1327,28 @@ namespace TSQL
             }
 
             return left;
+        }
+
+        /// <summary>
+        /// select_primary -> "(" query_expression ")" | select_core
+        /// </summary>
+        private QueryExpression SelectPrimary()
+        {
+            if (Check(TokenType.LEFT_PAREN))
+            {
+                Token leftParen = Advance();
+                QueryExpression inner = QueryExpression();
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected )");
+
+                ParenthesizedQuery pq = new ParenthesizedQuery(inner);
+                pq._leftParen = leftParen;
+                pq._rightParen = rightParen;
+                return pq;
+            }
+            else
+            {
+                return SelectCore();
+            }
         }
 
         /// <summary>

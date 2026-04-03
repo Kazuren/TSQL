@@ -121,6 +121,10 @@ namespace TSQL.StandardLibrary.Visitors
                     HandleQueryExpression(setOp.Left, requiredFlag);
                     HandleQueryExpression(setOp.Right, requiredFlag);
                 }
+                else if (queryExpr is ParenthesizedQuery parenQuery)
+                {
+                    HandleQueryExpression(parenQuery.Inner, requiredFlag);
+                }
             }
         }
     }

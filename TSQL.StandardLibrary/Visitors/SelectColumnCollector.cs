@@ -98,6 +98,10 @@ namespace TSQL.StandardLibrary.Visitors
                 // For UNION/EXCEPT/INTERSECT, result columns come from the first operand.
                 CollectFromQueryExpression(setOp.Left);
             }
+            else if (queryExpr is ParenthesizedQuery parenQuery)
+            {
+                CollectFromQueryExpression(parenQuery.Inner);
+            }
         }
 
         private void CollectFromSelectExpression(SelectExpression selectExpr)

@@ -1406,6 +1406,86 @@ namespace TSQL
         }
     }
 
+    public class ParenthesizedQuery : QueryExpression
+    {
+        private QueryExpression _inner;
+        public QueryExpression Inner
+        {
+            get => _inner;
+            set => SetWithTrivia(ref _inner, value);
+        }
+
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public ParenthesizedQuery(QueryExpression inner)
+        {
+            _inner = inner;
+        }
+
+        internal override void SetSetQuantifier(SetQuantifier quantifier)
+        {
+            Inner.Quantifier = quantifier;
+        }
+
+        internal override IReadOnlySyntaxElementList<SelectItem> GetColumnsCore()
+        {
+            return Inner.Columns;
+        }
+
+        public override void PrependColumn(string source)
+        {
+            Inner.PrependColumn(source);
+        }
+
+        public override void ReplaceColumns(string source)
+        {
+            Inner.ReplaceColumns(source);
+        }
+
+        public override bool ContainsTableReference(string tableName)
+        {
+            return Inner.ContainsTableReference(tableName);
+        }
+
+        internal override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _leftParen;
+            foreach (Token token in Inner.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+
+            if (OrderBy != null)
+            {
+                foreach (Token token in OrderBy.DescendantTokens())
+                    yield return token;
+            }
+
+            if (For != null)
+            {
+                foreach (Token token in For.DescendantTokens())
+                    yield return token;
+            }
+        }
+
+        internal override void WriteTo(StringBuilder sb)
+        {
+            _leftParen.AppendTo(sb);
+            Inner.WriteTo(sb);
+            _rightParen.AppendTo(sb);
+
+            if (OrderBy != null)
+            {
+                OrderBy.WriteTo(sb);
+            }
+
+            if (For != null)
+            {
+                For.WriteTo(sb);
+            }
+        }
+    }
+
     #endregion
 
     #region SQL Names

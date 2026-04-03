@@ -150,6 +150,10 @@ namespace TSQL.StandardLibrary.Visitors
                 WalkQueryExpressionWithClauses(setOp.Left);
                 WalkQueryExpressionWithClauses(setOp.Right);
             }
+            else if (queryExpr is ParenthesizedQuery parenQuery)
+            {
+                WalkQueryExpressionWithClauses(parenQuery.Inner);
+            }
 
             if (queryExpr.OrderBy != null)
             {
