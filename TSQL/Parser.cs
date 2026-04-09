@@ -2673,6 +2673,50 @@ namespace TSQL
                 expr = atTimeZone;
             }
 
+            // Method calls: expr.methodName(args)
+            // Handles XML methods (.value, .query, .exist, .modify, .nodes),
+            // CLR type methods, hierarchyid methods, etc.
+            while (Check(TokenType.DOT))
+            {
+                Token next = PeekAt(1);
+                Token afterNext = PeekAt(2);
+                if (next == null || afterNext == null)
+                {
+                    break;
+                }
+                if (!(next.Type == TokenType.IDENTIFIER || IsContextualKeyword(next.Type)))
+                {
+                    break;
+                }
+                if (afterNext.Type != TokenType.LEFT_PAREN)
+                {
+                    break;
+                }
+
+                Token dot = Advance();
+                Token methodName = Advance();
+                Token leftParen = Advance();
+
+                SyntaxElementList<Expr> arguments = new SyntaxElementList<Expr>();
+                if (!Check(TokenType.RIGHT_PAREN))
+                {
+                    arguments.Append(Expression());
+                    while (Match(TokenType.COMMA, out Token comma))
+                    {
+                        arguments.Append(Expression(), comma);
+                    }
+                }
+
+                Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ')' after method arguments");
+
+                Expr.MethodCall methodCall = new Expr.MethodCall(expr, arguments);
+                methodCall._dot = dot;
+                methodCall._methodName = methodName;
+                methodCall._leftParen = leftParen;
+                methodCall._rightParen = rightParen;
+                expr = methodCall;
+            }
+
             return expr;
         }
 
@@ -4509,6 +4553,17 @@ namespace TSQL
             }
 
             return _tokens[_current + 1];
+        }
+
+        private Token PeekAt(int offset)
+        {
+            int index = _current + offset;
+            if (index >= _tokens.Count)
+            {
+                return null;
+            }
+
+            return _tokens[index];
         }
 
         private Token Previous()

@@ -35,6 +35,7 @@ namespace TSQL
             T VisitIifExpr(Iif expr);
             T VisitAtTimeZoneExpr(AtTimeZone expr);
             T VisitOpenXmlExpr(OpenXmlExpression expr);
+            T VisitMethodCallExpr(MethodCall expr);
         }
 
         /// <summary>
@@ -1080,6 +1081,74 @@ namespace TSQL
                 _timeKeyword.AppendTo(sb);
                 _zoneKeyword.AppendTo(sb);
                 TimeZone.WriteTo(sb);
+            }
+        }
+
+        #endregion
+
+        #region Method Call
+
+        /// <summary>
+        /// Represents a method call on an expression: expr.methodName(args)
+        /// Used for XML methods (.value, .query, .exist, .modify, .nodes),
+        /// CLR type methods, hierarchyid methods, etc.
+        /// </summary>
+        public class MethodCall : Expr
+        {
+            private Expr _object;
+            public Expr Object
+            {
+                get => _object;
+                set => SetWithTrivia(ref _object, value);
+            }
+
+            public string MethodName { get => _methodName.Lexeme; }
+
+            public SyntaxElementList<Expr> Arguments { get; set; }
+
+            internal Token _dot;
+            internal Token _methodName;
+            internal Token _leftParen;
+            internal Token _rightParen;
+
+            public MethodCall(Expr obj, string methodName, SyntaxElementList<Expr> arguments)
+            {
+                _object = obj;
+                _dot = new ConcreteToken(TokenType.DOT, ".", null);
+                _methodName = new ConcreteToken(TokenType.IDENTIFIER, methodName, null);
+                _leftParen = new ConcreteToken(TokenType.LEFT_PAREN, "(", null);
+                _rightParen = new ConcreteToken(TokenType.RIGHT_PAREN, ")", null);
+                Arguments = arguments;
+            }
+
+            internal MethodCall(Expr obj, SyntaxElementList<Expr> arguments)
+            {
+                _object = obj;
+                Arguments = arguments;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor) => visitor.VisitMethodCallExpr(this);
+
+            internal override IEnumerable<Token> DescendantTokens()
+            {
+                foreach (Token token in Object.DescendantTokens())
+                    yield return token;
+                yield return _dot;
+                yield return _methodName;
+                yield return _leftParen;
+                foreach (Token token in Arguments.DescendantTokens())
+                    yield return token;
+                yield return _rightParen;
+            }
+
+            internal override void WriteTo(StringBuilder sb)
+            {
+                Object.WriteTo(sb);
+                _dot.AppendTo(sb);
+                _methodName.AppendTo(sb);
+                _leftParen.AppendTo(sb);
+                Arguments.WriteTo(sb);
+                _rightParen.AppendTo(sb);
             }
         }
 

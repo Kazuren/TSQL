@@ -84,6 +84,7 @@ namespace TSQL.Tests
             public object? VisitIifExpr(Expr.Iif expr) { LastType = "Iif"; return null; }
             public object? VisitAtTimeZoneExpr(Expr.AtTimeZone expr) { LastType = "AtTimeZone"; return null; }
             public object? VisitOpenXmlExpr(Expr.OpenXmlExpression expr) { LastType = "OpenXml"; return null; }
+            public object? VisitMethodCallExpr(Expr.MethodCall expr) { LastType = "MethodCall"; return null; }
         }
 
         #endregion

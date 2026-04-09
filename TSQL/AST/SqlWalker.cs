@@ -282,6 +282,15 @@ namespace TSQL
             Walk(expr.TimeZone);
         }
 
+        protected virtual void VisitMethodCall(Expr.MethodCall expr)
+        {
+            Walk(expr.Object);
+            foreach (Expr arg in expr.Arguments)
+            {
+                Walk(arg);
+            }
+        }
+
         protected virtual void VisitOpenXml(Expr.OpenXmlExpression expr)
         {
             VisitFunctionCall(expr);
@@ -626,6 +635,7 @@ namespace TSQL
         object Expr.Visitor<object>.VisitIifExpr(Expr.Iif expr) { VisitIif(expr); return null; }
         object Expr.Visitor<object>.VisitAtTimeZoneExpr(Expr.AtTimeZone expr) { VisitAtTimeZone(expr); return null; }
         object Expr.Visitor<object>.VisitOpenXmlExpr(Expr.OpenXmlExpression expr) { VisitOpenXml(expr); return null; }
+        object Expr.Visitor<object>.VisitMethodCallExpr(Expr.MethodCall expr) { VisitMethodCall(expr); return null; }
 
         object Predicate.Visitor<object>.VisitComparisonPredicate(Predicate.Comparison pred) { VisitComparison(pred); return null; }
         object Predicate.Visitor<object>.VisitLikePredicate(Predicate.Like pred) { VisitLike(pred); return null; }

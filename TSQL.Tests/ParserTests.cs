@@ -4110,5 +4110,105 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Method Call
+
+        [Fact]
+        public void ParseMethodCall_XmlValue_ParsesCorrectly()
+        {
+            string sql = "SELECT (SELECT 1 FOR XML PATH(N''), TYPE).value(N'.', N'NVARCHAR(MAX)')";
+
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            SelectExpression selectExpr = SelectExpressionOf(select);
+            SelectColumn col = Assert.IsType<SelectColumn>(selectExpr.Columns[0]);
+            Expr.MethodCall methodCall = Assert.IsType<Expr.MethodCall>(col.Expression);
+
+            Assert.IsType<Expr.Subquery>(methodCall.Object);
+            Assert.Equal("value", methodCall.MethodName);
+            Assert.Equal(2, methodCall.Arguments.Count);
+        }
+
+        [Fact]
+        public void ParseMethodCall_XmlValue_RoundTrips()
+        {
+            string sql = "SELECT (SELECT 1 FOR XML PATH(N''), TYPE).value(N'.', N'NVARCHAR(MAX)')";
+            Assert.Equal(sql, RoundTrip(sql));
+        }
+
+        [Fact]
+        public void ParseMethodCall_StuffWithXmlValue_Parses()
+        {
+            string sql = "SELECT STUFF((SELECT N',' + Name FROM T FOR XML PATH(N''), TYPE).value(N'.', N'NVARCHAR(MAX)'), 1, 1, N'')";
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        [Fact]
+        public void ParseMethodCall_VariableXmlMethod_Parses()
+        {
+            string sql = "SELECT @xml.value(N'(/root)[1]', N'INT')";
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            SelectExpression selectExpr = SelectExpressionOf(select);
+            SelectColumn col = Assert.IsType<SelectColumn>(selectExpr.Columns[0]);
+            Expr.MethodCall methodCall = Assert.IsType<Expr.MethodCall>(col.Expression);
+
+            Assert.IsType<Expr.Variable>(methodCall.Object);
+            Assert.Equal("value", methodCall.MethodName);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        [Fact]
+        public void ParseMethodCall_XmlQuery_Parses()
+        {
+            string sql = "SELECT @xml.query(N'/root/child')";
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            SelectExpression selectExpr = SelectExpressionOf(select);
+            SelectColumn col = Assert.IsType<SelectColumn>(selectExpr.Columns[0]);
+            Expr.MethodCall methodCall = Assert.IsType<Expr.MethodCall>(col.Expression);
+
+            Assert.Equal("query", methodCall.MethodName);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        [Fact]
+        public void ParseMethodCall_XmlExist_Parses()
+        {
+            string sql = "SELECT @xml.exist(N'/root/child')";
+            Assert.Equal(sql, RoundTrip(sql));
+        }
+
+        [Fact]
+        public void ParseMethodCall_ChainedMethods_Parses()
+        {
+            string sql = "SELECT @xml.query(N'/root').value(N'.', N'NVARCHAR(MAX)')";
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            SelectExpression selectExpr = SelectExpressionOf(select);
+            SelectColumn col = Assert.IsType<SelectColumn>(selectExpr.Columns[0]);
+
+            Expr.MethodCall outer = Assert.IsType<Expr.MethodCall>(col.Expression);
+            Assert.Equal("value", outer.MethodName);
+
+            Expr.MethodCall inner = Assert.IsType<Expr.MethodCall>(outer.Object);
+            Assert.Equal("query", inner.MethodName);
+            Assert.IsType<Expr.Variable>(inner.Object);
+
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        [Fact]
+        public void ParseMethodCall_NoArguments_Parses()
+        {
+            string sql = "SELECT @xml.nodes()";
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            SelectExpression selectExpr = SelectExpressionOf(select);
+            SelectColumn col = Assert.IsType<SelectColumn>(selectExpr.Columns[0]);
+            Expr.MethodCall methodCall = Assert.IsType<Expr.MethodCall>(col.Expression);
+
+            Assert.Equal("nodes", methodCall.MethodName);
+            Assert.Equal(0, methodCall.Arguments.Count);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        #endregion
     }
 }
