@@ -5,10 +5,6 @@ using static TSQL.Expr;
 
 namespace TSQL
 {
-    // UNSUPPORTED:
-    // ## @variable.function_call
-    //  - reason: @variable must be a CLR user-defined type, something that's rare and not worth implementing unless needed
-
     /*
     Legend:
     ? -> the group before it can appear zero or one time but not more.
