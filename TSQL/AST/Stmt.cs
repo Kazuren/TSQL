@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Text;
-using static TSQL.Expr;
 
 namespace TSQL
 {
@@ -1795,7 +1794,7 @@ namespace TSQL
             }
         }
 
-        public SelectColumn(Expr expression, Alias alias)
+        public SelectColumn(Expr expression, Alias alias = null)
         {
             _expression = expression;
             _alias = alias;
