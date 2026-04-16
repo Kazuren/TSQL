@@ -5,6 +5,9 @@
     <Version>1.2.0</Version>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\TSQL.snk</AssemblyOriginatorKeyFile>
+    <IncludeSymbols>True</IncludeSymbols>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>TSQL Parser Standard Library</Title>
   </PropertyGroup>
 
   <ItemGroup>

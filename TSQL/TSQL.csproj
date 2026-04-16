@@ -4,6 +4,8 @@
     <Version>1.4.3</Version>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\TSQL.snk</AssemblyOriginatorKeyFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>TSQL Parser</Title>
   </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\TSQL.Generators\TSQL.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
