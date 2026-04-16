@@ -533,7 +533,7 @@ namespace TSQL.Tests
             Stmt stmt = Stmt.Parse(
                 "SELECT * FROM T UNION ALL SELECT * FROM S");
             stmt.AddCondition("Active = @P0",
-                new object[] { 1 }, WhereClauseTarget.All, out IReadOnlyDictionary<string, object>? parameters);
+                new object[] { 1 }, QueryScope.All, out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Contains("T WHERE Active = @P0", stmt.ToSource());
             Assert.Contains("S WHERE Active = @P0", stmt.ToSource());
@@ -739,7 +739,7 @@ namespace TSQL.Tests
         {
             Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE x IN (SELECT id FROM S)");
             IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
-                scope: ColumnReferenceScope.All,
+                scope: QueryScope.All,
                 clauses: ColumnReferenceClause.All);
 
             List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
@@ -777,7 +777,7 @@ namespace TSQL.Tests
         {
             Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x IN (SELECT id FROM S)");
             IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
-                scope: ColumnReferenceScope.Subqueries,
+                scope: QueryScope.AllSubqueries,
                 clauses: ColumnReferenceClause.All);
 
             List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
@@ -791,7 +791,7 @@ namespace TSQL.Tests
         {
             Stmt.Select stmt = ParseSelect("WITH cte AS (SELECT id FROM S) SELECT a FROM cte");
             IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
-                scope: ColumnReferenceScope.Ctes,
+                scope: QueryScope.Ctes,
                 clauses: ColumnReferenceClause.All);
 
             List<string> names = refs.Select(r => r.ColumnName.Name).ToList();
@@ -804,7 +804,7 @@ namespace TSQL.Tests
         {
             Stmt.Select stmt = ParseSelect("SELECT a FROM T WHERE x = 1");
             IReadOnlyList<Expr.ColumnIdentifier> refs = stmt.CollectColumnReferences(
-                scope: ColumnReferenceScope.None,
+                scope: QueryScope.None,
                 clauses: ColumnReferenceClause.All);
 
             Assert.Empty(refs);

@@ -1,32 +1,17 @@
-using System;
 using TSQL.AST;
 
 namespace TSQL.StandardLibrary.Visitors
 {
-    [Flags]
-    public enum WhereClauseTarget
-    {
-        None = 0,
-        OutermostQuery = 1,
-        Ctes = 2,
-        FromSubqueries = 4,
-        InSubqueries = 8,
-        ExistsSubqueries = 16,
-        ScalarSubqueries = 32,
-        AllSubqueries = Ctes | FromSubqueries | InSubqueries | ExistsSubqueries | ScalarSubqueries,
-        All = OutermostQuery | AllSubqueries
-    }
-
     internal static class WhereClauseAppender
     {
         /// <summary>
         /// Appends a WHERE condition to SELECT statements within the given statement.
-        /// Use <see cref="WhereClauseTarget"/> flags to control which queries are modified:
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified:
         /// outermost query, CTEs, FROM/IN/EXISTS subqueries, scalar subqueries, or any combination.
         /// </summary>
-        public static void AddCondition(Stmt stmt, string condition, WhereClauseTarget target = WhereClauseTarget.OutermostQuery)
+        public static void AddCondition(Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery)
         {
-            if (target == WhereClauseTarget.None)
+            if (target == QueryScope.None)
             {
                 return;
             }
@@ -39,15 +24,15 @@ namespace TSQL.StandardLibrary.Visitors
         private class WhereConditionWalker : SqlWalker
         {
             private readonly string _condition;
-            private readonly WhereClauseTarget _target;
+            private readonly QueryScope _target;
 
-            public WhereConditionWalker(string condition, WhereClauseTarget target)
+            public WhereConditionWalker(string condition, QueryScope target)
             {
                 _condition = condition;
                 _target = target;
             }
 
-            private bool HasFlag(WhereClauseTarget flag)
+            private bool HasFlag(QueryScope flag)
             {
                 return (_target & flag) != 0;
             }
@@ -58,15 +43,15 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     foreach (CteDefinition cte in stmt.CteStmt.Ctes)
                     {
-                        HandleQueryExpression(cte.Query.Query, WhereClauseTarget.Ctes);
+                        HandleQueryExpression(cte.Query.Query, QueryScope.Ctes);
                     }
                 }
-                HandleQueryExpression(stmt.Query, WhereClauseTarget.OutermostQuery);
+                HandleQueryExpression(stmt.Query, QueryScope.OutermostQuery);
             }
 
             protected override void VisitSubqueryReference(SubqueryReference source)
             {
-                HandleQueryExpression(source.Subquery.Query, WhereClauseTarget.FromSubqueries);
+                HandleQueryExpression(source.Subquery.Query, QueryScope.FromSubqueries);
             }
 
             protected override void VisitIn(Predicate.In pred)
@@ -74,7 +59,7 @@ namespace TSQL.StandardLibrary.Visitors
                 Walk(pred.Expr);
                 if (pred.Subquery != null)
                 {
-                    HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.InSubqueries);
+                    HandleQueryExpression(pred.Subquery.Query, QueryScope.InSubqueries);
                 }
                 else if (pred.ValueList != null)
                 {
@@ -87,21 +72,21 @@ namespace TSQL.StandardLibrary.Visitors
 
             protected override void VisitExists(Predicate.Exists pred)
             {
-                HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.ExistsSubqueries);
+                HandleQueryExpression(pred.Subquery.Query, QueryScope.ExistsSubqueries);
             }
 
             protected override void VisitQuantifier(Predicate.Quantifier pred)
             {
                 Walk(pred.Left);
-                HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.ScalarSubqueries);
+                HandleQueryExpression(pred.Subquery.Query, QueryScope.ScalarSubqueries);
             }
 
             protected override void VisitSubquery(Expr.Subquery expr)
             {
-                HandleQueryExpression(expr.Query, WhereClauseTarget.ScalarSubqueries);
+                HandleQueryExpression(expr.Query, QueryScope.ScalarSubqueries);
             }
 
-            private void HandleQueryExpression(QueryExpression queryExpr, WhereClauseTarget requiredFlag)
+            private void HandleQueryExpression(QueryExpression queryExpr, QueryScope requiredFlag)
             {
                 if (queryExpr is SelectExpression selectExpr)
                 {

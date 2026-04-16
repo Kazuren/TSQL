@@ -6,16 +6,16 @@ namespace TSQL.StandardLibrary.Visitors
     internal class SelectColumnCollector : SqlWalker
     {
         private readonly List<SelectItem> _columns = new List<SelectItem>();
-        private readonly ColumnReferenceScope _scope;
+        private readonly QueryScope _scope;
 
         private bool _collecting;
 
-        private SelectColumnCollector(ColumnReferenceScope scope)
+        private SelectColumnCollector(QueryScope scope)
         {
             _scope = scope;
         }
 
-        internal static IReadOnlyList<SelectItem> Collect(Stmt stmt, ColumnReferenceScope scope)
+        internal static IReadOnlyList<SelectItem> Collect(Stmt stmt, QueryScope scope)
         {
             SelectColumnCollector collector = new SelectColumnCollector(scope);
             collector.Walk(stmt);
@@ -29,7 +29,7 @@ namespace TSQL.StandardLibrary.Visitors
             if (stmt.CteStmt != null)
             {
                 bool savedCollecting = _collecting;
-                _collecting = (_scope & ColumnReferenceScope.Ctes) != 0;
+                _collecting = (_scope & QueryScope.Ctes) != 0;
 
                 foreach (CteDefinition cte in stmt.CteStmt.Ctes)
                 {
@@ -40,7 +40,7 @@ namespace TSQL.StandardLibrary.Visitors
             }
 
             bool outerSaved = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.OutermostQuery) != 0;
+            _collecting = (_scope & QueryScope.OutermostQuery) != 0;
             CollectFromQueryExpression(stmt.Query);
             _collecting = outerSaved;
 
@@ -51,7 +51,7 @@ namespace TSQL.StandardLibrary.Visitors
         protected override void VisitSubquery(Expr.Subquery expr)
         {
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.ScalarSubqueries) != 0;
             CollectFromQueryExpression(expr.Query);
             _collecting = savedCollecting;
         }
@@ -59,7 +59,7 @@ namespace TSQL.StandardLibrary.Visitors
         protected override void VisitSubqueryReference(SubqueryReference source)
         {
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.FromSubqueries) != 0;
             CollectFromQueryExpression(source.Subquery.Query);
             _collecting = savedCollecting;
         }
@@ -69,7 +69,7 @@ namespace TSQL.StandardLibrary.Visitors
             if (pred.Subquery != null)
             {
                 bool savedCollecting = _collecting;
-                _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+                _collecting = (_scope & QueryScope.InSubqueries) != 0;
                 CollectFromQueryExpression(pred.Subquery.Query);
                 _collecting = savedCollecting;
             }
@@ -78,7 +78,7 @@ namespace TSQL.StandardLibrary.Visitors
         protected override void VisitExists(Predicate.Exists pred)
         {
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.ExistsSubqueries) != 0;
             CollectFromQueryExpression(pred.Subquery.Query);
             _collecting = savedCollecting;
         }

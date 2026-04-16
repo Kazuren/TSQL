@@ -163,7 +163,7 @@ namespace TSQL.Tests
 
         #endregion
 
-        #region WhereClauseTarget.All
+        #region QueryScope.All
 
         [Fact]
         public void AddCondition_All_EntersInSubquery()
@@ -171,7 +171,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM Users WHERE Id IN (SELECT UserId FROM Active)";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("TenantId = 1", WhereClauseTarget.All);
+            stmt.AddCondition("TenantId = 1", QueryScope.All);
 
             Assert.Equal(
                 "SELECT * FROM Users WHERE Id IN (SELECT UserId FROM Active WHERE TenantId = 1) AND TenantId = 1",
@@ -184,7 +184,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM (SELECT * FROM Users) AS sub";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.All);
+            stmt.AddCondition("Active = 1", QueryScope.All);
 
             Assert.Equal(
                 "SELECT * FROM (SELECT * FROM Users WHERE Active = 1) AS sub WHERE Active = 1",
@@ -197,7 +197,7 @@ namespace TSQL.Tests
             string sql = "WITH cte AS (SELECT * FROM Users) SELECT * FROM cte";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.All);
+            stmt.AddCondition("Active = 1", QueryScope.All);
 
             Assert.Equal(
                 "WITH cte AS (SELECT * FROM Users WHERE Active = 1) SELECT * FROM cte WHERE Active = 1",
@@ -210,7 +210,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM Users WHERE EXISTS (SELECT 1 FROM Roles WHERE Roles.UserId = Users.Id)";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.All);
+            stmt.AddCondition("Active = 1", QueryScope.All);
 
             Assert.Equal(
                 "SELECT * FROM Users WHERE EXISTS (SELECT 1 FROM Roles WHERE Roles.UserId = Users.Id AND Active = 1) AND Active = 1",
@@ -227,7 +227,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM (SELECT * FROM Users) AS sub";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.FromSubqueries);
+            stmt.AddCondition("Active = 1", QueryScope.FromSubqueries);
 
             Assert.Equal(
                 "SELECT * FROM (SELECT * FROM Users WHERE Active = 1) AS sub",
@@ -240,7 +240,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM Users WHERE Id IN (SELECT UserId FROM Active)";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("TenantId = 1", WhereClauseTarget.InSubqueries);
+            stmt.AddCondition("TenantId = 1", QueryScope.InSubqueries);
 
             Assert.Equal(
                 "SELECT * FROM Users WHERE Id IN (SELECT UserId FROM Active WHERE TenantId = 1)",
@@ -253,7 +253,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM Users WHERE EXISTS (SELECT 1 FROM Roles WHERE Roles.UserId = Users.Id)";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.ExistsSubqueries);
+            stmt.AddCondition("Active = 1", QueryScope.ExistsSubqueries);
 
             Assert.Equal(
                 "SELECT * FROM Users WHERE EXISTS (SELECT 1 FROM Roles WHERE Roles.UserId = Users.Id AND Active = 1)",
@@ -266,7 +266,7 @@ namespace TSQL.Tests
             string sql = "WITH cte AS (SELECT * FROM Users) SELECT * FROM cte";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.Ctes);
+            stmt.AddCondition("Active = 1", QueryScope.Ctes);
 
             Assert.Equal(
                 "WITH cte AS (SELECT * FROM Users WHERE Active = 1) SELECT * FROM cte",
@@ -279,7 +279,7 @@ namespace TSQL.Tests
             string sql = "WITH cte AS (SELECT * FROM Users) SELECT * FROM cte WHERE Id IN (SELECT UserId FROM Active)";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.OutermostQuery | WhereClauseTarget.Ctes);
+            stmt.AddCondition("Active = 1", QueryScope.OutermostQuery | QueryScope.Ctes);
 
             string result = stmt.ToSource();
             Assert.Equal(
@@ -293,7 +293,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM Users";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("Active = 1", WhereClauseTarget.None);
+            stmt.AddCondition("Active = 1", QueryScope.None);
 
             Assert.Equal("SELECT * FROM Users", stmt.ToSource());
         }
@@ -312,7 +312,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM T1";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("EXISTS (SELECT 1 FROM T2)", WhereClauseTarget.All);
+            stmt.AddCondition("EXISTS (SELECT 1 FROM T2)", QueryScope.All);
 
             Assert.Equal("SELECT * FROM T1 WHERE EXISTS (SELECT 1 FROM T2)", stmt.ToSource());
         }
@@ -323,7 +323,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM T1";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("ID IN (SELECT ID FROM T2)", WhereClauseTarget.All);
+            stmt.AddCondition("ID IN (SELECT ID FROM T2)", QueryScope.All);
 
             Assert.Equal("SELECT * FROM T1 WHERE ID IN (SELECT ID FROM T2)", stmt.ToSource());
         }
@@ -334,7 +334,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM T1";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("PRICE > ALL (SELECT PRICE FROM T2)", WhereClauseTarget.All);
+            stmt.AddCondition("PRICE > ALL (SELECT PRICE FROM T2)", QueryScope.All);
 
             Assert.Equal("SELECT * FROM T1 WHERE PRICE > ALL (SELECT PRICE FROM T2)", stmt.ToSource());
         }
@@ -345,7 +345,7 @@ namespace TSQL.Tests
             string sql = "SELECT * FROM T1";
             Stmt stmt = Parse(sql);
 
-            stmt.AddCondition("(SELECT COUNT(*) FROM T2) > 0", WhereClauseTarget.All);
+            stmt.AddCondition("(SELECT COUNT(*) FROM T2) > 0", QueryScope.All);
 
             Assert.Equal("SELECT * FROM T1 WHERE (SELECT COUNT(*) FROM T2) > 0", stmt.ToSource());
         }

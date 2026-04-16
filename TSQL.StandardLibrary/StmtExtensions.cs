@@ -8,7 +8,7 @@ namespace TSQL.StandardLibrary.Visitors
     {
         /// <summary>
         /// Appends a WHERE condition to SELECT statements within this statement.
-        /// Use <see cref="WhereClauseTarget"/> flags to control which queries are modified.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
         /// Defaults to outermost query only (both sides of UNION, etc.).
         /// </summary>
         /// <param name="stmt">The statement to modify.</param>
@@ -17,7 +17,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        public static Stmt AddCondition(this Stmt stmt, string condition, WhereClauseTarget target = WhereClauseTarget.OutermostQuery)
+        public static Stmt AddCondition(this Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery)
         {
             WhereClauseAppender.AddCondition(stmt, condition, target);
             return stmt;
@@ -35,15 +35,15 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="targetTable">Table name whose referencing SELECT(s) receive the condition.
         /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
         /// <param name="traverse">Which query-level categories the walker enters.
-        /// Defaults to <see cref="WhereClauseTarget.All"/>.</param>
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
         /// <param name="mutate">Which query-level categories are eligible for mutation.
-        /// Defaults to <see cref="WhereClauseTarget.All"/>.</param>
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddCondition(this Stmt stmt, string condition, string targetTable,
-            WhereClauseTarget traverse = WhereClauseTarget.All,
-            WhereClauseTarget mutate = WhereClauseTarget.All)
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
         {
             var walker = new TableScopedWalker(targetTable, traverse, mutate, selectExpr =>
             {
@@ -66,19 +66,17 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="targetTable">Table name whose referencing SELECT(s) receive the column.
         /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
         /// <param name="traverse">Which query-level categories the walker enters.
-        /// Defaults to <see cref="ColumnReferenceScope.All"/>.</param>
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
         /// <param name="mutate">Which query-level categories are eligible for mutation.
-        /// Defaults to <see cref="ColumnReferenceScope.All"/>.</param>
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="columnSource"/> is not valid SQL.</exception>
         public static Stmt AddSelectColumn(this Stmt stmt, string columnSource, string targetTable,
-            ColumnReferenceScope traverse = ColumnReferenceScope.All,
-            ColumnReferenceScope mutate = ColumnReferenceScope.All)
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
         {
-            var walker = new TableScopedWalker(targetTable,
-                TableScopedWalker.MapScope(traverse),
-                TableScopedWalker.MapScope(mutate),
+            var walker = new TableScopedWalker(targetTable, traverse, mutate,
                 selectExpr => selectExpr.PrependColumn(columnSource));
             walker.Walk(stmt);
             return stmt;
@@ -137,7 +135,7 @@ namespace TSQL.StandardLibrary.Visitors
             IEnumerable<object> values,
             out IReadOnlyDictionary<string, object> parameters)
         {
-            return AddCondition(stmt, condition, values, WhereClauseTarget.OutermostQuery, out parameters);
+            return AddCondition(stmt, condition, values, QueryScope.OutermostQuery, out parameters);
         }
 
         /// <summary>
@@ -156,7 +154,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
         public static Stmt AddCondition(this Stmt stmt, string condition,
             IEnumerable<object> values,
-            WhereClauseTarget target,
+            QueryScope target,
             out IReadOnlyDictionary<string, object> parameters)
         {
             (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
@@ -199,7 +197,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
             ColumnExistenceChecker columnExists,
-            WhereClauseTarget target = WhereClauseTarget.All)
+            QueryScope target = QueryScope.All)
         {
             SchemaAwareConditionAppender.AddCondition(stmt, condition, columnExists, target);
             return stmt;
@@ -227,7 +225,7 @@ namespace TSQL.StandardLibrary.Visitors
             ColumnExistenceChecker columnExists,
             out IReadOnlyDictionary<string, object> parameters)
         {
-            return AddSchemaAwareCondition(stmt, condition, values, columnExists, WhereClauseTarget.All, out parameters);
+            return AddSchemaAwareCondition(stmt, condition, values, columnExists, QueryScope.All, out parameters);
         }
 
         /// <summary>
@@ -250,7 +248,7 @@ namespace TSQL.StandardLibrary.Visitors
         public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
             IEnumerable<object> values,
             ColumnExistenceChecker columnExists,
-            WhereClauseTarget target,
+            QueryScope target,
             out IReadOnlyDictionary<string, object> parameters)
         {
             (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
@@ -298,7 +296,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <remarks>This method does not modify the statement.</remarks>
         public static IReadOnlyList<SelectItem> CollectSelectColumns(
             this Stmt stmt,
-            ColumnReferenceScope scope = ColumnReferenceScope.OutermostQuery)
+            QueryScope scope = QueryScope.OutermostQuery)
         {
             return SelectColumnCollector.Collect(stmt, scope);
         }
@@ -316,7 +314,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <remarks>This method does not modify the statement.</remarks>
         public static System.Collections.Generic.IReadOnlyList<Expr.ColumnIdentifier> CollectColumnReferences(
             this Stmt stmt,
-            ColumnReferenceScope scope = ColumnReferenceScope.OutermostQuery,
+            QueryScope scope = QueryScope.OutermostQuery,
             ColumnReferenceClause clauses = ColumnReferenceClause.Select)
         {
             return ColumnReferenceCollector.Collect(stmt, scope, clauses);

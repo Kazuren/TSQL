@@ -11,12 +11,12 @@ namespace TSQL.StandardLibrary.Visitors
     internal class TableScopedWalker : SqlWalker
     {
         private readonly string _targetTable;
-        private readonly WhereClauseTarget _traverse;
-        private readonly WhereClauseTarget _mutate;
+        private readonly QueryScope _traverse;
+        private readonly QueryScope _mutate;
         private readonly Action<SelectExpression> _action;
 
         public TableScopedWalker(string targetTable,
-            WhereClauseTarget traverse, WhereClauseTarget mutate,
+            QueryScope traverse, QueryScope mutate,
             Action<SelectExpression> action)
         {
             _targetTable = targetTable;
@@ -25,36 +25,36 @@ namespace TSQL.StandardLibrary.Visitors
             _action = action;
         }
 
-        private bool CanTraverse(WhereClauseTarget flag)
+        private bool CanTraverse(QueryScope flag)
         {
             return (_traverse & flag) != 0;
         }
 
-        private bool CanMutate(WhereClauseTarget flag)
+        private bool CanMutate(QueryScope flag)
         {
             return (_mutate & flag) != 0;
         }
 
         protected override void VisitSelect(Stmt.Select stmt)
         {
-            if (stmt.CteStmt != null && CanTraverse(WhereClauseTarget.Ctes))
+            if (stmt.CteStmt != null && CanTraverse(QueryScope.Ctes))
             {
                 foreach (CteDefinition cte in stmt.CteStmt.Ctes)
                 {
-                    HandleQueryExpression(cte.Query.Query, WhereClauseTarget.Ctes);
+                    HandleQueryExpression(cte.Query.Query, QueryScope.Ctes);
                 }
             }
-            if (CanTraverse(WhereClauseTarget.OutermostQuery))
+            if (CanTraverse(QueryScope.OutermostQuery))
             {
-                HandleQueryExpression(stmt.Query, WhereClauseTarget.OutermostQuery);
+                HandleQueryExpression(stmt.Query, QueryScope.OutermostQuery);
             }
         }
 
         protected override void VisitSubqueryReference(SubqueryReference source)
         {
-            if (CanTraverse(WhereClauseTarget.FromSubqueries))
+            if (CanTraverse(QueryScope.FromSubqueries))
             {
-                HandleQueryExpression(source.Subquery.Query, WhereClauseTarget.FromSubqueries);
+                HandleQueryExpression(source.Subquery.Query, QueryScope.FromSubqueries);
             }
         }
 
@@ -63,9 +63,9 @@ namespace TSQL.StandardLibrary.Visitors
             Walk(pred.Expr);
             if (pred.Subquery != null)
             {
-                if (CanTraverse(WhereClauseTarget.InSubqueries))
+                if (CanTraverse(QueryScope.InSubqueries))
                 {
-                    HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.InSubqueries);
+                    HandleQueryExpression(pred.Subquery.Query, QueryScope.InSubqueries);
                 }
             }
             else if (pred.ValueList != null)
@@ -79,30 +79,30 @@ namespace TSQL.StandardLibrary.Visitors
 
         protected override void VisitExists(Predicate.Exists pred)
         {
-            if (CanTraverse(WhereClauseTarget.ExistsSubqueries))
+            if (CanTraverse(QueryScope.ExistsSubqueries))
             {
-                HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.ExistsSubqueries);
+                HandleQueryExpression(pred.Subquery.Query, QueryScope.ExistsSubqueries);
             }
         }
 
         protected override void VisitQuantifier(Predicate.Quantifier pred)
         {
             Walk(pred.Left);
-            if (CanTraverse(WhereClauseTarget.ScalarSubqueries))
+            if (CanTraverse(QueryScope.ScalarSubqueries))
             {
-                HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.ScalarSubqueries);
+                HandleQueryExpression(pred.Subquery.Query, QueryScope.ScalarSubqueries);
             }
         }
 
         protected override void VisitSubquery(Expr.Subquery expr)
         {
-            if (CanTraverse(WhereClauseTarget.ScalarSubqueries))
+            if (CanTraverse(QueryScope.ScalarSubqueries))
             {
-                HandleQueryExpression(expr.Query, WhereClauseTarget.ScalarSubqueries);
+                HandleQueryExpression(expr.Query, QueryScope.ScalarSubqueries);
             }
         }
 
-        private void HandleQueryExpression(QueryExpression queryExpr, WhereClauseTarget category)
+        private void HandleQueryExpression(QueryExpression queryExpr, QueryScope category)
         {
             if (queryExpr is SelectExpression selectExpr)
             {
@@ -124,17 +124,5 @@ namespace TSQL.StandardLibrary.Visitors
             }
         }
 
-        /// <summary>
-        /// Maps <see cref="ColumnReferenceScope"/> flags to the corresponding
-        /// <see cref="WhereClauseTarget"/> flags so the walker can use a single enum internally.
-        /// </summary>
-        internal static WhereClauseTarget MapScope(ColumnReferenceScope scope)
-        {
-            WhereClauseTarget result = WhereClauseTarget.None;
-            if ((scope & ColumnReferenceScope.OutermostQuery) != 0) result |= WhereClauseTarget.OutermostQuery;
-            if ((scope & ColumnReferenceScope.Ctes) != 0) result |= WhereClauseTarget.Ctes;
-            if ((scope & ColumnReferenceScope.Subqueries) != 0) result |= WhereClauseTarget.AllSubqueries;
-            return result;
-        }
     }
 }

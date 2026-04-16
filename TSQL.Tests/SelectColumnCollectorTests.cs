@@ -200,7 +200,7 @@ namespace TSQL.Tests
             Stmt.Select stmt = Stmt.ParseSelect(
                 "SELECT a FROM T WHERE x IN (SELECT id FROM S)");
             IReadOnlyList<SelectItem> columns = stmt.CollectSelectColumns(
-                scope: ColumnReferenceScope.All);
+                scope: QueryScope.All);
 
             Assert.Equal(2, columns.Count);
         }
@@ -211,7 +211,7 @@ namespace TSQL.Tests
             Stmt.Select stmt = Stmt.ParseSelect(
                 "WITH cte AS (SELECT id FROM S) SELECT a FROM cte");
             IReadOnlyList<SelectItem> columns = stmt.CollectSelectColumns(
-                scope: ColumnReferenceScope.Ctes);
+                scope: QueryScope.Ctes);
 
             Assert.Single(columns);
             SelectColumn col = Assert.IsType<SelectColumn>(columns[0]);

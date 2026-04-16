@@ -5,16 +5,6 @@ using TSQL.AST;
 namespace TSQL.StandardLibrary.Visitors
 {
     [Flags]
-    public enum ColumnReferenceScope
-    {
-        None = 0,
-        OutermostQuery = 1,
-        Ctes = 2,
-        Subqueries = 4,
-        All = OutermostQuery | Ctes | Subqueries
-    }
-
-    [Flags]
     public enum ColumnReferenceClause
     {
         None = 0,
@@ -30,13 +20,13 @@ namespace TSQL.StandardLibrary.Visitors
     internal class ColumnReferenceCollector : SqlWalker
     {
         private readonly List<Expr.ColumnIdentifier> _columns = new List<Expr.ColumnIdentifier>();
-        private readonly ColumnReferenceScope _scope;
+        private readonly QueryScope _scope;
         private readonly ColumnReferenceClause _clauses;
 
         private bool _collecting;
         private ColumnReferenceClause _currentClause;
 
-        private ColumnReferenceCollector(ColumnReferenceScope scope, ColumnReferenceClause clauses)
+        private ColumnReferenceCollector(QueryScope scope, ColumnReferenceClause clauses)
         {
             _scope = scope;
             _clauses = clauses;
@@ -44,7 +34,7 @@ namespace TSQL.StandardLibrary.Visitors
 
         internal static IReadOnlyList<Expr.ColumnIdentifier> Collect(
             Stmt stmt,
-            ColumnReferenceScope scope,
+            QueryScope scope,
             ColumnReferenceClause clauses)
         {
             ColumnReferenceCollector collector = new ColumnReferenceCollector(scope, clauses);
@@ -67,7 +57,7 @@ namespace TSQL.StandardLibrary.Visitors
             if (stmt.CteStmt != null)
             {
                 bool savedCollecting = _collecting;
-                _collecting = (_scope & ColumnReferenceScope.Ctes) != 0;
+                _collecting = (_scope & QueryScope.Ctes) != 0;
 
                 foreach (CteDefinition cte in stmt.CteStmt.Ctes)
                 {
@@ -78,7 +68,7 @@ namespace TSQL.StandardLibrary.Visitors
             }
 
             bool outerSaved = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.OutermostQuery) != 0;
+            _collecting = (_scope & QueryScope.OutermostQuery) != 0;
             WalkQueryExpressionWithClauses(stmt.Query);
             _collecting = outerSaved;
         }
@@ -86,7 +76,7 @@ namespace TSQL.StandardLibrary.Visitors
         protected override void VisitSubquery(Expr.Subquery expr)
         {
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.ScalarSubqueries) != 0;
             WalkQueryExpressionWithClauses(expr.Query);
             _collecting = savedCollecting;
         }
@@ -94,7 +84,7 @@ namespace TSQL.StandardLibrary.Visitors
         protected override void VisitSubqueryReference(SubqueryReference source)
         {
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.FromSubqueries) != 0;
             WalkQueryExpressionWithClauses(source.Subquery.Query);
             _collecting = savedCollecting;
         }
@@ -105,7 +95,7 @@ namespace TSQL.StandardLibrary.Visitors
             if (pred.Subquery != null)
             {
                 bool savedCollecting = _collecting;
-                _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+                _collecting = (_scope & QueryScope.InSubqueries) != 0;
                 WalkQueryExpressionWithClauses(pred.Subquery.Query);
                 _collecting = savedCollecting;
             }
@@ -121,7 +111,7 @@ namespace TSQL.StandardLibrary.Visitors
         protected override void VisitExists(Predicate.Exists pred)
         {
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.ExistsSubqueries) != 0;
             WalkQueryExpressionWithClauses(pred.Subquery.Query);
             _collecting = savedCollecting;
         }
@@ -130,7 +120,7 @@ namespace TSQL.StandardLibrary.Visitors
         {
             Walk(pred.Left);
             bool savedCollecting = _collecting;
-            _collecting = (_scope & ColumnReferenceScope.Subqueries) != 0;
+            _collecting = (_scope & QueryScope.ScalarSubqueries) != 0;
             WalkQueryExpressionWithClauses(pred.Subquery.Query);
             _collecting = savedCollecting;
         }

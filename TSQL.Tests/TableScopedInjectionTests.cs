@@ -285,7 +285,7 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("WITH cte AS (SELECT * FROM Users) SELECT * FROM cte");
 
             stmt.AddCondition("Active = 1", "Users",
-                traverse: WhereClauseTarget.OutermostQuery);
+                traverse: QueryScope.OutermostQuery);
 
             // CTE not entered, outer has no Users table → no change
             Assert.Equal(
@@ -299,8 +299,8 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("WITH cte AS (SELECT * FROM Users) SELECT * FROM Users");
 
             stmt.AddCondition("Active = 1", "Users",
-                traverse: WhereClauseTarget.All,
-                mutate: WhereClauseTarget.OutermostQuery);
+                traverse: QueryScope.All,
+                mutate: QueryScope.OutermostQuery);
 
             // CTE is traversed but not mutated; outermost References Users → mutated
             Assert.Equal(
@@ -314,8 +314,8 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("WITH cte AS (SELECT * FROM Users) SELECT * FROM Users");
 
             stmt.AddCondition("Active = 1", "Users",
-                traverse: WhereClauseTarget.All,
-                mutate: WhereClauseTarget.Ctes);
+                traverse: QueryScope.All,
+                mutate: QueryScope.Ctes);
 
             // CTE mutated, outermost not
             Assert.Equal(
@@ -329,8 +329,8 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("SELECT * FROM (SELECT * FROM Users) AS sub");
 
             stmt.AddCondition("Active = 1", "Users",
-                traverse: WhereClauseTarget.All,
-                mutate: WhereClauseTarget.FromSubqueries);
+                traverse: QueryScope.All,
+                mutate: QueryScope.FromSubqueries);
 
             // Inner FROM subquery mutated, outer not
             Assert.Equal(
@@ -348,7 +348,7 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("WITH cte AS (SELECT a FROM Users) SELECT * FROM cte");
 
             stmt.AddSelectColumn("b", "Users",
-                traverse: ColumnReferenceScope.OutermostQuery);
+                traverse: QueryScope.OutermostQuery);
 
             // CTE not entered → no change
             Assert.Equal(
@@ -362,8 +362,8 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("WITH cte AS (SELECT a FROM Users) SELECT x FROM Users");
 
             stmt.AddSelectColumn("b", "Users",
-                traverse: ColumnReferenceScope.All,
-                mutate: ColumnReferenceScope.OutermostQuery);
+                traverse: QueryScope.All,
+                mutate: QueryScope.OutermostQuery);
 
             // CTE traversed but not mutated; outermost mutated
             Assert.Equal(
@@ -377,8 +377,8 @@ namespace TSQL.Tests
             var stmt = Stmt.ParseSelect("SELECT * FROM (SELECT a FROM Users) AS sub");
 
             stmt.AddSelectColumn("b", "Users",
-                traverse: ColumnReferenceScope.All,
-                mutate: ColumnReferenceScope.Subqueries);
+                traverse: QueryScope.All,
+                mutate: QueryScope.AllSubqueries);
 
             // FROM subquery mutated, outer not
             Assert.Equal(

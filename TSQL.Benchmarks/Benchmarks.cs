@@ -457,11 +457,11 @@ namespace TSQL.Benchmarks
             return stmt.ToSource();
         }
 
-        [Benchmark(Description = "CTE + UNION with WhereClauseTarget.All")]
+        [Benchmark(Description = "CTE + UNION with QueryScope.All")]
         public string Complex()
         {
             Stmt stmt = Stmt.Parse(ComplexQuery);
-            stmt.AddCondition("CreatedDate > '2024-01-01'", WhereClauseTarget.All);
+            stmt.AddCondition("CreatedDate > '2024-01-01'", QueryScope.All);
             return stmt.ToSource();
         }
     }
@@ -538,7 +538,7 @@ namespace TSQL.Benchmarks
         public string Complex()
         {
             Stmt stmt = Stmt.Parse(ComplexQuery);
-            stmt.AddSchemaAwareCondition("T2.STATUS = 1 AND I_ID = 0", ComplexChecker, WhereClauseTarget.All);
+            stmt.AddSchemaAwareCondition("T2.STATUS = 1 AND I_ID = 0", ComplexChecker, QueryScope.All);
             return stmt.ToSource();
         }
     }
@@ -745,13 +745,13 @@ namespace TSQL.Benchmarks
         [Benchmark(Description = "JOIN + WHERE + ORDER BY, all clauses")]
         public IReadOnlyList<Expr.ColumnIdentifier> Medium()
         {
-            return _mediumStmt.CollectColumnReferences(ColumnReferenceScope.OutermostQuery, ColumnReferenceClause.All);
+            return _mediumStmt.CollectColumnReferences(QueryScope.OutermostQuery, ColumnReferenceClause.All);
         }
 
         [Benchmark(Description = "CTE + subquery + GROUP BY + HAVING, all scopes")]
         public IReadOnlyList<Expr.ColumnIdentifier> Complex()
         {
-            return _complexStmt.CollectColumnReferences(ColumnReferenceScope.All, ColumnReferenceClause.All);
+            return _complexStmt.CollectColumnReferences(QueryScope.All, ColumnReferenceClause.All);
         }
     }
 

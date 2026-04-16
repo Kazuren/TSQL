@@ -23,9 +23,9 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         public static void AddCondition(Stmt stmt, string condition,
             ColumnExistenceChecker columnExists,
-            WhereClauseTarget target = WhereClauseTarget.All)
+            QueryScope target = QueryScope.All)
         {
-            if (target == WhereClauseTarget.None)
+            if (target == QueryScope.None)
             {
                 return;
             }
@@ -418,18 +418,18 @@ namespace TSQL.StandardLibrary.Visitors
         /// <summary>
         /// Main walker that mirrors WhereConditionWalker but checks column existence per table
         /// and prefixes condition columns with the appropriate table alias/name before adding.
-        /// Uses WhereClauseTarget flags to control which query levels are processed.
+        /// Uses QueryScope flags to control which query levels are processed.
         /// </summary>
         private class SchemaAwareWalker : SqlWalker
         {
             private readonly string _condition;
             private readonly IReadOnlyList<string> _unprefixedColumnNames;
             private readonly ColumnExistenceChecker _columnExists;
-            private readonly WhereClauseTarget _target;
+            private readonly QueryScope _target;
             private readonly bool _hasMixedPrefixes;
 
             public SchemaAwareWalker(string condition, IReadOnlyList<string> unprefixedColumnNames,
-                ColumnExistenceChecker columnExists, WhereClauseTarget target, bool hasMixedPrefixes)
+                ColumnExistenceChecker columnExists, QueryScope target, bool hasMixedPrefixes)
             {
                 _condition = condition;
                 _unprefixedColumnNames = unprefixedColumnNames;
@@ -438,7 +438,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _hasMixedPrefixes = hasMixedPrefixes;
             }
 
-            private bool HasFlag(WhereClauseTarget flag)
+            private bool HasFlag(QueryScope flag)
             {
                 return (_target & flag) != 0;
             }
@@ -449,15 +449,15 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     foreach (CteDefinition cte in stmt.CteStmt.Ctes)
                     {
-                        HandleQueryExpression(cte.Query.Query, WhereClauseTarget.Ctes);
+                        HandleQueryExpression(cte.Query.Query, QueryScope.Ctes);
                     }
                 }
-                HandleQueryExpression(stmt.Query, WhereClauseTarget.OutermostQuery);
+                HandleQueryExpression(stmt.Query, QueryScope.OutermostQuery);
             }
 
             protected override void VisitSubqueryReference(SubqueryReference source)
             {
-                HandleQueryExpression(source.Subquery.Query, WhereClauseTarget.FromSubqueries);
+                HandleQueryExpression(source.Subquery.Query, QueryScope.FromSubqueries);
             }
 
             protected override void VisitIn(Predicate.In pred)
@@ -465,7 +465,7 @@ namespace TSQL.StandardLibrary.Visitors
                 Walk(pred.Expr);
                 if (pred.Subquery != null)
                 {
-                    HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.InSubqueries);
+                    HandleQueryExpression(pred.Subquery.Query, QueryScope.InSubqueries);
                 }
                 else if (pred.ValueList != null)
                 {
@@ -478,21 +478,21 @@ namespace TSQL.StandardLibrary.Visitors
 
             protected override void VisitExists(Predicate.Exists pred)
             {
-                HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.ExistsSubqueries);
+                HandleQueryExpression(pred.Subquery.Query, QueryScope.ExistsSubqueries);
             }
 
             protected override void VisitQuantifier(Predicate.Quantifier pred)
             {
                 Walk(pred.Left);
-                HandleQueryExpression(pred.Subquery.Query, WhereClauseTarget.ScalarSubqueries);
+                HandleQueryExpression(pred.Subquery.Query, QueryScope.ScalarSubqueries);
             }
 
             protected override void VisitSubquery(Expr.Subquery expr)
             {
-                HandleQueryExpression(expr.Query, WhereClauseTarget.ScalarSubqueries);
+                HandleQueryExpression(expr.Query, QueryScope.ScalarSubqueries);
             }
 
-            private void HandleQueryExpression(QueryExpression queryExpr, WhereClauseTarget requiredFlag)
+            private void HandleQueryExpression(QueryExpression queryExpr, QueryScope requiredFlag)
             {
                 if (queryExpr is SelectExpression selectExpr)
                 {

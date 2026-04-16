@@ -18,7 +18,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="target">Which query levels receive the condition.</param>
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
         public static Script AddCondition(this Script script, string condition,
-            WhereClauseTarget target = WhereClauseTarget.OutermostQuery)
+            QueryScope target = QueryScope.OutermostQuery)
         {
             foreach (Stmt stmt in script.Statements)
             {
@@ -40,7 +40,7 @@ namespace TSQL.StandardLibrary.Visitors
             IEnumerable<object> values,
             out IReadOnlyDictionary<string, object> parameters)
         {
-            return AddCondition(script, condition, values, WhereClauseTarget.OutermostQuery, out parameters);
+            return AddCondition(script, condition, values, QueryScope.OutermostQuery, out parameters);
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
         public static Script AddCondition(this Script script, string condition,
             IEnumerable<object> values,
-            WhereClauseTarget target,
+            QueryScope target,
             out IReadOnlyDictionary<string, object> parameters)
         {
             (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
@@ -83,7 +83,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
         public static Script AddSchemaAwareCondition(this Script script, string condition,
             ColumnExistenceChecker columnExists,
-            WhereClauseTarget target = WhereClauseTarget.All)
+            QueryScope target = QueryScope.All)
         {
             foreach (Stmt stmt in script.Statements)
             {
@@ -109,7 +109,7 @@ namespace TSQL.StandardLibrary.Visitors
             out IReadOnlyDictionary<string, object> parameters)
         {
             return AddSchemaAwareCondition(script, condition, values, columnExists,
-                WhereClauseTarget.All, out parameters);
+                QueryScope.All, out parameters);
         }
 
         /// <summary>
@@ -127,7 +127,7 @@ namespace TSQL.StandardLibrary.Visitors
         public static Script AddSchemaAwareCondition(this Script script, string condition,
             IEnumerable<object> values,
             ColumnExistenceChecker columnExists,
-            WhereClauseTarget target,
+            QueryScope target,
             out IReadOnlyDictionary<string, object> parameters)
         {
             (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
@@ -195,7 +195,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <returns>The collected column identifiers from all statements.</returns>
         public static IReadOnlyList<Expr.ColumnIdentifier> CollectColumnReferences(
             this Script script,
-            ColumnReferenceScope scope = ColumnReferenceScope.OutermostQuery,
+            QueryScope scope = QueryScope.OutermostQuery,
             ColumnReferenceClause clauses = ColumnReferenceClause.Select)
         {
             List<Expr.ColumnIdentifier> allColumns = new List<Expr.ColumnIdentifier>();

@@ -238,7 +238,7 @@ namespace TSQL.Tests
 
         #endregion
 
-        #region WhereClauseTarget Flags
+        #region QueryScope Flags
 
         [Fact]
         public void OutermostQueryOnly_OnlyOuterQueryGetsCondition()
@@ -249,7 +249,7 @@ namespace TSQL.Tests
                 ("T2", new[] { "ID", "I_ID" }));
 
             stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema),
-                target: WhereClauseTarget.OutermostQuery);
+                target: QueryScope.OutermostQuery);
 
             Assert.Equal(
                 "SELECT * FROM T1 WHERE T1.ID IN (SELECT T2.ID FROM T2) AND T1.I_ID = 0",
