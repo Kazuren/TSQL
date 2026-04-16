@@ -415,109 +415,24 @@ namespace TSQL.StandardLibrary.Visitors
         // ###################### SchemaAwareWalker ############################
         // #####################################################################
 
-        /// <summary>
-        /// Main walker that mirrors WhereConditionWalker but checks column existence per table
-        /// and prefixes condition columns with the appropriate table alias/name before adding.
-        /// Uses QueryScope flags to control which query levels are processed.
-        /// </summary>
-        private class SchemaAwareWalker : SqlWalker
+        private class SchemaAwareWalker : ScopedQueryWalker
         {
             private readonly string _condition;
             private readonly IReadOnlyList<string> _unprefixedColumnNames;
             private readonly ColumnExistenceChecker _columnExists;
-            private readonly QueryScope _target;
             private readonly bool _hasMixedPrefixes;
 
             public SchemaAwareWalker(string condition, IReadOnlyList<string> unprefixedColumnNames,
                 ColumnExistenceChecker columnExists, QueryScope target, bool hasMixedPrefixes)
+                : base(QueryScope.All, target)
             {
                 _condition = condition;
                 _unprefixedColumnNames = unprefixedColumnNames;
                 _columnExists = columnExists;
-                _target = target;
                 _hasMixedPrefixes = hasMixedPrefixes;
             }
 
-            private bool HasFlag(QueryScope flag)
-            {
-                return (_target & flag) != 0;
-            }
-
-            protected override void VisitSelect(Stmt.Select stmt)
-            {
-                if (stmt.CteStmt != null)
-                {
-                    foreach (CteDefinition cte in stmt.CteStmt.Ctes)
-                    {
-                        HandleQueryExpression(cte.Query.Query, QueryScope.Ctes);
-                    }
-                }
-                HandleQueryExpression(stmt.Query, QueryScope.OutermostQuery);
-            }
-
-            protected override void VisitSubqueryReference(SubqueryReference source)
-            {
-                HandleQueryExpression(source.Subquery.Query, QueryScope.FromSubqueries);
-            }
-
-            protected override void VisitIn(Predicate.In pred)
-            {
-                Walk(pred.Expr);
-                if (pred.Subquery != null)
-                {
-                    HandleQueryExpression(pred.Subquery.Query, QueryScope.InSubqueries);
-                }
-                else if (pred.ValueList != null)
-                {
-                    foreach (Expr expr in pred.ValueList)
-                    {
-                        Walk(expr);
-                    }
-                }
-            }
-
-            protected override void VisitExists(Predicate.Exists pred)
-            {
-                HandleQueryExpression(pred.Subquery.Query, QueryScope.ExistsSubqueries);
-            }
-
-            protected override void VisitQuantifier(Predicate.Quantifier pred)
-            {
-                Walk(pred.Left);
-                HandleQueryExpression(pred.Subquery.Query, QueryScope.ScalarSubqueries);
-            }
-
-            protected override void VisitSubquery(Expr.Subquery expr)
-            {
-                HandleQueryExpression(expr.Query, QueryScope.ScalarSubqueries);
-            }
-
-            private void HandleQueryExpression(QueryExpression queryExpr, QueryScope requiredFlag)
-            {
-                if (queryExpr is SelectExpression selectExpr)
-                {
-                    // Walk must happen before adding the condition so that the walk only
-                    // traverses the original AST. If the condition is added first and it
-                    // contains subqueries (EXISTS, IN, quantifier), walking the freshly-added
-                    // WHERE predicate re-enters HandleQueryExpression and causes infinite recursion.
-                    WalkSelectExpression(selectExpr);
-                    if (HasFlag(requiredFlag))
-                    {
-                        ProcessSelectExpression(selectExpr);
-                    }
-                }
-                else if (queryExpr is SetOperation setOp)
-                {
-                    HandleQueryExpression(setOp.Left, requiredFlag);
-                    HandleQueryExpression(setOp.Right, requiredFlag);
-                }
-                else if (queryExpr is ParenthesizedQuery parenQuery)
-                {
-                    HandleQueryExpression(parenQuery.Inner, requiredFlag);
-                }
-            }
-
-            private void ProcessSelectExpression(SelectExpression selectExpr)
+            protected override void OnMatch(SelectExpression selectExpr)
             {
                 if (_hasMixedPrefixes)
                 {
