@@ -974,9 +974,20 @@ namespace TSQL
             set
             {
                 _into = value;
-                if (value != null && _intoKeyword == null)
+                if (value != null)
                 {
-                    _intoKeyword = ConcreteToken.WithLeadingSpace(TokenType.INTO, "INTO");
+                    if (_intoKeyword == null)
+                    {
+                        _intoKeyword = ConcreteToken.WithLeadingSpace(TokenType.INTO, "INTO");
+                    }
+
+                    // Ensure the identifier renders with a space after the INTO keyword.
+                    Token first = FirstTokenOf(value);
+                    if (first != null)
+                    {
+                        first.ClearLeadingTrivia();
+                        first.AddLeadingTrivia(Whitespace.Space);
+                    }
                 }
             }
         }

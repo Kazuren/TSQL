@@ -39,6 +39,19 @@ namespace TSQL
         }
 
         /// <summary>
+        /// Parses a dotted object identifier from the given string.
+        /// Supports 1–4 parts and the double-dot syntax (e.g. <c>"database..table"</c>).
+        /// </summary>
+        /// <param name="sql">The identifier text to parse (e.g. <c>"dbo.Users"</c>, <c>"mydb..mytable"</c>).</param>
+        /// <exception cref="ParseError">Thrown when the text is not a valid object identifier.</exception>
+        public static ObjectIdentifier ParseObjectIdentifier(string sql)
+        {
+            ObjectIdentifier result = Parser.CreateParser(sql).ParseObjectIdentifier();
+            BuildTokenChain(result);
+            return result;
+        }
+
+        /// <summary>
         /// Factory method that creates the appropriate literal subtype based on the value's runtime type.
         /// </summary>
         public static Expr Literal(object value)
@@ -240,9 +253,34 @@ namespace TSQL
                 objectName.FirstToken()?.ClearLeadingTrivia();
             }
 
+            /// <summary>
+            /// Creates a database..object identifier (schema skipped, defaults to dbo at runtime).
+            /// Renders as <c>database..object</c> with two dots.
+            /// </summary>
+            public ObjectIdentifier(DatabaseName databaseName, ObjectName objectName)
+            {
+                DatabaseName = databaseName;
+                ObjectName = objectName;
+                _databaseToSchemaDot = new ConcreteToken(TokenType.DOT, ".", null);
+                _schemaToObjectDot = new ConcreteToken(TokenType.DOT, ".", null);
+                objectName.FirstToken()?.ClearLeadingTrivia();
+            }
+
             public ObjectIdentifier(ObjectName objectName)
             {
                 ObjectName = objectName;
+            }
+
+            /// <summary>
+            /// Parses a dotted object identifier from the given string.
+            /// Equivalent to <see cref="Expr.ParseObjectIdentifier"/>; provided for convenience
+            /// when the caller already has the <c>ObjectIdentifier</c> type in scope.
+            /// </summary>
+            /// <param name="sql">The identifier text to parse (e.g. <c>"dbo.Users"</c>, <c>"mydb..mytable"</c>).</param>
+            /// <exception cref="ParseError">Thrown when the text is not a valid object identifier.</exception>
+            public static ObjectIdentifier Parse(string sql)
+            {
+                return ParseObjectIdentifier(sql);
             }
 
             public override T Accept<T>(Visitor<T> visitor)

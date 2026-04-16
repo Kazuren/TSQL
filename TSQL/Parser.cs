@@ -388,6 +388,20 @@ namespace TSQL
             }
         }
 
+        internal Expr.ObjectIdentifier ParseObjectIdentifier()
+        {
+            Reset();
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ObjectIdentifier result = ObjectIdentifier(parts);
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected end of object identifier.");
+            }
+
+            return result;
+        }
+
         public AST.Predicate ParseSearchCondition()
         {
             Reset();
@@ -4680,6 +4694,17 @@ namespace TSQL
                 objectIdentifier._schemaToObjectDot = parts[3].DotBefore;
                 return objectIdentifier;
             }
+            else if (IsPattern_DatabaseObject_WithSkippedSchema(parts))
+            {
+                // Pattern: database..object (schema is skipped, defaults to dbo at runtime)
+                ObjectIdentifier objectIdentifier = new ObjectIdentifier(
+                    new DatabaseName(parts[0].Token),
+                    new ObjectName(parts[2].Token)
+                );
+                objectIdentifier._databaseToSchemaDot = ((SkippedPart)parts[1]).DotBefore;
+                objectIdentifier._schemaToObjectDot = parts[2].DotBefore;
+                return objectIdentifier;
+            }
             else
             {
                 throw Error(Peek(), "Invalid object identifier format");
@@ -4808,6 +4833,14 @@ namespace TSQL
                 && !parts[1].IsSkipped
                 && !parts[2].IsSkipped
                 && !parts[3].IsSkipped;
+        }
+
+        private bool IsPattern_DatabaseObject_WithSkippedSchema(IdentifierPartsBuffer parts)
+        {
+            return parts.Count == 3
+                && !parts[0].IsSkipped
+                && parts[1].IsSkipped
+                && !parts[2].IsSkipped;
         }
 
         // Pattern recognition methods - these make the valid patterns explicit

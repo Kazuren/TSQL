@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TSQL.AST;
 
 namespace TSQL.StandardLibrary.Visitors
 {
@@ -20,6 +21,103 @@ namespace TSQL.StandardLibrary.Visitors
         {
             WhereClauseAppender.AddCondition(stmt, condition, target);
             return stmt;
+        }
+
+        /// <summary>
+        /// Appends a WHERE condition to every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// <paramref name="traverse"/> controls which query-level categories the walker enters;
+        /// <paramref name="mutate"/> controls which of those categories are eligible for the
+        /// WHERE injection (in addition to the <paramref name="targetTable"/> match).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate to append (e.g. <c>"Id = 5"</c>).</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the condition.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="WhereClauseTarget.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="WhereClauseTarget.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        public static Stmt AddCondition(this Stmt stmt, string condition, string targetTable,
+            WhereClauseTarget traverse = WhereClauseTarget.All,
+            WhereClauseTarget mutate = WhereClauseTarget.All)
+        {
+            var walker = new TableScopedWalker(targetTable, traverse, mutate, selectExpr =>
+            {
+                AST.Predicate predicate = AST.Predicate.ParsePredicate(condition);
+                selectExpr.AddWhere(predicate);
+            });
+            walker.Walk(stmt);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Prepends a column (parsed from a SQL source fragment) to every SELECT within this
+        /// statement whose FROM clause references <paramref name="targetTable"/>, subject to
+        /// traversal and mutation scope. <paramref name="traverse"/> controls which query-level
+        /// categories the walker enters; <paramref name="mutate"/> controls which of those
+        /// categories are eligible for the column injection.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="columnSource">Free-form SQL column source (expression optionally followed by an alias).</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the column.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="ColumnReferenceScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="ColumnReferenceScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="columnSource"/> is not valid SQL.</exception>
+        public static Stmt AddSelectColumn(this Stmt stmt, string columnSource, string targetTable,
+            ColumnReferenceScope traverse = ColumnReferenceScope.All,
+            ColumnReferenceScope mutate = ColumnReferenceScope.All)
+        {
+            var walker = new TableScopedWalker(targetTable,
+                TableScopedWalker.MapScope(traverse),
+                TableScopedWalker.MapScope(mutate),
+                selectExpr => selectExpr.PrependColumn(columnSource));
+            walker.Walk(stmt);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Sets a <c>SELECT INTO</c> clause on the outermost SELECT of this statement.
+        /// If the outermost query is a UNION/INTERSECT/EXCEPT, the INTO is placed on the
+        /// first SELECT (the only position T-SQL permits). If an INTO already exists, it is
+        /// replaced.
+        /// </summary>
+        /// <param name="stmt">The SELECT statement to modify.</param>
+        /// <param name="tableName">Target table name. May be a simple name (<c>"#tmp"</c>) or
+        /// a dotted name up to four parts (<c>"server.db.schema.table"</c>).</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="tableName"/> has more than four dotted parts.</exception>
+        public static Stmt.Select AddInto(this Stmt.Select stmt, string tableName)
+        {
+            SelectExpression outermost = FindOutermostSelectExpression(stmt.Query);
+            outermost.Into = Expr.ObjectIdentifier.Parse(tableName);
+            return stmt;
+        }
+
+        private static SelectExpression FindOutermostSelectExpression(QueryExpression queryExpr)
+        {
+            if (queryExpr is SelectExpression selectExpr)
+            {
+                return selectExpr;
+            }
+            if (queryExpr is SetOperation setOp)
+            {
+                return FindOutermostSelectExpression(setOp.Left);
+            }
+            if (queryExpr is ParenthesizedQuery parenQuery)
+            {
+                return FindOutermostSelectExpression(parenQuery.Inner);
+            }
+            throw new ArgumentException("Cannot add INTO to this query expression; no SelectExpression found.");
         }
 
         /// <summary>
