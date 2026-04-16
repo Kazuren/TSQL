@@ -967,7 +967,7 @@ namespace TSQL
         private SyntaxElementList<SelectItem> _columns;
         public new SyntaxElementList<SelectItem> Columns => _columns;
         internal override IReadOnlySyntaxElementList<SelectItem> GetColumnsCore() => _columns;
-        private Expr.ObjectIdentifier _into;
+        internal Expr.ObjectIdentifier _into;
         public Expr.ObjectIdentifier Into
         {
             get => _into;

@@ -1397,7 +1397,7 @@ namespace TSQL
             if (Match(TokenType.INTO, out Token intoToken))
             {
                 IdentifierPartsBuffer intoParts = CollectIdentifierParts();
-                selectExpr.Into = ObjectIdentifier(intoParts);
+                selectExpr._into = ObjectIdentifier(intoParts);
                 selectExpr._intoKeyword = intoToken;
             }
 
