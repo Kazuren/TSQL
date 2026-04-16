@@ -159,15 +159,15 @@ stmt.AddCondition(
 // parameters["@TenantId"] == 42
 ```
 
-Use `WhereClauseTarget` flags to control which query levels receive the condition:
+Use `QueryScope` flags to control which query levels receive the condition:
 
 ```csharp
 // Add to both sides of a UNION
 stmt = Stmt.Parse("SELECT * FROM Users UNION SELECT * FROM Admins");
-stmt.AddCondition("Active = 1", WhereClauseTarget.OutermostQuery);
+stmt.AddCondition("Active = 1", QueryScope.OutermostQuery);
 
 // Add everywhere: outermost, CTEs, and all subqueries
-stmt.AddCondition("TenantId = 1", WhereClauseTarget.All);
+stmt.AddCondition("TenantId = 1", QueryScope.All);
 ```
 
 ### Parameterize Literals
@@ -238,7 +238,7 @@ foreach (TableReference table in refs.Tables)
 // Column references with scope/clause filtering
 IReadOnlyList<Expr.ColumnIdentifier> columns =
     stmt.CollectColumnReferences(
-        ColumnReferenceScope.All,
+        QueryScope.All,
         ColumnReferenceClause.Where | ColumnReferenceClause.Select);
 ```
 

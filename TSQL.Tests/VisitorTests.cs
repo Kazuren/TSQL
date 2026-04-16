@@ -528,7 +528,7 @@ namespace TSQL.Tests
         }
 
         [Fact]
-        public void AddConditionParameterized_WithWhereClauseTargetAll()
+        public void AddConditionParameterized_WithQueryScopeAll()
         {
             Stmt stmt = Stmt.Parse(
                 "SELECT * FROM T UNION ALL SELECT * FROM S");
