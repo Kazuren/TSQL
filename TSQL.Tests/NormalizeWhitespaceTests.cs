@@ -74,14 +74,5 @@ namespace TSQL.Tests
             Assert.Equal("SELECT 'foo   bar' FROM T", stmt.ToSource());
         }
 
-        [Fact]
-        public void NormalizeWhitespace_ReturnsSelfForChaining()
-        {
-            Stmt.Select stmt = Stmt.ParseSelect("SELECT *\tFROM T");
-
-            SyntaxElement result = stmt.NormalizeWhitespace();
-
-            Assert.Same(stmt, result);
-        }
     }
 }

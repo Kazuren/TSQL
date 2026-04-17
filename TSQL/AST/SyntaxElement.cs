@@ -94,21 +94,19 @@ namespace TSQL
         }
 
         /// <summary>
-        /// Collapses runs of whitespace trivia around every token to single spaces.
+        /// Collapses runs of whitespace trivia before every token to single spaces.
         /// Comments are preserved. Line comments (<c>--</c>) are followed by a newline
         /// rather than a space so the next token isn't swallowed by the comment.
         /// Use this when downstream consumers need canonical single-space whitespace —
         /// e.g. after <c>AddCondition</c> when the original SQL had tabs or newlines
         /// between keywords.
         /// </summary>
-        /// <returns>The same element, for fluent chaining.</returns>
-        public SyntaxElement NormalizeWhitespace()
+        public void NormalizeWhitespace()
         {
             foreach (Token token in DescendantTokens())
             {
                 NormalizeTokenLeadingTrivia(token);
             }
-            return this;
         }
 
         private static void NormalizeTokenLeadingTrivia(Token token)

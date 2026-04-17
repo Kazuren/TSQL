@@ -53,7 +53,7 @@ namespace TSQL
         }
     }
 
-    internal class Whitespace : TriviaBase
+    internal sealed class Whitespace : TriviaBase
     {
         internal static readonly Whitespace Space = new Whitespace(" ");
         internal static readonly Whitespace Newline = new Whitespace("\n");
