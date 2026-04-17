@@ -55,7 +55,7 @@ All AST nodes implement `Accept<T>()` for visitor traversal:
 - `Stmt.Visitor<T>` - Statement visitor interface
 ### Trivia Preservation
 
-Tokens carry leading/trailing trivia (whitespace, comments) enabling exact source reconstruction via `ToSource()`.
+Tokens carry leading/trailing trivia (whitespace, comments) enabling exact source reconstruction via `ToSource()`. `SyntaxElement.NormalizeWhitespace()` collapses whitespace trivia to single spaces (preserving comments, with `\n` after line comments) for consumers that need canonical formatting.
 
 ### Source Generation
 

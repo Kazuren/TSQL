@@ -77,8 +77,8 @@ namespace TSQL
         {
             Token token = FirstToken();
             if (token == null) return;
-            token.AddLeadingTrivia(new Comment("-- " + comment));
-            token.AddLeadingTrivia(new Whitespace("\n"));
+            token.AddLeadingTrivia(new LineComment("-- " + comment));
+            token.AddLeadingTrivia(Whitespace.Newline);
         }
 
         /// <summary>
@@ -89,8 +89,71 @@ namespace TSQL
         {
             Token token = FirstToken();
             if (token == null) return;
-            token.AddLeadingTrivia(new Comment("/* " + comment + " */"));
+            token.AddLeadingTrivia(new BlockComment("/* " + comment + " */"));
             token.AddLeadingTrivia(Whitespace.Space);
+        }
+
+        /// <summary>
+        /// Collapses runs of whitespace trivia around every token to single spaces.
+        /// Comments are preserved. Line comments (<c>--</c>) are followed by a newline
+        /// rather than a space so the next token isn't swallowed by the comment.
+        /// Use this when downstream consumers need canonical single-space whitespace —
+        /// e.g. after <c>AddCondition</c> when the original SQL had tabs or newlines
+        /// between keywords.
+        /// </summary>
+        /// <returns>The same element, for fluent chaining.</returns>
+        public SyntaxElement NormalizeWhitespace()
+        {
+            foreach (Token token in DescendantTokens())
+            {
+                NormalizeTokenLeadingTrivia(token);
+            }
+            return this;
+        }
+
+        private static void NormalizeTokenLeadingTrivia(Token token)
+        {
+            IReadOnlyList<Trivia> original = token.LeadingTrivia;
+            if (original.Count == 0)
+            {
+                return;
+            }
+
+            List<Trivia> rewritten = new List<Trivia>(original.Count);
+            Whitespace pendingSeparator = null;
+            foreach (Trivia t in original)
+            {
+                if (t is Whitespace)
+                {
+                    if (pendingSeparator == null)
+                    {
+                        pendingSeparator = Whitespace.Space;
+                    }
+                }
+                else if (t is Comment comment)
+                {
+                    if (pendingSeparator != null)
+                    {
+                        rewritten.Add(pendingSeparator);
+                    }
+                    rewritten.Add(comment);
+                    if (comment is LineComment)
+                    {
+                        pendingSeparator = Whitespace.Newline;
+                    }
+                    else
+                    {
+                        pendingSeparator = null;
+                    }
+                }
+            }
+            if (pendingSeparator != null)
+            {
+                rewritten.Add(pendingSeparator);
+            }
+
+            token.ClearLeadingTrivia();
+            token.AddLeadingTrivia(rewritten);
         }
 
         public override string ToString()

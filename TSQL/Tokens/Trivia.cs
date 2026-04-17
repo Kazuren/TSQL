@@ -56,14 +56,35 @@ namespace TSQL
     internal class Whitespace : TriviaBase
     {
         internal static readonly Whitespace Space = new Whitespace(" ");
+        internal static readonly Whitespace Newline = new Whitespace("\n");
 
         public Whitespace(string source, int start, int length) : base(source, start, length) { }
         public Whitespace(string content) : base(content) { }
     }
 
-    internal class Comment : TriviaBase
+    internal abstract class Comment : TriviaBase
     {
-        public Comment(string source, int start, int length) : base(source, start, length) { }
-        public Comment(string content) : base(content) { }
+        protected Comment(string source, int start, int length) : base(source, start, length) { }
+        protected Comment(string content) : base(content) { }
+    }
+
+    /// <summary>
+    /// A single-line comment (<c>-- ...</c>). Terminates at end-of-line, so a newline
+    /// must follow it in normalized output to prevent the next token being swallowed.
+    /// </summary>
+    internal sealed class LineComment : Comment
+    {
+        public LineComment(string source, int start, int length) : base(source, start, length) { }
+        public LineComment(string content) : base(content) { }
+    }
+
+    /// <summary>
+    /// A block comment (<c>/* ... */</c>). Self-delimiting, so it can appear inline
+    /// between tokens without affecting surrounding whitespace.
+    /// </summary>
+    internal sealed class BlockComment : Comment
+    {
+        public BlockComment(string source, int start, int length) : base(source, start, length) { }
+        public BlockComment(string content) : base(content) { }
     }
 }

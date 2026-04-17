@@ -269,7 +269,7 @@ namespace TSQL
             // Consume the closing "*/" of the multi-line comment
             Consume(2);
 
-            AddTrivia(new Comment(_source, _start, _current - _start));
+            AddTrivia(new BlockComment(_source, _start, _current - _start));
         }
 
         private void SingleLineComment()
@@ -285,7 +285,7 @@ namespace TSQL
                 _current--;
             }
 
-            AddTrivia(new Comment(_source, _start, _current - _start));
+            AddTrivia(new LineComment(_source, _start, _current - _start));
         }
 
         private void Whitespace()
