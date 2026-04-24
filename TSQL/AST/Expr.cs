@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -51,32 +50,23 @@ namespace TSQL
             return result;
         }
 
-        /// <summary>
-        /// Factory method that creates the appropriate literal subtype based on the value's runtime type.
-        /// </summary>
-        public static Expr Literal(object value)
-        {
-            if (value == null)
-            {
-                return new NullLiteral();
-            }
-            else if (value is string s)
-            {
-                return new StringLiteral(s);
-            }
-            else if (value is int i)
-            {
-                return new IntLiteral(i);
-            }
-            else if (value is double || value is decimal || value is float)
-            {
-                return new DecimalLiteral(System.Convert.ToDecimal(value));
-            }
-            else
-            {
-                throw new System.ArgumentException($"Expected literal to be null, string, int, double, float or decimal but got: {value.GetType().FullName}", nameof(value));
-            }
-        }
+        /// <summary>Creates a string literal.</summary>
+        public static StringLiteral Literal(string value) => new StringLiteral(value);
+
+        /// <summary>Creates an integer literal.</summary>
+        public static IntLiteral Literal(int value) => new IntLiteral(value);
+
+        /// <summary>Creates a decimal literal.</summary>
+        public static DecimalLiteral Literal(decimal value) => new DecimalLiteral(value);
+
+        /// <summary>Creates a decimal literal from a double value.</summary>
+        public static DecimalLiteral Literal(double value) => new DecimalLiteral((decimal)value);
+
+        /// <summary>Creates a decimal literal from a float value.</summary>
+        public static DecimalLiteral Literal(float value) => new DecimalLiteral((decimal)value);
+
+        /// <summary>Creates a SQL NULL literal.</summary>
+        public static NullLiteral LiteralNull() => new NullLiteral();
 
         public enum ArithmeticOperator { Add, Subtract, Multiply, Divide, Modulo, BitwiseAnd, BitwiseOr, BitwiseXor }
         public enum UnaryOperator { Negate, BitwiseNot, Plus }
