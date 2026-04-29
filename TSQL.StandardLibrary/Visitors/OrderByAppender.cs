@@ -91,7 +91,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _replace = replace;
             }
 
-            protected override void OnQueryExpressionMatch(QueryExpression queryExpr)
+            protected override void OnQuery(QueryExpression queryExpr)
             {
                 ApplyOrderBy(queryExpr, _orderByItems, _replace);
             }

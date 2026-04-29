@@ -20,7 +20,7 @@ namespace TSQL.StandardLibrary.Visitors
             _action = action;
         }
 
-        protected override void OnMatch(SelectExpression selectExpr)
+        protected override void OnSelect(SelectExpression selectExpr)
         {
             if (selectExpr.ContainsTableReference(_targetTable))
             {

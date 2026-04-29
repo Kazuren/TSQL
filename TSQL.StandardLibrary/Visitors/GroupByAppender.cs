@@ -91,7 +91,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _replace = replace;
             }
 
-            protected override void OnMatch(SelectExpression selectExpr)
+            protected override void OnSelect(SelectExpression selectExpr)
             {
                 ApplyGroupBy(selectExpr, _groupByItems, _replace);
             }

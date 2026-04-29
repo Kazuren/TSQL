@@ -60,7 +60,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _joinFragment = joinFragment;
             }
 
-            protected override void OnMatch(SelectExpression selectExpr)
+            protected override void OnSelect(SelectExpression selectExpr)
             {
                 ApplyJoin(selectExpr, _joinFragment);
             }

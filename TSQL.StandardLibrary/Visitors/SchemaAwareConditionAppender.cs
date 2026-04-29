@@ -432,7 +432,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _hasMixedPrefixes = hasMixedPrefixes;
             }
 
-            protected override void OnMatch(SelectExpression selectExpr)
+            protected override void OnSelect(SelectExpression selectExpr)
             {
                 if (_hasMixedPrefixes)
                 {

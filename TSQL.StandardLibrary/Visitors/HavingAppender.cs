@@ -51,7 +51,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _condition = condition;
             }
 
-            protected override void OnMatch(SelectExpression selectExpr)
+            protected override void OnSelect(SelectExpression selectExpr)
             {
                 ApplyHaving(selectExpr, _condition);
             }

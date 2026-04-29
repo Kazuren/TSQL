@@ -3,10 +3,10 @@ using TSQL.AST;
 namespace TSQL.StandardLibrary.Visitors
 {
     /// <summary>
-    /// Base walker that dispatches to <see cref="OnMatch"/> for every SelectExpression
+    /// Base walker that dispatches to <see cref="OnSelect"/> for every SelectExpression
     /// whose query-level category passes the <c>mutate</c> scope check. The <c>traverse</c>
     /// scope controls which categories the walker enters at all. Children are always walked
-    /// before <see cref="OnMatch"/> is called (post-order), so mutations don't interfere
+    /// before <see cref="OnSelect"/> is called (post-order), so mutations don't interfere
     /// with the traversal.
     /// </summary>
     internal abstract class ScopedQueryWalker : SqlWalker
@@ -28,22 +28,22 @@ namespace TSQL.StandardLibrary.Visitors
         /// Called once per SELECT branch. Use for clause-level mutations (WHERE, GROUP BY, HAVING, JOIN).
         /// <code>
         /// WITH Cte AS (
-        ///     SELECT a FROM T1   ← OnMatch (Ctes)
+        ///     SELECT a FROM T1   ← OnSelect (Ctes)
         ///     UNION
-        ///     SELECT b FROM T2   ← OnMatch (Ctes)
+        ///     SELECT b FROM T2   ← OnSelect (Ctes)
         /// )
-        /// SELECT * FROM Cte      ← OnMatch (OutermostQuery)
+        /// SELECT * FROM Cte      ← OnSelect (OutermostQuery)
         /// WHERE x IN (
-        ///     SELECT y FROM T3   ← OnMatch (InSubqueries)
+        ///     SELECT y FROM T3   ← OnSelect (InSubqueries)
         /// )
         /// ORDER BY 1
         /// </code>
         /// </remarks>
-        protected virtual void OnMatch(SelectExpression selectExpr) { }
+        protected virtual void OnSelect(SelectExpression selectExpr) { }
 
         /// <summary>
         /// Called once for each QueryExpression at a category boundary (CTE, outermost, subquery).
-        /// Unlike <see cref="OnMatch"/>, this is called for the entire QueryExpression
+        /// Unlike <see cref="OnSelect"/>, this is called for the entire QueryExpression
         /// (which may be a SetOperation for UNION queries) rather than for each SelectExpression branch.
         /// </summary>
         /// <remarks>
@@ -52,16 +52,16 @@ namespace TSQL.StandardLibrary.Visitors
         /// WITH Cte AS (
         ///     SELECT a FROM T1
         ///     UNION
-        ///     SELECT b FROM T2   ← OnQueryExpressionMatch (Ctes) - once for entire UNION
+        ///     SELECT b FROM T2   ← OnQuery (Ctes) - once for entire UNION
         /// )
         /// SELECT * FROM Cte
         /// WHERE x IN (
-        ///     SELECT y FROM T3   ← OnQueryExpressionMatch (InSubqueries)
+        ///     SELECT y FROM T3   ← OnQuery (InSubqueries)
         /// )
-        /// ORDER BY 1             ← OnQueryExpressionMatch (OutermostQuery)
+        /// ORDER BY 1             ← OnQuery (OutermostQuery)
         /// </code>
         /// </remarks>
-        protected virtual void OnQueryExpressionMatch(QueryExpression queryExpr) { }
+        protected virtual void OnQuery(QueryExpression queryExpr) { }
 
         private bool CanTraverse(QueryScope flag)
         {
@@ -142,13 +142,13 @@ namespace TSQL.StandardLibrary.Visitors
 
         private void HandleQueryExpression(QueryExpression queryExpr, QueryScope category)
         {
-            // Walk and call OnMatch for SelectExpression leaves
+            // Walk and call OnSelect for SelectExpression leaves
             WalkQueryExpressionRecursive(queryExpr, category);
 
             // Call QueryExpression callback at the top level (once, not for each branch)
             if (CanMutate(category))
             {
-                OnQueryExpressionMatch(queryExpr);
+                OnQuery(queryExpr);
             }
         }
 
@@ -159,7 +159,7 @@ namespace TSQL.StandardLibrary.Visitors
                 WalkSelectExpression(selectExpr);
                 if (CanMutate(category))
                 {
-                    OnMatch(selectExpr);
+                    OnSelect(selectExpr);
                 }
             }
             else if (queryExpr is SetOperation setOp)
