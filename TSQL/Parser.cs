@@ -415,6 +415,91 @@ namespace TSQL
             return predicate;
         }
 
+        internal SyntaxElementList<GroupByItem> ParseGroupByItems()
+        {
+            Reset();
+            SyntaxElementList<GroupByItem> items = ParseGroupByList();
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected end of GROUP BY items.");
+            }
+
+            return items;
+        }
+
+        internal SyntaxElementList<OrderByItem> ParseOrderByItems()
+        {
+            Reset();
+            SyntaxElementList<OrderByItem> items = ParseOrderByList();
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected end of ORDER BY items.");
+            }
+
+            return items;
+        }
+
+        internal QualifiedJoin ParseJoinFragment()
+        {
+            Reset();
+
+            Token joinTypeToken = null;
+            Token outerToken = null;
+            JoinType joinType = JoinType.Inner;
+
+            if (Match(TokenType.INNER, out Token innerToken))
+            {
+                joinTypeToken = innerToken;
+                joinType = JoinType.Inner;
+            }
+            else if (Match(TokenType.LEFT, out Token leftToken))
+            {
+                joinTypeToken = leftToken;
+                joinType = JoinType.LeftOuter;
+                Match(TokenType.OUTER, out outerToken);
+            }
+            else if (Match(TokenType.RIGHT, out Token rightToken))
+            {
+                joinTypeToken = rightToken;
+                joinType = JoinType.RightOuter;
+                Match(TokenType.OUTER, out outerToken);
+            }
+            else if (Match(TokenType.FULL, out Token fullToken))
+            {
+                joinTypeToken = fullToken;
+                joinType = JoinType.FullOuter;
+                Match(TokenType.OUTER, out outerToken);
+            }
+
+            Token joinHintToken = null;
+            JoinHint? joinHint = null;
+            if (Match(TokenType.LOOP, out Token loopToken)) { joinHintToken = loopToken; joinHint = JoinHint.Loop; }
+            else if (Match(TokenType.HASH, out Token hashToken)) { joinHintToken = hashToken; joinHint = JoinHint.Hash; }
+            else if (Match(TokenType.MERGE, out Token mergeToken)) { joinHintToken = mergeToken; joinHint = JoinHint.Merge; }
+            else if (Match(TokenType.REMOTE, out Token remoteToken)) { joinHintToken = remoteToken; joinHint = JoinHint.Remote; }
+
+            Token joinToken = Consume(TokenType.JOIN, "Expected JOIN");
+            TableSource right = ParseTableSourcePrimary();
+            Token onToken = Consume(TokenType.ON, "Expected ON");
+            AST.Predicate onCondition = SearchCondition();
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected end of JOIN fragment.");
+            }
+
+            QualifiedJoin qualifiedJoin = new QualifiedJoin(null, right, joinType, onCondition, joinHint);
+            qualifiedJoin._joinHintToken = joinHintToken;
+            qualifiedJoin._joinTypeToken = joinTypeToken;
+            qualifiedJoin._outerToken = outerToken;
+            qualifiedJoin._joinToken = joinToken;
+            qualifiedJoin._onToken = onToken;
+
+            return qualifiedJoin;
+        }
+
         /// <summary>
         /// Dispatches to the correct statement parser based on the next token.
         /// Handles optional leading CTE (WITH clause).
@@ -3317,6 +3402,19 @@ namespace TSQL
 
         #region GROUP BY Parsing
 
+        private SyntaxElementList<GroupByItem> ParseGroupByList()
+        {
+            SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
+            items.Append(GroupByItem());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                items.Append(GroupByItem(), comma);
+            }
+
+            return items;
+        }
+
         /// <summary>
         /// GROUP BY a, ROLLUP(b, c), GROUPING SETS((a, b), ())
         /// </summary>
@@ -3325,13 +3423,7 @@ namespace TSQL
             Token groupKeyword = Consume(TokenType.GROUP, "Expected GROUP");
             Token byKeyword = Consume(TokenType.BY, "Expected BY after GROUP");
 
-            SyntaxElementList<GroupByItem> items = new SyntaxElementList<GroupByItem>();
-            items.Append(GroupByItem());
-
-            while (Match(TokenType.COMMA, out Token comma))
-            {
-                items.Append(GroupByItem(), comma);
-            }
+            SyntaxElementList<GroupByItem> items = ParseGroupByList();
 
             return new GroupByClause(groupKeyword, byKeyword, items);
         }

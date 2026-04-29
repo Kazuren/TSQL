@@ -244,6 +244,28 @@ namespace TSQL
             JoinHint = joinHint;
         }
 
+        public static QualifiedJoin ParseJoinFragment(string sql)
+        {
+            return Parser.CreateParser(sql).ParseJoinFragment();
+        }
+
+        public static QualifiedJoin CreateJoin(TableSource left, string joinFragment)
+        {
+            QualifiedJoin join = ParseJoinFragment(joinFragment);
+            join.Left = left;
+            BuildTokenChain(join);
+
+            Token firstToken = join.FirstJoinToken;
+            if (firstToken != null)
+            {
+                firstToken.ClearLeadingTrivia();
+                firstToken.AddLeadingTrivia(Whitespace.Space);
+            }
+            return join;
+        }
+
+        private Token FirstJoinToken => _joinTypeToken ?? _outerToken ?? _joinHintToken ?? _joinToken;
+
         public override T Accept<T>(Visitor<T> visitor)
         {
             return visitor.VisitQualifiedJoin(this);

@@ -26,12 +26,20 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         protected abstract void OnMatch(SelectExpression selectExpr);
 
+        /// <summary>
+        /// Called once for each QueryExpression at a category boundary (CTE, outermost, subquery).
+        /// Unlike <see cref="OnMatch"/>, this is called for the entire QueryExpression
+        /// (which may be a SetOperation for UNION queries) rather than for each SelectExpression branch.
+        /// Default implementation does nothing.
+        /// </summary>
+        protected virtual void OnQueryExpressionMatch(QueryExpression queryExpr) { }
+
         private bool CanTraverse(QueryScope flag)
         {
             return (_traverse & flag) != 0;
         }
 
-        private bool CanMutate(QueryScope flag)
+        protected bool CanMutate(QueryScope flag)
         {
             return (_mutate & flag) != 0;
         }
@@ -105,9 +113,20 @@ namespace TSQL.StandardLibrary.Visitors
 
         private void HandleQueryExpression(QueryExpression queryExpr, QueryScope category)
         {
+            // Walk and call OnMatch for SelectExpression leaves
+            WalkQueryExpressionRecursive(queryExpr, category);
+
+            // Call QueryExpression callback at the top level (once, not for each branch)
+            if (CanMutate(category))
+            {
+                OnQueryExpressionMatch(queryExpr);
+            }
+        }
+
+        private void WalkQueryExpressionRecursive(QueryExpression queryExpr, QueryScope category)
+        {
             if (queryExpr is SelectExpression selectExpr)
             {
-                // Walk before mutating so the traversal sees only the original AST.
                 WalkSelectExpression(selectExpr);
                 if (CanMutate(category))
                 {
@@ -116,12 +135,12 @@ namespace TSQL.StandardLibrary.Visitors
             }
             else if (queryExpr is SetOperation setOp)
             {
-                HandleQueryExpression(setOp.Left, category);
-                HandleQueryExpression(setOp.Right, category);
+                WalkQueryExpressionRecursive(setOp.Left, category);
+                WalkQueryExpressionRecursive(setOp.Right, category);
             }
             else if (queryExpr is ParenthesizedQuery parenQuery)
             {
-                HandleQueryExpression(parenQuery.Inner, category);
+                WalkQueryExpressionRecursive(parenQuery.Inner, category);
             }
         }
     }

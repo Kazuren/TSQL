@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -380,6 +381,13 @@ namespace TSQL
 
     public class OrderByItem : SyntaxElement
     {
+        public static SyntaxElementList<OrderByItem> ParseOrderByItems(string sql)
+        {
+            SyntaxElementList<OrderByItem> result = Parser.CreateParser(sql).ParseOrderByItems();
+            BuildTokenChain(result);
+            return result;
+        }
+
         private Expr _expression;
         public Expr Expression
         {
@@ -457,7 +465,15 @@ namespace TSQL
         }
     }
 
-    public abstract class GroupByItem : SyntaxElement { }
+    public abstract class GroupByItem : SyntaxElement
+    {
+        public static SyntaxElementList<GroupByItem> ParseGroupByItems(string sql)
+        {
+            SyntaxElementList<GroupByItem> result = Parser.CreateParser(sql).ParseGroupByItems();
+            BuildTokenChain(result);
+            return result;
+        }
+    }
 
     public class GroupByExpression : GroupByItem
     {
@@ -867,6 +883,43 @@ namespace TSQL
         public SetQuantifier Quantifier { set => SetSetQuantifier(value); }
         internal abstract void SetSetQuantifier(SetQuantifier quantifier);
 
+        public void AddOrderBy(SyntaxElementList<OrderByItem> items)
+        {
+            if (items == null || items.Count == 0)
+            {
+                return;
+            }
+
+            Token firstItemToken = FirstTokenOf(items);
+            if (firstItemToken != null)
+            {
+                firstItemToken.ClearLeadingTrivia();
+                firstItemToken.AddLeadingTrivia(Whitespace.Space);
+            }
+
+            if (OrderBy == null)
+            {
+                OrderBy = new OrderByClause
+                {
+                    Items = items,
+                    _orderKeyword = ConcreteToken.WithLeadingSpace(TokenType.ORDER, "ORDER"),
+                    _orderByKeyword = ConcreteToken.WithLeadingSpace(TokenType.BY, "BY")
+                };
+            }
+            else
+            {
+                foreach (OrderByItem item in items)
+                {
+                    OrderBy.Items.Append(item);
+                }
+            }
+        }
+
+        public void ClearOrderBy()
+        {
+            OrderBy = null;
+        }
+
         /// <summary>
         /// Returns a read-only view of the columns in this query expression.
         /// For SelectExpression, returns its column list.
@@ -1114,19 +1167,47 @@ namespace TSQL
 
         public void AddWhere(AST.Predicate condition)
         {
-            if (Where == null)
+            AddPredicateToClause(
+                condition,
+                Where,
+                kw => _whereKeyword = kw,
+                pred => _where = pred,
+                TokenType.WHERE,
+                "WHERE");
+        }
+
+        public void AddHaving(AST.Predicate condition)
+        {
+            AddPredicateToClause(
+                condition,
+                Having,
+                kw => _havingKeyword = kw,
+                pred => _having = pred,
+                TokenType.HAVING,
+                "HAVING");
+        }
+
+        private void AddPredicateToClause(
+            AST.Predicate condition,
+            AST.Predicate existingPredicate,
+            Action<Token> setKeyword,
+            Action<AST.Predicate> setPredicate,
+            TokenType keywordType,
+            string keywordText)
+        {
+            if (existingPredicate == null)
             {
-                _whereKeyword = ConcreteToken.WithLeadingSpace(TokenType.WHERE, "WHERE");
+                setKeyword(ConcreteToken.WithLeadingSpace(keywordType, keywordText));
 
                 Token conditionFirst = FirstTokenOf(condition);
                 conditionFirst.ClearLeadingTrivia();
                 conditionFirst.AddLeadingTrivia(Whitespace.Space);
 
-                _where = condition;
+                setPredicate(condition);
             }
             else
             {
-                AST.Predicate existing = _where;
+                AST.Predicate existing = existingPredicate;
 
                 if (existing is AST.Predicate.Or)
                 {
@@ -1147,10 +1228,40 @@ namespace TSQL
                 var andPredicate = new AST.Predicate.And(existing, condition);
                 andPredicate._andToken = andToken;
 
-                // Assign directly to avoid SetWithTrivia trivia transfer,
-                // since we manage trivia explicitly above.
-                _where = andPredicate;
+                setPredicate(andPredicate);
             }
+        }
+
+        public void AddGroupBy(SyntaxElementList<GroupByItem> items)
+        {
+            if (items == null || items.Count == 0)
+            {
+                return;
+            }
+
+            Token firstItemToken = FirstTokenOf(items);
+            if (firstItemToken != null)
+            {
+                firstItemToken.ClearLeadingTrivia();
+                firstItemToken.AddLeadingTrivia(Whitespace.Space);
+            }
+
+            if (GroupBy == null)
+            {
+                GroupBy = new GroupByClause(items);
+            }
+            else
+            {
+                foreach (GroupByItem item in items)
+                {
+                    GroupBy.Items.Append(item);
+                }
+            }
+        }
+
+        public void ClearGroupBy()
+        {
+            GroupBy = null;
         }
 
         private static AST.Predicate WrapInGrouping(AST.Predicate predicate)

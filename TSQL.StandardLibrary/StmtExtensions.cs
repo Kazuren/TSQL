@@ -13,7 +13,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate to append (e.g. <c>"Active = 1"</c>).</param>
-        /// <param name="target">Which query levels receive the condition.</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
@@ -191,7 +191,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate to append (e.g. <c>"TenantId = 1"</c>).</param>
         /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
-        /// <param name="target">Which query levels receive the condition.</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
@@ -318,6 +318,249 @@ namespace TSQL.StandardLibrary.Visitors
             ColumnReferenceClause clauses = ColumnReferenceClause.Select)
         {
             return ColumnReferenceCollector.Collect(stmt, scope, clauses);
+        }
+
+        /// <summary>
+        /// Appends a HAVING condition to SELECT statements within this statement.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
+        /// Defaults to outermost query only (both sides of UNION, etc.).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate to append (e.g. <c>"COUNT(*) > 10"</c>).</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        public static Stmt AddHaving(this Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery)
+        {
+            HavingAppender.AddHaving(stmt, condition, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends a HAVING condition to every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate to append (e.g. <c>"COUNT(*) > 10"</c>).</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the condition.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        public static Stmt AddHaving(this Stmt stmt, string condition, string targetTable,
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
+        {
+            HavingAppender.AddHaving(stmt, condition, targetTable, traverse, mutate);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends GROUP BY items to SELECT statements within this statement.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
+        /// Defaults to outermost query only (both sides of UNION, etc.).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="groupByItems">GROUP BY items to append (e.g. <c>"Category, Region"</c>).</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="groupByItems"/> is not valid SQL.</exception>
+        public static Stmt AddGroupBy(this Stmt stmt, string groupByItems, QueryScope target = QueryScope.OutermostQuery)
+        {
+            GroupByAppender.AddGroupBy(stmt, groupByItems, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends GROUP BY items to every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="groupByItems">GROUP BY items to append (e.g. <c>"Category, Region"</c>).</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the GROUP BY items.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="groupByItems"/> is not valid SQL.</exception>
+        public static Stmt AddGroupBy(this Stmt stmt, string groupByItems, string targetTable,
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
+        {
+            GroupByAppender.AddGroupBy(stmt, groupByItems, targetTable, traverse, mutate);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Replaces the GROUP BY clause in SELECT statements within this statement.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
+        /// Defaults to outermost query only (both sides of UNION, etc.).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="groupByItems">GROUP BY items to set (e.g. <c>"NewCategory"</c>). Pass empty string to clear.</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="groupByItems"/> is not valid SQL.</exception>
+        public static Stmt ReplaceGroupBy(this Stmt stmt, string groupByItems, QueryScope target = QueryScope.OutermostQuery)
+        {
+            GroupByAppender.ReplaceGroupBy(stmt, groupByItems, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Replaces the GROUP BY clause in every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="groupByItems">GROUP BY items to set (e.g. <c>"NewCategory"</c>). Pass empty string to clear.</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the GROUP BY replacement.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="groupByItems"/> is not valid SQL.</exception>
+        public static Stmt ReplaceGroupBy(this Stmt stmt, string groupByItems, string targetTable,
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
+        {
+            GroupByAppender.ReplaceGroupBy(stmt, groupByItems, targetTable, traverse, mutate);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends ORDER BY items to SELECT statements within this statement.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
+        /// Defaults to outermost query only (both sides of UNION, etc.).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="orderByItems">ORDER BY items to append (e.g. <c>"Name ASC, CreatedDate DESC"</c>).</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="orderByItems"/> is not valid SQL.</exception>
+        public static Stmt AddOrderBy(this Stmt stmt, string orderByItems, QueryScope target = QueryScope.OutermostQuery)
+        {
+            OrderByAppender.AddOrderBy(stmt, orderByItems, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends ORDER BY items to every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="orderByItems">ORDER BY items to append (e.g. <c>"Name ASC"</c>).</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the ORDER BY items.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="orderByItems"/> is not valid SQL.</exception>
+        public static Stmt AddOrderBy(this Stmt stmt, string orderByItems, string targetTable,
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
+        {
+            OrderByAppender.AddOrderBy(stmt, orderByItems, targetTable, traverse, mutate);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Replaces the ORDER BY clause in SELECT statements within this statement.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
+        /// Defaults to outermost query only (both sides of UNION, etc.).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="orderByItems">ORDER BY items to set (e.g. <c>"NewColumn DESC"</c>). Pass empty string to clear.</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="orderByItems"/> is not valid SQL.</exception>
+        public static Stmt ReplaceOrderBy(this Stmt stmt, string orderByItems, QueryScope target = QueryScope.OutermostQuery)
+        {
+            OrderByAppender.ReplaceOrderBy(stmt, orderByItems, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Replaces the ORDER BY clause in every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="orderByItems">ORDER BY items to set (e.g. <c>"NewColumn DESC"</c>). Pass empty string to clear.</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the ORDER BY replacement.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="orderByItems"/> is not valid SQL.</exception>
+        public static Stmt ReplaceOrderBy(this Stmt stmt, string orderByItems, string targetTable,
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
+        {
+            OrderByAppender.ReplaceOrderBy(stmt, orderByItems, targetTable, traverse, mutate);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends a JOIN clause to SELECT statements within this statement.
+        /// The join is added to the rightmost table source in the FROM clause.
+        /// Use <see cref="QueryScope"/> flags to control which queries are modified.
+        /// Defaults to outermost query only (both sides of UNION, etc.).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="joinFragment">JOIN clause to append (e.g. <c>"INNER JOIN Orders o ON o.CustomerId = c.Id"</c>).</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="joinFragment"/> is not a valid JOIN clause.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the query has no FROM clause.</exception>
+        public static Stmt AddJoin(this Stmt stmt, string joinFragment, QueryScope target = QueryScope.OutermostQuery)
+        {
+            JoinAppender.AddJoin(stmt, joinFragment, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends a JOIN clause to every SELECT within this statement whose FROM clause
+        /// references <paramref name="targetTable"/>, subject to traversal and mutation scope.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="joinFragment">JOIN clause to append (e.g. <c>"INNER JOIN Orders o ON o.CustomerId = c.Id"</c>).</param>
+        /// <param name="targetTable">Table name whose referencing SELECT(s) receive the JOIN.
+        /// Comparison is case-insensitive and honors dotted schema-qualified names.</param>
+        /// <param name="traverse">Which query-level categories the walker enters.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="mutate">Which query-level categories are eligible for mutation.
+        /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="joinFragment"/> is not a valid JOIN clause.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the query has no FROM clause.</exception>
+        public static Stmt AddJoin(this Stmt stmt, string joinFragment, string targetTable,
+            QueryScope traverse = QueryScope.All,
+            QueryScope mutate = QueryScope.All)
+        {
+            JoinAppender.AddJoin(stmt, joinFragment, targetTable, traverse, mutate);
+            return stmt;
         }
     }
 }
