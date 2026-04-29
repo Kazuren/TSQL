@@ -402,6 +402,20 @@ namespace TSQL
             return result;
         }
 
+        internal Expr.ColumnIdentifier ParseColumnIdentifier()
+        {
+            Reset();
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ColumnIdentifier result = ColumnIdentifier(parts);
+
+            if (!IsAtEnd())
+            {
+                throw Error(Peek(), "Expected end of column identifier.");
+            }
+
+            return result;
+        }
+
         public AST.Predicate ParseSearchCondition()
         {
             Reset();

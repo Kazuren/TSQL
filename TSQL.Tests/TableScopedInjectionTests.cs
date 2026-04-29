@@ -478,6 +478,89 @@ namespace TSQL.Tests
 
         #endregion
 
+        #region Expr.ParseColumnIdentifier
+
+        [Fact]
+        public void ParseColumnIdentifier_SimpleName()
+        {
+            var id = Expr.ParseColumnIdentifier("Name");
+
+            Assert.Equal("Name", id.ColumnName.Name);
+            Assert.Null(id.ObjectName);
+            Assert.Null(id.SchemaName);
+            Assert.Null(id.DatabaseName);
+            Assert.Equal("Name", id.ToSource());
+        }
+
+        [Fact]
+        public void ParseColumnIdentifier_ObjectQualified()
+        {
+            var id = Expr.ParseColumnIdentifier("Users.Name");
+
+            Assert.Equal("Users", id.ObjectName.Name);
+            Assert.Equal("Name", id.ColumnName.Name);
+            Assert.Null(id.SchemaName);
+            Assert.Null(id.DatabaseName);
+            Assert.Equal("Users.Name", id.ToSource());
+        }
+
+        [Fact]
+        public void ParseColumnIdentifier_SchemaObjectColumn()
+        {
+            var id = Expr.ParseColumnIdentifier("dbo.Users.Name");
+
+            Assert.Equal("dbo", id.SchemaName.Name);
+            Assert.Equal("Users", id.ObjectName.Name);
+            Assert.Equal("Name", id.ColumnName.Name);
+            Assert.Null(id.DatabaseName);
+            Assert.Equal("dbo.Users.Name", id.ToSource());
+        }
+
+        [Fact]
+        public void ParseColumnIdentifier_FourPart()
+        {
+            var id = Expr.ParseColumnIdentifier("mydb.dbo.Users.Name");
+
+            Assert.Equal("mydb", id.DatabaseName.Name);
+            Assert.Equal("dbo", id.SchemaName.Name);
+            Assert.Equal("Users", id.ObjectName.Name);
+            Assert.Equal("Name", id.ColumnName.Name);
+            Assert.Equal("mydb.dbo.Users.Name", id.ToSource());
+        }
+
+        [Fact]
+        public void ParseColumnIdentifier_DoubleDot_SkipsSchema()
+        {
+            var id = Expr.ParseColumnIdentifier("mydb..Users.Name");
+
+            Assert.Equal("mydb", id.DatabaseName.Name);
+            Assert.Null(id.SchemaName);
+            Assert.Equal("Users", id.ObjectName.Name);
+            Assert.Equal("Name", id.ColumnName.Name);
+            Assert.Equal("mydb..Users.Name", id.ToSource());
+        }
+
+        [Fact]
+        public void ParseColumnIdentifier_TempTable()
+        {
+            var id = Expr.ParseColumnIdentifier("#tmp.Id");
+
+            Assert.Equal("#tmp", id.ObjectName.Name);
+            Assert.Equal("Id", id.ColumnName.Name);
+            Assert.Equal("#tmp.Id", id.ToSource());
+        }
+
+        [Fact]
+        public void ParseColumnIdentifier_ViaColumnIdentifierParse()
+        {
+            var id = Expr.ColumnIdentifier.Parse("t.Id");
+
+            Assert.Equal("t", id.ObjectName.Name);
+            Assert.Equal("Id", id.ColumnName.Name);
+        }
+
+        #endregion
+
         #region Chaining — All Three Together
 
         [Fact]

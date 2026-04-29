@@ -50,6 +50,19 @@ namespace TSQL
             return result;
         }
 
+        /// <summary>
+        /// Parses a dotted column identifier from the given string.
+        /// Supports 1–4 parts and the double-dot syntax (e.g. <c>"database..table.column"</c>).
+        /// </summary>
+        /// <param name="sql">The identifier text to parse (e.g. <c>"t.Name"</c>, <c>"dbo.Users.Id"</c>).</param>
+        /// <exception cref="ParseError">Thrown when the text is not a valid column identifier.</exception>
+        public static ColumnIdentifier ParseColumnIdentifier(string sql)
+        {
+            ColumnIdentifier result = Parser.CreateParser(sql).ParseColumnIdentifier();
+            BuildTokenChain(result);
+            return result;
+        }
+
         /// <summary>Creates a string literal.</summary>
         public static StringLiteral Literal(string value) => new StringLiteral(value);
 
@@ -483,6 +496,18 @@ namespace TSQL
             public ColumnIdentifier(ColumnName columnName)
             {
                 ColumnName = columnName;
+            }
+
+            /// <summary>
+            /// Parses a dotted column identifier from the given string.
+            /// Equivalent to <see cref="Expr.ParseColumnIdentifier"/>; provided for convenience
+            /// when the caller already has the <c>ColumnIdentifier</c> type in scope.
+            /// </summary>
+            /// <param name="sql">The identifier text to parse (e.g. <c>"t.Name"</c>, <c>"dbo.Users.Id"</c>).</param>
+            /// <exception cref="ParseError">Thrown when the text is not a valid column identifier.</exception>
+            public static ColumnIdentifier Parse(string sql)
+            {
+                return ParseColumnIdentifier(sql);
             }
 
             public override T Accept<T>(Visitor<T> visitor)
