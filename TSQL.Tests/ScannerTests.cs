@@ -444,7 +444,7 @@
             var tokens = scanner.ScanTokens();
 
             // Find the comment trivia
-            Comment comment = null;
+            Comment? comment = null;
             foreach (var token in tokens)
             {
                 foreach (var trivia in token.LeadingTrivia)

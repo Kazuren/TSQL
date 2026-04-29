@@ -72,7 +72,7 @@ namespace TSQL.Tests
             QueryExpression queryExpr = stmt.Query;
 
             Assert.True(queryExpr.Columns.Any<Wildcard>());
-            Assert.Equal(1, queryExpr.Columns.OfType<SelectColumn>().Count());
+            Assert.Single(queryExpr.Columns.OfType<SelectColumn>());
         }
 
         [Fact]
