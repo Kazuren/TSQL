@@ -230,12 +230,12 @@ WHERE Price > 10.00 OR InStock = 1";
 }
 
 // ###########################################################################
-// ########################## Demo 4: Schema-Aware Condition #################
+// ########################## Demo 4: Conditional Condition ##################
 // ###########################################################################
 
 void Demo4_SchemaAwareCondition()
 {
-    PrintDemoHeader("4", "SchemaAwareCondition (company filter)",
+    PrintDemoHeader("4", "AddConditionWhen (company filter)",
         "Inject CompanyId = @CompanyId only into tables that have a CompanyId column.");
 
     // Simulated schema: only some tables have CompanyId
@@ -244,10 +244,7 @@ void Demo4_SchemaAwareCondition()
         "Orders", "Customers"
     };
 
-    ColumnExistenceChecker columnExists = (tableName, columns) =>
-    {
-        return tablesWithCompanyId.Contains(tableName);
-    };
+    ShouldApply shouldApply = ctx => tablesWithCompanyId.Contains(ctx.TableName);
 
     PrintLabel("Schema");
     Console.WriteLine("  Orders     — has CompanyId");
@@ -266,12 +263,12 @@ WHERE o.Total > 100";
     PrintLabel("Original");
     PrintSqlWithAst(stmt);
 
-    stmt.AddSchemaAwareCondition("CompanyId = @CompanyId",
+    stmt.AddConditionWhen("CompanyId = @CompanyId",
         new object[] { ("@CompanyId", 42) },
-        columnExists,
+        shouldApply,
         out var parameters);
 
-    PrintLabel("After AddSchemaAwareCondition(\"CompanyId = @CompanyId\", ...)");
+    PrintLabel("After AddConditionWhen(\"CompanyId = @CompanyId\", ...)");
     PrintSqlWithAst(stmt);
 
     PrintLabel("Parameters");

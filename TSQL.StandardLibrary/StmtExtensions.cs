@@ -182,30 +182,30 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         /// <summary>
-        /// Appends a WHERE condition to SELECT statements, but only for tables that contain
-        /// all referenced columns (verified via the <paramref name="columnExists"/> callback).
+        /// Appends a WHERE condition to SELECT statements, but only for tables where
+        /// the <paramref name="shouldApply"/> callback returns true.
         /// Unprefixed column references are automatically prefixed with the table alias/name.
         /// If ALL columns are already prefixed, falls back to regular AddCondition behavior.
         /// Defaults to all query levels (outermost + subqueries + CTEs).
         /// </summary>
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate to append (e.g. <c>"TenantId = 1"</c>).</param>
-        /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
-            ColumnExistenceChecker columnExists,
+        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
+            ShouldApply shouldApply,
             QueryScope target = QueryScope.All)
         {
-            SchemaAwareConditionAppender.AddCondition(stmt, condition, columnExists, target);
+            ConditionalConditionAppender.AddCondition(stmt, condition, shouldApply, target);
             return stmt;
         }
 
         /// <summary>
         /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
-        /// that contain all referenced columns (verified via the <paramref name="columnExists"/> callback).
+        /// where the <paramref name="shouldApply"/> callback returns true.
         /// Variables in the condition that collide with existing variables in the statement
         /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
         /// Unprefixed column references are automatically prefixed with the table alias/name.
@@ -214,23 +214,23 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
         /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
-        /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
-        public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
+        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
             IEnumerable<object> values,
-            ColumnExistenceChecker columnExists,
+            ShouldApply shouldApply,
             out IReadOnlyDictionary<string, object> parameters)
         {
-            return AddSchemaAwareCondition(stmt, condition, values, columnExists, QueryScope.All, out parameters);
+            return AddConditionWhen(stmt, condition, values, shouldApply, QueryScope.All, out parameters);
         }
 
         /// <summary>
         /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
-        /// that contain all referenced columns (verified via the <paramref name="columnExists"/> callback).
+        /// where the <paramref name="shouldApply"/> callback returns true.
         /// Variables in the condition that collide with existing variables in the statement
         /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
         /// Unprefixed column references are automatically prefixed with the table alias/name.
@@ -238,23 +238,23 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
         /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
-        /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="target">Which query levels receive the condition.</param>
         /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
-        public static Stmt AddSchemaAwareCondition(this Stmt stmt, string condition,
+        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
             IEnumerable<object> values,
-            ColumnExistenceChecker columnExists,
+            ShouldApply shouldApply,
             QueryScope target,
             out IReadOnlyDictionary<string, object> parameters)
         {
             (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
                 = ConditionParameterResolver.Resolve(stmt, condition, values);
             parameters = resolvedParams;
-            SchemaAwareConditionAppender.AddCondition(stmt, resolvedCondition, columnExists, target);
+            ConditionalConditionAppender.AddCondition(stmt, resolvedCondition, shouldApply, target);
             return stmt;
         }
 

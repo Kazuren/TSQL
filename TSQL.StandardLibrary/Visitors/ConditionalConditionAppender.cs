@@ -5,24 +5,81 @@ using TSQL.AST;
 namespace TSQL.StandardLibrary.Visitors
 {
     /// <summary>
-    /// Callback delegate: "Does table 'tableName' have ALL of these columns?"
-    /// The walker calls this to check column existence.
-    /// The user provides the implementation (e.g. queries INFORMATION_SCHEMA.COLUMNS).
-    /// This keeps the parser library free of any external dependencies.
+    /// Context passed to <see cref="ShouldApply"/> to decide whether a condition
+    /// should be applied to a specific table.
     /// </summary>
-    public delegate bool ColumnExistenceChecker(string tableName, IReadOnlyList<string> columnNames);
+    public sealed class ConditionContext
+    {
+        /// <summary>The table reference AST node.</summary>
+        public TableReference Table { get; }
 
-    internal static class SchemaAwareConditionAppender
+        /// <summary>The parsed condition being applied.</summary>
+        public Predicate Condition { get; }
+
+        /// <summary>
+        /// Unprefixed column names referenced in the condition.
+        /// The callback should return true only if the table has ALL of these columns.
+        /// </summary>
+        public IReadOnlyList<string> ReferencedColumns { get; }
+
+        /// <summary>The physical table name (e.g., "Orders").</summary>
+        public string TableName => Table.TableName.ObjectName.Name;
+
+        /// <summary>The schema name if qualified (e.g., "dbo"), or null.</summary>
+        public string SchemaName => Table.TableName.SchemaName?.Name;
+
+        /// <summary>The database name if qualified, or null.</summary>
+        public string DatabaseName => Table.TableName.DatabaseName?.Name;
+
+        /// <summary>The alias if present (e.g., "o" from "Orders o"), or null.</summary>
+        public string Alias => Table.Alias?.Lexeme;
+
+        internal ConditionContext(
+            TableReference table, Predicate condition,
+            IReadOnlyList<string> referencedColumns)
+        {
+            Table = table;
+            Condition = condition;
+            ReferencedColumns = referencedColumns;
+        }
+    }
+
+    /// <summary>
+    /// Callback delegate: "Should this condition be applied to this table?"
+    /// Return true to apply the condition (prefixed with the table's alias),
+    /// false to skip this table.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="ConditionContext.ReferencedColumns"/> contains unprefixed column names
+    /// from the condition. If the condition references multiple columns, the callback is
+    /// called once with ALL column names — return true only if the table has ALL of them.
+    /// </remarks>
+    public delegate bool ShouldApply(ConditionContext context);
+
+    internal static class ConditionalConditionAppender
     {
         /// <summary>
-        /// Appends a WHERE condition to SELECT statements, but only for tables that contain
-        /// all referenced columns (verified via the <paramref name="columnExists"/> callback).
+        /// Appends a WHERE condition to SELECT statements, but only for tables where
+        /// the <paramref name="shouldApply"/> callback returns true.
         /// Unprefixed column references in the condition are automatically prefixed with the
         /// table alias (or table name if no alias).
         /// If ALL columns in the condition are already prefixed, falls back to regular AddCondition behavior.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The callback receives a <see cref="ConditionContext"/> containing the table being evaluated
+        /// and all unprefixed column names from the condition. If the condition references multiple
+        /// columns (e.g., "A = 1 AND B = 2"), the callback is called once with ALL column names
+        /// ["A", "B"]. Return true only if the table has ALL referenced columns.
+        /// </para>
+        /// <para>
+        /// For conditions with mixed prefixed and unprefixed columns (e.g., "T1.A = 1 AND B = 2"),
+        /// the prefixed parts are added once unconditionally, while unprefixed parts are added
+        /// per-table based on the callback result.
+        /// </para>
+        /// </remarks>
         public static void AddCondition(Stmt stmt, string condition,
-            ColumnExistenceChecker columnExists,
+            ShouldApply shouldApply,
             QueryScope target = QueryScope.All)
         {
             if (target == QueryScope.None)
@@ -49,8 +106,9 @@ namespace TSQL.StandardLibrary.Visitors
 
             bool hasMixedPrefixes = columnCollector.PrefixedColumnNames.Count > 0;
 
-            SchemaAwareWalker walker = new SchemaAwareWalker(
-                condition, columnCollector.UnprefixedColumnNames, columnExists, target, hasMixedPrefixes);
+            ConditionalWalker walker = new ConditionalWalker(
+                condition, parsedCondition, columnCollector.UnprefixedColumnNames,
+                shouldApply, target, hasMixedPrefixes);
             walker.Walk(stmt);
         }
 
@@ -99,10 +157,10 @@ namespace TSQL.StandardLibrary.Visitors
         /// </summary>
         private static class SelectLevelTableCollector
         {
-            public static List<(TableReference Table, string PhysicalName, string EffectiveName)>
+            public static List<(TableReference Table, string EffectiveName)>
                 Collect(SelectExpression selectExpr)
             {
-                List<(TableReference, string, string)> results = new List<(TableReference, string, string)>();
+                List<(TableReference, string)> results = new List<(TableReference, string)>();
                 if (selectExpr.From == null)
                 {
                     return results;
@@ -117,13 +175,12 @@ namespace TSQL.StandardLibrary.Visitors
             }
 
             private static void CollectFromTableSource(TableSource source,
-                List<(TableReference Table, string PhysicalName, string EffectiveName)> results)
+                List<(TableReference Table, string EffectiveName)> results)
             {
                 if (source is TableReference tableRef)
                 {
-                    string physicalName = tableRef.TableName.ObjectName.Name;
                     string effectiveName = tableRef.Alias != null ? tableRef.Alias.Lexeme : tableRef.TableName.ObjectName.Lexeme;
-                    results.Add((tableRef, physicalName, effectiveName));
+                    results.Add((tableRef, effectiveName));
                 }
                 else if (source is QualifiedJoin qualifiedJoin)
                 {
@@ -412,23 +469,26 @@ namespace TSQL.StandardLibrary.Visitors
 
 
         // #####################################################################
-        // ###################### SchemaAwareWalker ############################
+        // ###################### ConditionalWalker ############################
         // #####################################################################
 
-        private class SchemaAwareWalker : ScopedQueryWalker
+        private class ConditionalWalker : ScopedQueryWalker
         {
             private readonly string _condition;
+            private readonly Predicate _parsedCondition;
             private readonly IReadOnlyList<string> _unprefixedColumnNames;
-            private readonly ColumnExistenceChecker _columnExists;
+            private readonly ShouldApply _shouldApply;
             private readonly bool _hasMixedPrefixes;
 
-            public SchemaAwareWalker(string condition, IReadOnlyList<string> unprefixedColumnNames,
-                ColumnExistenceChecker columnExists, QueryScope target, bool hasMixedPrefixes)
+            public ConditionalWalker(string condition, Predicate parsedCondition,
+                IReadOnlyList<string> unprefixedColumnNames,
+                ShouldApply shouldApply, QueryScope target, bool hasMixedPrefixes)
                 : base(QueryScope.All, target)
             {
                 _condition = condition;
+                _parsedCondition = parsedCondition;
                 _unprefixedColumnNames = unprefixedColumnNames;
-                _columnExists = columnExists;
+                _shouldApply = shouldApply;
                 _hasMixedPrefixes = hasMixedPrefixes;
             }
 
@@ -450,11 +510,14 @@ namespace TSQL.StandardLibrary.Visitors
             /// </summary>
             private void ProcessFullyUnprefixedCondition(SelectExpression selectExpr)
             {
-                List<(TableReference Table, string PhysicalName, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
+                List<(TableReference Table, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
 
-                foreach ((TableReference table, string physicalName, string effectiveName) in tables)
+                foreach ((TableReference table, string effectiveName) in tables)
                 {
-                    if (_columnExists(physicalName, _unprefixedColumnNames))
+                    ConditionContext context = new ConditionContext(
+                        table, _parsedCondition, _unprefixedColumnNames);
+
+                    if (_shouldApply(context))
                     {
                         // Re-parse for each table (AddWhere mutates)
                         Predicate freshCondition = Predicate.ParsePredicate(_condition);
@@ -473,7 +536,7 @@ namespace TSQL.StandardLibrary.Visitors
             /// </summary>
             private void ProcessMixedCondition(SelectExpression selectExpr)
             {
-                List<(TableReference Table, string PhysicalName, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
+                List<(TableReference Table, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
 
                 // Decompose the condition into top-level AND conjuncts and classify them
                 Predicate parsed = Predicate.ParsePredicate(_condition);
@@ -507,9 +570,12 @@ namespace TSQL.StandardLibrary.Visitors
                 {
                     string unprefixedCondition = string.Join(" AND ", unprefixedSources);
 
-                    foreach ((TableReference table, string physicalName, string effectiveName) in tables)
+                    foreach ((TableReference table, string effectiveName) in tables)
                     {
-                        if (_columnExists(physicalName, _unprefixedColumnNames))
+                        ConditionContext context = new ConditionContext(
+                            table, _parsedCondition, _unprefixedColumnNames);
+
+                        if (_shouldApply(context))
                         {
                             Predicate freshCondition = Predicate.ParsePredicate(unprefixedCondition);
                             ColumnPrefixer prefixer = new ColumnPrefixer(effectiveName, _unprefixedColumnNames);

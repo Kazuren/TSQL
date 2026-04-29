@@ -1,8 +1,9 @@
+using TSQL.AST;
 using TSQL.StandardLibrary.Visitors;
 
 namespace TSQL.Tests
 {
-    public class SchemaAwareConditionAppenderTests
+    public class AddConditionWhenTests
     {
         private static Stmt Parse(string sql)
         {
@@ -10,17 +11,17 @@ namespace TSQL.Tests
         }
 
         /// <summary>
-        /// Creates a ColumnExistenceChecker that checks against the provided table-column mapping.
+        /// Creates a ShouldApply callback that checks against the provided table-column mapping.
         /// </summary>
-        private static ColumnExistenceChecker CreateChecker(Dictionary<string, HashSet<string>> schema)
+        private static ShouldApply CreateShouldApply(Dictionary<string, HashSet<string>> schema)
         {
-            return (tableName, columnNames) =>
+            return ctx =>
             {
-                if (!schema.TryGetValue(tableName, out HashSet<string>? columns))
+                if (!schema.TryGetValue(ctx.TableName, out HashSet<string>? columns))
                 {
                     return false;
                 }
-                foreach (string col in columnNames)
+                foreach (string col in ctx.ReferencedColumns)
                 {
                     if (!columns.Contains(col))
                     {
@@ -50,7 +51,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0 OR I_ID = 1", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = 0 OR T1.I_ID = 1", stmt.ToSource());
         }
@@ -61,7 +62,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "OTHER_COL" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1", stmt.ToSource());
         }
@@ -72,7 +73,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1 AS A");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 AS A WHERE A.I_ID = 0", stmt.ToSource());
         }
@@ -89,7 +90,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0 OR I_ID = 1", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT T1.ID, T2.ID FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE (T1.I_ID = 0 OR T1.I_ID = 1) AND (T2.I_ID = 0 OR T2.I_ID = 1)",
@@ -104,7 +105,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0 OR I_ID = 1", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT T1.ID, T2.ID FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = 0 OR T1.I_ID = 1",
@@ -119,7 +120,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT T1.ID, T2.ID FROM T1 JOIN T2 ON T1.ID = T2.T1_ID",
@@ -134,7 +135,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 5", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 5", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT A.ID, B.ID FROM T1 AS A JOIN T2 AS B ON A.ID = B.T1_ID WHERE A.I_ID = 5 AND B.I_ID = 5",
@@ -154,7 +155,7 @@ namespace TSQL.Tests
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
             // Condition is already prefixed with T1 - should fall back to regular AddCondition
-            stmt.AddSchemaAwareCondition("T1.I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("T1.I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = 0",
@@ -171,7 +172,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM (SELECT * FROM T1) AS Sub1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM (SELECT * FROM T1 WHERE T1.I_ID = 0) AS Sub1",
@@ -190,7 +191,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 WHERE T1.ID IN (SELECT T2.ID FROM T2 WHERE T2.I_ID = 0) AND T1.I_ID = 0",
@@ -209,7 +210,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 WHERE EXISTS (SELECT 1 FROM T2 WHERE T2.ID = T1.ID AND T2.I_ID = 0) AND T1.I_ID = 0",
@@ -228,7 +229,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             // CTE references T1 (has I_ID), outer query references CTE (not a physical table) and T2 (has I_ID)
             Assert.Equal(
@@ -248,7 +249,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema),
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema),
                 target: QueryScope.OutermostQuery);
 
             Assert.Equal(
@@ -268,7 +269,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "I_ID" }),
                 ("T2", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 WHERE T1.I_ID = 0 UNION ALL SELECT * FROM T2 WHERE T2.I_ID = 0",
@@ -283,7 +284,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "I_ID" }),
                 ("T2", new[] { "OTHER" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 WHERE T1.I_ID = 0 UNION ALL SELECT * FROM T2",
@@ -304,7 +305,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID", "STATUS" }),
                 ("T2", new[] { "ID", "T1_ID", "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("T1.I_ID = 0 AND STATUS = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("T1.I_ID = 0 AND STATUS = 1", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = 0 AND T1.STATUS = 1 AND T2.STATUS = 1",
@@ -321,7 +322,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID", "STATUS" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
-            stmt.AddSchemaAwareCondition("T1.I_ID = 0 AND STATUS = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("T1.I_ID = 0 AND STATUS = 1", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = 0 AND T1.STATUS = 1",
@@ -338,7 +339,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID" }));
 
-            stmt.AddSchemaAwareCondition("T1.I_ID = 0 AND STATUS = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("T1.I_ID = 0 AND STATUS = 1", CreateShouldApply(schema));
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = 0",
@@ -356,7 +357,7 @@ namespace TSQL.Tests
             // Table only has I_ID, not STATUS
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0 AND STATUS = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0 AND STATUS = 1", CreateShouldApply(schema));
 
             // Both I_ID and STATUS must exist - since STATUS doesn't, no condition added
             Assert.Equal("SELECT * FROM T1", stmt.ToSource());
@@ -368,7 +369,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0 AND STATUS = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0 AND STATUS = 1", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = 0 AND T1.STATUS = 1", stmt.ToSource());
         }
@@ -383,7 +384,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.NAME = 'Test'");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.NAME = 'Test' AND T1.I_ID = 0", stmt.ToSource());
         }
@@ -400,7 +401,7 @@ namespace TSQL.Tests
                 ("T1", new[] { "I_ID" }),
                 ("T2", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 CROSS JOIN T2 WHERE T1.I_ID = 0 AND T2.I_ID = 0", stmt.ToSource());
         }
@@ -415,7 +416,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("", CreateChecker(schema));
+            stmt.AddConditionWhen("", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1", stmt.ToSource());
         }
@@ -426,7 +427,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("   ", CreateChecker(schema));
+            stmt.AddConditionWhen("   ", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1", stmt.ToSource());
         }
@@ -441,7 +442,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME" }));
 
-            stmt.AddSchemaAwareCondition("NAME LIKE '%test%'", CreateChecker(schema));
+            stmt.AddConditionWhen("NAME LIKE '%test%'", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.NAME LIKE '%test%'", stmt.ToSource());
         }
@@ -452,7 +453,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "AGE" }));
 
-            stmt.AddSchemaAwareCondition("AGE BETWEEN 18 AND 65", CreateChecker(schema));
+            stmt.AddConditionWhen("AGE BETWEEN 18 AND 65", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.AGE BETWEEN 18 AND 65", stmt.ToSource());
         }
@@ -463,7 +464,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("STATUS IS NULL", CreateChecker(schema));
+            stmt.AddConditionWhen("STATUS IS NULL", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS IS NULL", stmt.ToSource());
         }
@@ -474,7 +475,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "DESCRIPTION" }));
 
-            stmt.AddSchemaAwareCondition("FREETEXT(DESCRIPTION, 'search')", CreateChecker(schema));
+            stmt.AddConditionWhen("FREETEXT(DESCRIPTION, 'search')", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE FREETEXT(T1.DESCRIPTION, 'search')", stmt.ToSource());
         }
@@ -485,7 +486,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("STATUS IN (1, 2, 3)", CreateChecker(schema));
+            stmt.AddConditionWhen("STATUS IN (1, 2, 3)", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS IN (1, 2, 3)", stmt.ToSource());
         }
@@ -496,7 +497,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "PRICE" }));
 
-            stmt.AddSchemaAwareCondition("PRICE > ALL (SELECT 1)", CreateChecker(schema));
+            stmt.AddConditionWhen("PRICE > ALL (SELECT 1)", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.PRICE > ALL (SELECT 1)", stmt.ToSource());
         }
@@ -508,7 +509,7 @@ namespace TSQL.Tests
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "ID" }));
 
             // EXISTS has no unprefixed columns — falls back to regular AddCondition
-            stmt.AddSchemaAwareCondition("EXISTS (SELECT 1 FROM T2)", CreateChecker(schema));
+            stmt.AddConditionWhen("EXISTS (SELECT 1 FROM T2)", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE EXISTS (SELECT 1 FROM T2)", stmt.ToSource());
         }
@@ -519,7 +520,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("(STATUS = 1)", CreateChecker(schema));
+            stmt.AddConditionWhen("(STATUS = 1)", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE (T1.STATUS = 1)", stmt.ToSource());
         }
@@ -530,7 +531,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS", "AGE" }));
 
-            stmt.AddSchemaAwareCondition("STATUS = 1 AND AGE > 18", CreateChecker(schema));
+            stmt.AddConditionWhen("STATUS = 1 AND AGE > 18", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS = 1 AND T1.AGE > 18", stmt.ToSource());
         }
@@ -541,7 +542,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS", "AGE" }));
 
-            stmt.AddSchemaAwareCondition("STATUS = 1 OR AGE > 18", CreateChecker(schema));
+            stmt.AddConditionWhen("STATUS = 1 OR AGE > 18", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS = 1 OR T1.AGE > 18", stmt.ToSource());
         }
@@ -552,7 +553,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("NOT STATUS = 1", CreateChecker(schema));
+            stmt.AddConditionWhen("NOT STATUS = 1", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE NOT T1.STATUS = 1", stmt.ToSource());
         }
@@ -563,7 +564,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "DESCRIPTION" }));
 
-            stmt.AddSchemaAwareCondition("CONTAINS(DESCRIPTION, 'search')", CreateChecker(schema));
+            stmt.AddConditionWhen("CONTAINS(DESCRIPTION, 'search')", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE CONTAINS(T1.DESCRIPTION, 'search')", stmt.ToSource());
         }
@@ -574,7 +575,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("STATUS IN (SELECT STATUS FROM T2)", CreateChecker(schema));
+            stmt.AddConditionWhen("STATUS IN (SELECT STATUS FROM T2)", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.STATUS IN (SELECT STATUS FROM T2)", stmt.ToSource());
         }
@@ -585,7 +586,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME" }));
 
-            stmt.AddSchemaAwareCondition("NAME LIKE '%[_]test' ESCAPE '['", CreateChecker(schema));
+            stmt.AddConditionWhen("NAME LIKE '%[_]test' ESCAPE '['", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.NAME LIKE '%[_]test' ESCAPE '['", stmt.ToSource());
         }
@@ -600,8 +601,8 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @P0",
-                new object[] { 42 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
+            stmt.AddConditionWhen("I_ID = @P0",
+                new object[] { 42 }, CreateShouldApply(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0", stmt.ToSource());
             Assert.Single(parameters);
@@ -614,8 +615,8 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @TenantId",
-                new object[] { ("@TenantId", 99) }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
+            stmt.AddConditionWhen("I_ID = @TenantId",
+                new object[] { ("@TenantId", 99) }, CreateShouldApply(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @TenantId", stmt.ToSource());
             Assert.Single(parameters);
@@ -628,8 +629,8 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1 WHERE T1.NAME = @P0");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "NAME", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @P0",
-                new object[] { 7 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
+            stmt.AddConditionWhen("I_ID = @P0",
+                new object[] { 7 }, CreateShouldApply(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.NAME = @P0 AND T1.I_ID = @P0_1", stmt.ToSource());
             Assert.Single(parameters);
@@ -644,8 +645,8 @@ namespace TSQL.Tests
                 ("T1", new[] { "ID", "I_ID" }),
                 ("T2", new[] { "ID", "T1_ID", "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @Filter",
-                new object[] { ("@Filter", 5) }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? parameters);
+            stmt.AddConditionWhen("I_ID = @Filter",
+                new object[] { ("@Filter", 5) }, CreateShouldApply(schema), out IReadOnlyDictionary<string, object>? parameters);
 
             Assert.Equal(
                 "SELECT * FROM T1 JOIN T2 ON T1.ID = T2.T1_ID WHERE T1.I_ID = @Filter AND T2.I_ID = @Filter",
@@ -660,10 +661,10 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID", "STATUS" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = @P0",
-                new object[] { 1 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? p1);
-            stmt.AddSchemaAwareCondition("STATUS = @P0",
-                new object[] { 2 }, CreateChecker(schema), out IReadOnlyDictionary<string, object>? p2);
+            stmt.AddConditionWhen("I_ID = @P0",
+                new object[] { 1 }, CreateShouldApply(schema), out IReadOnlyDictionary<string, object>? p1);
+            stmt.AddConditionWhen("STATUS = @P0",
+                new object[] { 2 }, CreateShouldApply(schema), out IReadOnlyDictionary<string, object>? p2);
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = @P0 AND T1.STATUS = @P0_1", stmt.ToSource());
             Assert.Single(p1);
@@ -682,7 +683,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM [FROM]");
             Dictionary<string, HashSet<string>> schema = Schema(("FROM", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM [FROM] WHERE [FROM].I_ID = 0", stmt.ToSource());
         }
@@ -693,7 +694,7 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM [T1] AS [A]");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM [T1] AS [A] WHERE [A].I_ID = 0", stmt.ToSource());
         }
@@ -704,9 +705,96 @@ namespace TSQL.Tests
             Stmt stmt = Parse("SELECT * FROM T1");
             Dictionary<string, HashSet<string>> schema = Schema(("T1", new[] { "I_ID" }));
 
-            stmt.AddSchemaAwareCondition("I_ID = 0", CreateChecker(schema));
+            stmt.AddConditionWhen("I_ID = 0", CreateShouldApply(schema));
 
             Assert.Equal("SELECT * FROM T1 WHERE T1.I_ID = 0", stmt.ToSource());
+        }
+
+        #endregion
+
+        #region ConditionContext Properties
+
+        [Fact]
+        public void ConditionContext_ExposesTableReference()
+        {
+            Stmt stmt = Parse("SELECT * FROM dbo.Orders o");
+            TableReference? capturedTable = null;
+
+            ShouldApply capture = ctx =>
+            {
+                capturedTable = ctx.Table;
+                return false;
+            };
+
+            stmt.AddConditionWhen("TenantId = 1", capture);
+
+            Assert.NotNull(capturedTable);
+            Assert.Equal("Orders", capturedTable!.TableName.ObjectName.Name);
+            Assert.Equal("dbo", capturedTable.TableName.SchemaName?.Name);
+        }
+
+        [Fact]
+        public void ConditionContext_ExposesConvenienceGetters()
+        {
+            Stmt stmt = Parse("SELECT * FROM server.db.dbo.Orders o");
+            string? tableName = null;
+            string? schemaName = null;
+            string? databaseName = null;
+            string? alias = null;
+
+            ShouldApply capture = ctx =>
+            {
+                tableName = ctx.TableName;
+                schemaName = ctx.SchemaName;
+                databaseName = ctx.DatabaseName;
+                alias = ctx.Alias;
+                return false;
+            };
+
+            stmt.AddConditionWhen("TenantId = 1", capture);
+
+            Assert.Equal("Orders", tableName);
+            Assert.Equal("dbo", schemaName);
+            Assert.Equal("db", databaseName);
+            Assert.Equal("o", alias);
+        }
+
+        [Fact]
+        public void ConditionContext_ExposesReferencedColumns()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            IReadOnlyList<string>? referencedColumns = null;
+
+            ShouldApply capture = ctx =>
+            {
+                referencedColumns = ctx.ReferencedColumns;
+                return false;
+            };
+
+            stmt.AddConditionWhen("A = 1 AND B = 2", capture);
+
+            Assert.NotNull(referencedColumns);
+            Assert.Equal(2, referencedColumns!.Count);
+            Assert.Contains("A", referencedColumns);
+            Assert.Contains("B", referencedColumns);
+        }
+
+        [Fact]
+        public void ConditionContext_ExposesCondition()
+        {
+            Stmt stmt = Parse("SELECT * FROM T1");
+            Predicate condition = null;
+
+            ShouldApply capture = ctx =>
+            {
+                condition = ctx.Condition;
+                return false;
+            };
+
+            stmt.AddConditionWhen("Status = 1", capture);
+
+            Assert.NotNull(condition);
+            Assert.IsType<Predicate.Comparison>(condition);
         }
 
         #endregion

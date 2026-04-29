@@ -69,64 +69,65 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         // #####################################################################
-        // #################### AddSchemaAwareCondition #######################
+        // ####################### AddConditionWhen ###########################
         // #####################################################################
 
         /// <summary>
         /// Appends a WHERE condition to SELECT statements in this script, but only for tables
-        /// that contain all referenced columns. Non-SELECT statements are left unchanged.
+        /// where the <paramref name="shouldApply"/> callback returns true.
+        /// Non-SELECT statements are left unchanged.
         /// </summary>
         /// <param name="script">The script to modify.</param>
         /// <param name="condition">A SQL predicate to append.</param>
-        /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="target">Which query levels receive the condition.</param>
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
-        public static Script AddSchemaAwareCondition(this Script script, string condition,
-            ColumnExistenceChecker columnExists,
+        public static Script AddConditionWhen(this Script script, string condition,
+            ShouldApply shouldApply,
             QueryScope target = QueryScope.All)
         {
             foreach (Stmt stmt in script.Statements)
             {
-                SchemaAwareConditionAppender.AddCondition(stmt, condition, columnExists, target);
+                ConditionalConditionAppender.AddCondition(stmt, condition, shouldApply, target);
             }
             return script;
         }
 
         /// <summary>
         /// Appends a WHERE condition with parameter values to SELECT statements in this script,
-        /// but only for tables that contain all referenced columns.
+        /// but only for tables where the <paramref name="shouldApply"/> callback returns true.
         /// Variable collision detection considers all statements in the script.
         /// </summary>
         /// <param name="script">The script to modify.</param>
         /// <param name="condition">A SQL predicate containing @-prefixed variables.</param>
         /// <param name="values">Parameter values.</param>
-        /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="parameters">Receives the resolved parameter name-to-value mapping.</param>
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
-        public static Script AddSchemaAwareCondition(this Script script, string condition,
+        public static Script AddConditionWhen(this Script script, string condition,
             IEnumerable<object> values,
-            ColumnExistenceChecker columnExists,
+            ShouldApply shouldApply,
             out IReadOnlyDictionary<string, object> parameters)
         {
-            return AddSchemaAwareCondition(script, condition, values, columnExists,
+            return AddConditionWhen(script, condition, values, shouldApply,
                 QueryScope.All, out parameters);
         }
 
         /// <summary>
         /// Appends a WHERE condition with parameter values to SELECT statements in this script,
-        /// but only for tables that contain all referenced columns.
+        /// but only for tables where the <paramref name="shouldApply"/> callback returns true.
         /// Variable collision detection considers all statements in the script.
         /// </summary>
         /// <param name="script">The script to modify.</param>
         /// <param name="condition">A SQL predicate containing @-prefixed variables.</param>
         /// <param name="values">Parameter values.</param>
-        /// <param name="columnExists">Callback that returns true if a table contains all of the given columns.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="target">Which query levels receive the condition.</param>
         /// <param name="parameters">Receives the resolved parameter name-to-value mapping.</param>
         /// <returns>The same <paramref name="script"/> instance, for chaining.</returns>
-        public static Script AddSchemaAwareCondition(this Script script, string condition,
+        public static Script AddConditionWhen(this Script script, string condition,
             IEnumerable<object> values,
-            ColumnExistenceChecker columnExists,
+            ShouldApply shouldApply,
             QueryScope target,
             out IReadOnlyDictionary<string, object> parameters)
         {
@@ -135,7 +136,7 @@ namespace TSQL.StandardLibrary.Visitors
             parameters = resolvedParams;
             foreach (Stmt stmt in script.Statements)
             {
-                SchemaAwareConditionAppender.AddCondition(stmt, resolvedCondition, columnExists, target);
+                ConditionalConditionAppender.AddCondition(stmt, resolvedCondition, shouldApply, target);
             }
             return script;
         }

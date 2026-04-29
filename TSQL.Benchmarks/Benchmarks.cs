@@ -467,12 +467,12 @@ namespace TSQL.Benchmarks
     }
 
     /// <summary>
-    /// Benchmarks for schema-aware condition appending (column existence checking + auto-prefixing)
+    /// Benchmarks for conditional condition appending (column existence checking + auto-prefixing)
     /// </summary>
     [CPUUsageDiagnoser]
     [MemoryDiagnoser]
     [BenchmarkCategory("StandardLibrary")]
-    public class SchemaAwareConditionBenchmarks
+    public class AddConditionWhenBenchmarks
     {
         private const string SimpleQuery = "SELECT * FROM T1";
         private const string MediumQuery = "SELECT A.ID, B.ID FROM T1 AS A JOIN T2 AS B ON A.ID = B.T1_ID";
@@ -495,19 +495,19 @@ namespace TSQL.Benchmarks
             ["T2"] = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "ID", "STATUS", "I_ID" }
         };
 
-        private static readonly ColumnExistenceChecker SimpleChecker = CreateChecker(SimpleSchema);
-        private static readonly ColumnExistenceChecker MediumChecker = CreateChecker(MediumSchema);
-        private static readonly ColumnExistenceChecker ComplexChecker = CreateChecker(ComplexSchema);
+        private static readonly ShouldApply SimpleShouldApply = CreateShouldApply(SimpleSchema);
+        private static readonly ShouldApply MediumShouldApply = CreateShouldApply(MediumSchema);
+        private static readonly ShouldApply ComplexShouldApply = CreateShouldApply(ComplexSchema);
 
-        private static ColumnExistenceChecker CreateChecker(Dictionary<string, HashSet<string>> schema)
+        private static ShouldApply CreateShouldApply(Dictionary<string, HashSet<string>> schema)
         {
-            return (tableName, columnNames) =>
+            return ctx =>
             {
-                if (!schema.TryGetValue(tableName, out HashSet<string> columns))
+                if (!schema.TryGetValue(ctx.TableName, out HashSet<string> columns))
                 {
                     return false;
                 }
-                foreach (string col in columnNames)
+                foreach (string col in ctx.ReferencedColumns)
                 {
                     if (!columns.Contains(col))
                     {
@@ -522,7 +522,7 @@ namespace TSQL.Benchmarks
         public string Simple()
         {
             Stmt stmt = Stmt.Parse(SimpleQuery);
-            stmt.AddSchemaAwareCondition("I_ID = 0", SimpleChecker);
+            stmt.AddConditionWhen("I_ID = 0", SimpleShouldApply);
             return stmt.ToSource();
         }
 
@@ -530,7 +530,7 @@ namespace TSQL.Benchmarks
         public string Medium()
         {
             Stmt stmt = Stmt.Parse(MediumQuery);
-            stmt.AddSchemaAwareCondition("I_ID = 0 OR I_ID = 1", MediumChecker);
+            stmt.AddConditionWhen("I_ID = 0 OR I_ID = 1", MediumShouldApply);
             return stmt.ToSource();
         }
 
@@ -538,7 +538,7 @@ namespace TSQL.Benchmarks
         public string Complex()
         {
             Stmt stmt = Stmt.Parse(ComplexQuery);
-            stmt.AddSchemaAwareCondition("T2.STATUS = 1 AND I_ID = 0", ComplexChecker, QueryScope.All);
+            stmt.AddConditionWhen("T2.STATUS = 1 AND I_ID = 0", ComplexShouldApply, QueryScope.All);
             return stmt.ToSource();
         }
     }

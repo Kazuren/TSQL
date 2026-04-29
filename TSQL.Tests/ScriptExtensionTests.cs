@@ -104,21 +104,21 @@ namespace TSQL.Tests
         }
 
         // #####################################################################
-        // #################### AddSchemaAwareCondition #######################
+        // ####################### AddConditionWhen ###########################
         // #####################################################################
 
         [Fact]
-        public void AddSchemaAwareCondition_AppliesPerStatement()
+        public void AddConditionWhen_AppliesPerStatement()
         {
             Script script = Script.Parse(
                 "SELECT * FROM Users; SELECT * FROM Orders");
-            ColumnExistenceChecker checker = CreateChecker(
+            ShouldApply checker = CreateShouldApply(
                 Schema(
                     ("Users", new[] { "TenantId" }),
                     ("Orders", new[] { "TenantId" })
                 ));
 
-            script.AddSchemaAwareCondition("TenantId = 1", checker);
+            script.AddConditionWhen("TenantId = 1", checker);
 
             // Both tables have TenantId, so both get the condition prefixed with table name
             Assert.Equal(
@@ -127,17 +127,17 @@ namespace TSQL.Tests
         }
 
         [Fact]
-        public void AddSchemaAwareCondition_WithParams_ResolvesAcrossStatements()
+        public void AddConditionWhen_WithParams_ResolvesAcrossStatements()
         {
             Script script = Script.Parse(
                 "SELECT * FROM Users WHERE Id = @TenantId; SELECT * FROM Orders");
-            ColumnExistenceChecker checker = CreateChecker(
+            ShouldApply checker = CreateShouldApply(
                 Schema(
                     ("Users", new[] { "TenantId" }),
                     ("Orders", new[] { "TenantId" })
                 ));
 
-            script.AddSchemaAwareCondition("TenantId = @TenantId",
+            script.AddConditionWhen("TenantId = @TenantId",
                 new object[] { ("@TenantId", 5) },
                 checker,
                 out IReadOnlyDictionary<string, object> parameters);
@@ -203,15 +203,15 @@ namespace TSQL.Tests
         // ############################ Helpers ###############################
         // #####################################################################
 
-        private static ColumnExistenceChecker CreateChecker(Dictionary<string, HashSet<string>> schema)
+        private static ShouldApply CreateShouldApply(Dictionary<string, HashSet<string>> schema)
         {
-            return (tableName, columnNames) =>
+            return ctx =>
             {
-                if (!schema.TryGetValue(tableName, out HashSet<string>? columns))
+                if (!schema.TryGetValue(ctx.TableName, out HashSet<string>? columns))
                 {
                     return false;
                 }
-                foreach (string col in columnNames)
+                foreach (string col in ctx.ReferencedColumns)
                 {
                     if (!columns.Contains(col))
                     {
