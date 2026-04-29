@@ -6,6 +6,8 @@
     <AssemblyOriginatorKeyFile>..\TSQL.snk</AssemblyOriginatorKeyFile>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>TSQL Parser</Title>
+    <RepositoryUrl>https://github.com/Kazuren/TSQL.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\TSQL.Generators\TSQL.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />

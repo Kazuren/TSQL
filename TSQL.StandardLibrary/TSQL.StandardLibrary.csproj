@@ -8,6 +8,8 @@
     <IncludeSymbols>True</IncludeSymbols>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>TSQL Parser Standard Library</Title>
+    <RepositoryUrl>https://github.com/Kazuren/TSQL.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
