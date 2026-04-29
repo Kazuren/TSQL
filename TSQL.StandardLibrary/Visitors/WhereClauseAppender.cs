@@ -14,7 +14,7 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
         public static void AddCondition(Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery)
         {
-            if (target == QueryScope.None)
+            if (target == QueryScope.None || string.IsNullOrEmpty(condition))
             {
                 return;
             }

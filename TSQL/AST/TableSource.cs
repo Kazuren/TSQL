@@ -256,15 +256,12 @@ namespace TSQL
             BuildTokenChain(join);
 
             Token firstToken = join.FirstJoinToken;
-            if (firstToken != null)
-            {
-                firstToken.ClearLeadingTrivia();
-                firstToken.AddLeadingTrivia(Whitespace.Space);
-            }
+            firstToken.ClearLeadingTrivia();
+            firstToken.AddLeadingTrivia(Whitespace.Space);
             return join;
         }
 
-        private Token FirstJoinToken => _joinTypeToken ?? _outerToken ?? _joinHintToken ?? _joinToken;
+        private Token FirstJoinToken => _joinTypeToken ?? _joinHintToken ?? _joinToken;
 
         public override T Accept<T>(Visitor<T> visitor)
         {

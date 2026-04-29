@@ -24,14 +24,43 @@ namespace TSQL.StandardLibrary.Visitors
         /// Called for every SelectExpression whose category passes the <c>mutate</c> scope check.
         /// The SelectExpression's children have already been walked.
         /// </summary>
-        protected abstract void OnMatch(SelectExpression selectExpr);
+        /// <remarks>
+        /// Called once per SELECT branch. Use for clause-level mutations (WHERE, GROUP BY, HAVING, JOIN).
+        /// <code>
+        /// WITH Cte AS (
+        ///     SELECT a FROM T1   ← OnMatch (Ctes)
+        ///     UNION
+        ///     SELECT b FROM T2   ← OnMatch (Ctes)
+        /// )
+        /// SELECT * FROM Cte      ← OnMatch (OutermostQuery)
+        /// WHERE x IN (
+        ///     SELECT y FROM T3   ← OnMatch (InSubqueries)
+        /// )
+        /// ORDER BY 1
+        /// </code>
+        /// </remarks>
+        protected virtual void OnMatch(SelectExpression selectExpr) { }
 
         /// <summary>
         /// Called once for each QueryExpression at a category boundary (CTE, outermost, subquery).
         /// Unlike <see cref="OnMatch"/>, this is called for the entire QueryExpression
         /// (which may be a SetOperation for UNION queries) rather than for each SelectExpression branch.
-        /// Default implementation does nothing.
         /// </summary>
+        /// <remarks>
+        /// Called once per query expression. Use for query-level mutations (ORDER BY) that apply to combined results.
+        /// <code>
+        /// WITH Cte AS (
+        ///     SELECT a FROM T1
+        ///     UNION
+        ///     SELECT b FROM T2   ← OnQueryExpressionMatch (Ctes) - once for entire UNION
+        /// )
+        /// SELECT * FROM Cte
+        /// WHERE x IN (
+        ///     SELECT y FROM T3   ← OnQueryExpressionMatch (InSubqueries)
+        /// )
+        /// ORDER BY 1             ← OnQueryExpressionMatch (OutermostQuery)
+        /// </code>
+        /// </remarks>
         protected virtual void OnQueryExpressionMatch(QueryExpression queryExpr) { }
 
         private bool CanTraverse(QueryScope flag)

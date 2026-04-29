@@ -25,7 +25,7 @@ namespace TSQL.StandardLibrary.Visitors
         public static void AddJoin(Stmt stmt, string joinFragment, string targetTable,
             QueryScope traverse, QueryScope mutate)
         {
-            if (string.IsNullOrEmpty(joinFragment))
+            if (mutate == QueryScope.None || string.IsNullOrEmpty(joinFragment))
             {
                 return;
             }

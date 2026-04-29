@@ -24,7 +24,7 @@ namespace TSQL.StandardLibrary.Visitors
         public static void AddHaving(Stmt stmt, string condition, string targetTable,
             QueryScope traverse, QueryScope mutate)
         {
-            if (string.IsNullOrEmpty(condition))
+            if (mutate == QueryScope.None || string.IsNullOrEmpty(condition))
             {
                 return;
             }

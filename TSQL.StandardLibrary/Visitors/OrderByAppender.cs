@@ -24,7 +24,7 @@ namespace TSQL.StandardLibrary.Visitors
         public static void AddOrderBy(Stmt stmt, string orderByItems, string targetTable,
             QueryScope traverse, QueryScope mutate)
         {
-            if (string.IsNullOrEmpty(orderByItems))
+            if (mutate == QueryScope.None || string.IsNullOrEmpty(orderByItems))
             {
                 return;
             }
@@ -54,6 +54,11 @@ namespace TSQL.StandardLibrary.Visitors
         public static void ReplaceOrderBy(Stmt stmt, string orderByItems, string targetTable,
             QueryScope traverse, QueryScope mutate)
         {
+            if (mutate == QueryScope.None)
+            {
+                return;
+            }
+
             var walker = new TableScopedWalker(targetTable, traverse, mutate,
                 selectExpr => ApplyOrderBy(selectExpr, orderByItems, replace: true));
             walker.Walk(stmt);
@@ -84,12 +89,6 @@ namespace TSQL.StandardLibrary.Visitors
             {
                 _orderByItems = orderByItems;
                 _replace = replace;
-            }
-
-            protected override void OnMatch(SelectExpression selectExpr)
-            {
-                // ORDER BY applies at the QueryExpression level, not SelectExpression.
-                // Use OnQueryExpressionMatch instead.
             }
 
             protected override void OnQueryExpressionMatch(QueryExpression queryExpr)

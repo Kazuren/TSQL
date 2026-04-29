@@ -24,7 +24,7 @@ namespace TSQL.StandardLibrary.Visitors
         public static void AddGroupBy(Stmt stmt, string groupByItems, string targetTable,
             QueryScope traverse, QueryScope mutate)
         {
-            if (string.IsNullOrEmpty(groupByItems))
+            if (mutate == QueryScope.None || string.IsNullOrEmpty(groupByItems))
             {
                 return;
             }
@@ -54,6 +54,11 @@ namespace TSQL.StandardLibrary.Visitors
         public static void ReplaceGroupBy(Stmt stmt, string groupByItems, string targetTable,
             QueryScope traverse, QueryScope mutate)
         {
+            if (mutate == QueryScope.None)
+            {
+                return;
+            }
+
             var walker = new TableScopedWalker(targetTable, traverse, mutate,
                 selectExpr => ApplyGroupBy(selectExpr, groupByItems, replace: true));
             walker.Walk(stmt);
