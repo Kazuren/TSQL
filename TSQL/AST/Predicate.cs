@@ -109,6 +109,9 @@ namespace TSQL.AST
             }
 
             internal Token _operatorToken;
+            // T-SQL allows spaces within compound operators (e.g. "> =" for ">="),
+            // which the scanner produces as two separate tokens.
+            internal Token _operatorToken2;
 
             public Comparison(Expr left, ComparisonOperator op, Expr right)
             {
@@ -120,11 +123,12 @@ namespace TSQL.AST
                 _right = right;
             }
 
-            internal Comparison(Expr left, Token operatorToken, Expr right)
+            internal Comparison(Expr left, Token operatorToken, Token operatorToken2, ComparisonOperator op, Expr right)
             {
                 _left = left;
                 _operatorToken = operatorToken;
-                _operator = TokenTypeToComparisonOperator(operatorToken.Type);
+                _operatorToken2 = operatorToken2;
+                _operator = op;
                 _right = right;
             }
 
@@ -135,6 +139,8 @@ namespace TSQL.AST
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
                 yield return _operatorToken;
+                if (_operatorToken2 != null)
+                    yield return _operatorToken2;
                 foreach (Token token in Right.DescendantTokens())
                     yield return token;
             }
@@ -143,6 +149,8 @@ namespace TSQL.AST
             {
                 Left.WriteTo(sb);
                 _operatorToken.AppendTo(sb);
+                if (_operatorToken2 != null)
+                    _operatorToken2.AppendTo(sb);
                 Right.WriteTo(sb);
             }
         }
@@ -633,13 +641,17 @@ namespace TSQL.AST
             }
 
             internal Token _operatorToken;
+            // T-SQL allows spaces within compound operators (e.g. "> =" for ">="),
+            // which the scanner produces as two separate tokens.
+            internal Token _operatorToken2;
             internal Token _quantifierToken;
 
-            internal Quantifier(Expr left, Token operatorToken, Token quantifierToken, Expr.Subquery subquery)
+            internal Quantifier(Expr left, Token operatorToken, Token operatorToken2, ComparisonOperator op, Token quantifierToken, Expr.Subquery subquery)
             {
                 _left = left;
                 _operatorToken = operatorToken;
-                Operator = TokenTypeToComparisonOperator(operatorToken.Type);
+                _operatorToken2 = operatorToken2;
+                Operator = op;
                 _quantifierToken = quantifierToken;
                 QuantifierKind = TokenTypeToQuantifierType(quantifierToken.Type);
                 _subquery = subquery;
@@ -652,6 +664,8 @@ namespace TSQL.AST
                 foreach (Token token in Left.DescendantTokens())
                     yield return token;
                 yield return _operatorToken;
+                if (_operatorToken2 != null)
+                    yield return _operatorToken2;
                 yield return _quantifierToken;
                 foreach (Token token in Subquery.DescendantTokens())
                     yield return token;
@@ -661,6 +675,8 @@ namespace TSQL.AST
             {
                 Left.WriteTo(sb);
                 _operatorToken.AppendTo(sb);
+                if (_operatorToken2 != null)
+                    _operatorToken2.AppendTo(sb);
                 _quantifierToken.AppendTo(sb);
                 Subquery.WriteTo(sb);
             }

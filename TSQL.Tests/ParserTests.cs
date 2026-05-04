@@ -4210,5 +4210,45 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region Spaced Compound Operators
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE a > = 1", ComparisonOperator.GreaterThanOrEqual)]
+        [InlineData("SELECT a FROM T WHERE a < = 1", ComparisonOperator.LessThanOrEqual)]
+        [InlineData("SELECT a FROM T WHERE a < > 1", ComparisonOperator.NotEqual)]
+        public void Parse_SpacedCompoundOperator_ParsesAsComparisonOperator(string sql, ComparisonOperator expected)
+        {
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            Predicate.Comparison comparison = Assert.IsType<Predicate.Comparison>(SelectExpressionOf(select).Where);
+            Assert.Equal(expected, comparison.Operator);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE a > = ALL (SELECT b FROM T2)", ComparisonOperator.GreaterThanOrEqual)]
+        [InlineData("SELECT a FROM T WHERE a < = SOME (SELECT b FROM T2)", ComparisonOperator.LessThanOrEqual)]
+        [InlineData("SELECT a FROM T WHERE a < > ANY (SELECT b FROM T2)", ComparisonOperator.NotEqual)]
+        public void Parse_SpacedCompoundOperator_InQuantifierPredicate(string sql, ComparisonOperator expected)
+        {
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            Predicate.Quantifier quantifier = Assert.IsType<Predicate.Quantifier>(SelectExpressionOf(select).Where);
+            Assert.Equal(expected, quantifier.Operator);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        [Theory]
+        [InlineData("SELECT a FROM T WHERE a ! = 1", ComparisonOperator.NotEqual)]
+        [InlineData("SELECT a FROM T WHERE a ! > 1", ComparisonOperator.NotGreaterThan)]
+        [InlineData("SELECT a FROM T WHERE a ! < 1", ComparisonOperator.NotLessThan)]
+        public void Parse_SpacedBangOperator_ParsesAsComparisonOperator(string sql, ComparisonOperator expected)
+        {
+            Stmt.Select select = Stmt.ParseSelect(sql);
+            Predicate.Comparison comparison = Assert.IsType<Predicate.Comparison>(SelectExpressionOf(select).Where);
+            Assert.Equal(expected, comparison.Operator);
+            Assert.Equal(sql, select.ToSource());
+        }
+
+        #endregion
     }
 }

@@ -2591,21 +2591,19 @@ namespace TSQL
             Expr leftExpr = Expression();
 
             // comparison_operator expression
-            if (IsComparisonOperator())
+            if (MatchComparisonOperator(out Token op, out Token op2, out ComparisonOperator compOp))
             {
-                Token op = Advance();
-
                 // Check for quantified predicate: op (ALL|SOME|ANY) (select)
                 if (Check(TokenType.ALL, TokenType.SOME, TokenType.ANY))
                 {
                     Token quantifier = Advance();
                     Expr.Subquery subquery = Subquery();
-                    Predicate.Quantifier quant = new Predicate.Quantifier(leftExpr, op, quantifier, subquery);
+                    Predicate.Quantifier quant = new Predicate.Quantifier(leftExpr, op, op2, compOp, quantifier, subquery);
                     return quant;
                 }
 
                 Expr rightExpr = Expression();
-                return new Predicate.Comparison(leftExpr, op, rightExpr);
+                return new Predicate.Comparison(leftExpr, op, op2, compOp, rightExpr);
             }
 
             // [NOT] LIKE expression [ESCAPE string]
@@ -2692,14 +2690,101 @@ namespace TSQL
             throw Error(Peek(), "Expected predicate (comparison, LIKE, BETWEEN, IS NULL, IN, or EXISTS)");
         }
 
-        private bool IsComparisonOperator()
+        // T-SQL allows spaces within compound operators (e.g. "> =" for ">="),
+        // which the scanner produces as two separate tokens.
+        private bool MatchComparisonOperator(out Token op, out Token op2, out ComparisonOperator compOp)
         {
-            if (IsAtEnd()) return false;
-            TokenType type = Peek().Type;
-            return type == TokenType.EQUAL || type == TokenType.NOT_EQUAL ||
-                   type == TokenType.GREATER || type == TokenType.GREATER_EQUAL ||
-                   type == TokenType.LESS || type == TokenType.LESS_EQUAL ||
-                   type == TokenType.NOT_LESS || type == TokenType.NOT_GREATER;
+            op = null;
+            op2 = null;
+            compOp = default;
+
+            if (IsAtEnd())
+            {
+                return false;
+            }
+
+            switch (Peek().Type)
+            {
+                case TokenType.GREATER:
+                    if (CheckNext(TokenType.EQUAL))
+                    {
+                        op = Advance();
+                        op2 = Advance();
+                        compOp = ComparisonOperator.GreaterThanOrEqual;
+                        return true;
+                    }
+                    op = Advance();
+                    compOp = ComparisonOperator.GreaterThan;
+                    return true;
+
+                case TokenType.LESS:
+                    if (CheckNext(TokenType.EQUAL))
+                    {
+                        op = Advance();
+                        op2 = Advance();
+                        compOp = ComparisonOperator.LessThanOrEqual;
+                        return true;
+                    }
+                    if (CheckNext(TokenType.GREATER))
+                    {
+                        op = Advance();
+                        op2 = Advance();
+                        compOp = ComparisonOperator.NotEqual;
+                        return true;
+                    }
+                    op = Advance();
+                    compOp = ComparisonOperator.LessThan;
+                    return true;
+
+                case TokenType.BANG:
+                    if (CheckNext(TokenType.EQUAL))
+                    {
+                        op = Advance(); op2 = Advance();
+                        compOp = ComparisonOperator.NotEqual;
+                        return true;
+                    }
+                    if (CheckNext(TokenType.GREATER))
+                    {
+                        op = Advance(); op2 = Advance();
+                        compOp = ComparisonOperator.NotGreaterThan;
+                        return true;
+                    }
+                    if (CheckNext(TokenType.LESS))
+                    {
+                        op = Advance(); op2 = Advance();
+                        compOp = ComparisonOperator.NotLessThan;
+                        return true;
+                    }
+                    return false;
+
+                case TokenType.EQUAL:
+                    op = Advance();
+                    compOp = ComparisonOperator.Equal;
+                    return true;
+                case TokenType.NOT_EQUAL:
+                    op = Advance();
+                    compOp = ComparisonOperator.NotEqual;
+                    return true;
+                case TokenType.GREATER_EQUAL:
+                    op = Advance();
+                    compOp = ComparisonOperator.GreaterThanOrEqual;
+                    return true;
+                case TokenType.LESS_EQUAL:
+                    op = Advance();
+                    compOp = ComparisonOperator.LessThanOrEqual;
+                    return true;
+                case TokenType.NOT_LESS:
+                    op = Advance();
+                    compOp = ComparisonOperator.NotLessThan;
+                    return true;
+                case TokenType.NOT_GREATER:
+                    op = Advance();
+                    compOp = ComparisonOperator.NotGreaterThan;
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         #endregion

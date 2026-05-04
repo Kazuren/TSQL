@@ -110,6 +110,10 @@ namespace TSQL
                     {
                         AddToken(TokenType.NOT_GREATER);
                     }
+                    else
+                    {
+                        AddToken(TokenType.BANG);
+                    }
                     break;
                 case '<':
                     if (Match('>'))
