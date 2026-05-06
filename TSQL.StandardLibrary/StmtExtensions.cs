@@ -55,6 +55,24 @@ namespace TSQL.StandardLibrary.Visitors
         }
 
         /// <summary>
+        /// Prepends a column (parsed from a SQL source fragment) to the outermost SELECT in this statement.
+        /// For UNION/INTERSECT/EXCEPT, adds to the first SELECT (both sides are modified for symmetry).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="columnSource">Free-form SQL column source (expression optionally followed by an alias).</param>
+        /// <param name="target">Which query scopes to modify. Defaults to outermost query.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="columnSource"/> is not valid SQL.</exception>
+        public static Stmt AddSelectColumn(this Stmt stmt, string columnSource, QueryScope target = QueryScope.OutermostQuery)
+        {
+            var walker = new ActionScopedWalker(QueryScope.All, target,
+                selectExpr => selectExpr.PrependColumn(columnSource));
+            walker.Walk(stmt);
+            return stmt;
+        }
+
+        /// <summary>
         /// Prepends a column (parsed from a SQL source fragment) to every SELECT within this
         /// statement whose FROM clause references <paramref name="targetTable"/>, subject to
         /// traversal and mutation scope. <paramref name="traverse"/> controls which query-level
