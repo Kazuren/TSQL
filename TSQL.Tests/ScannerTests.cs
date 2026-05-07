@@ -275,6 +275,20 @@
         }
 
         [Fact]
+        public void ScanTokens_VariableWithAtSignInName_ScannedAsSingleToken()
+        {
+            // T-SQL allows @ in variable names: @foo@bar is a valid single variable
+            Scanner scanner = new Scanner("SELECT @foo@bar");
+            List<SourceToken> tokens = scanner.ScanTokens();
+            tokens.Should().MatchExpectedTokens(new[]
+            {
+                new ExpectedToken(TokenType.SELECT, "SELECT"),
+                new ExpectedToken(TokenType.VARIABLE, "@foo@bar"),
+                new ExpectedToken(TokenType.EOF, "")
+            });
+        }
+
+        [Fact]
         public void ScanTokens_MultilineString_TracksLineNumbers()
         {
             var scanner = new Scanner("'line1\nline2'");

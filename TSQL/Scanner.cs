@@ -654,6 +654,7 @@ namespace TSQL
             for (char c = 'A'; c <= 'Z'; c++) table[c] = ALPHA;
             table['_'] = ALPHA;
             table['#'] = ALPHA;
+            table['@'] = ALPHA;
             return table;
         }
 
