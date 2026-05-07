@@ -373,5 +373,49 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region allowLeadingWhereKeyword Parameter
+
+        [Fact]
+        public void AddCondition_WithLeadingWhereKeyword_ConsumesKeywordByDefault()
+        {
+            string sql = "SELECT * FROM Users";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddCondition("WHERE Active = 1");
+
+            Assert.Equal("SELECT * FROM Users WHERE Active = 1", stmt.ToSource());
+        }
+
+        [Fact]
+        public void AddCondition_WithLeadingWhereKeyword_ThrowsWhenDisabled()
+        {
+            string sql = "SELECT * FROM Users";
+            Stmt stmt = Parse(sql);
+
+            Assert.Throws<ParseError>(() => stmt.AddCondition("WHERE Active = 1", allowLeadingWhereKeyword: false));
+        }
+
+        [Fact]
+        public void AddCondition_TargetTable_WithLeadingWhereKeyword_ConsumesKeywordByDefault()
+        {
+            string sql = "SELECT * FROM Users UNION SELECT * FROM Admins";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddCondition("WHERE Active = 1", "Users");
+
+            Assert.Equal("SELECT * FROM Users WHERE Active = 1 UNION SELECT * FROM Admins", stmt.ToSource());
+        }
+
+        [Fact]
+        public void AddCondition_TargetTable_WithLeadingWhereKeyword_ThrowsWhenDisabled()
+        {
+            string sql = "SELECT * FROM Users";
+            Stmt stmt = Parse(sql);
+
+            Assert.Throws<ParseError>(() => stmt.AddCondition("WHERE Active = 1", "Users", allowLeadingWhereKeyword: false));
+        }
+
+        #endregion
     }
 }

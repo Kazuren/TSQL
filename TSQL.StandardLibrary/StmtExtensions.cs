@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using TSQL.AST;
-
 namespace TSQL.StandardLibrary.Visitors
 {
     public static class StmtExtensions
@@ -14,12 +10,16 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate to append (e.g. <c>"Active = 1"</c>).</param>
         /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <param name="allowLeadingWhereKeyword">
+        /// When true (the default), a leading WHERE keyword is silently consumed if present.
+        /// This allows callers to pass either <c>WHERE x = 1</c> or <c>x = 1</c>.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        public static Stmt AddCondition(this Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery)
+        public static Stmt AddCondition(this Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery, bool allowLeadingWhereKeyword = true)
         {
-            WhereClauseAppender.AddCondition(stmt, condition, target);
+            WhereClauseAppender.AddCondition(stmt, condition, target, allowLeadingWhereKeyword);
             return stmt;
         }
 
@@ -38,19 +38,141 @@ namespace TSQL.StandardLibrary.Visitors
         /// Defaults to <see cref="QueryScope.All"/>.</param>
         /// <param name="mutate">Which query-level categories are eligible for mutation.
         /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="allowLeadingWhereKeyword">
+        /// When true (the default), a leading WHERE keyword is silently consumed if present.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddCondition(this Stmt stmt, string condition, string targetTable,
             QueryScope traverse = QueryScope.All,
-            QueryScope mutate = QueryScope.All)
+            QueryScope mutate = QueryScope.All,
+            bool allowLeadingWhereKeyword = true)
         {
-            var walker = new TableScopedWalker(targetTable, traverse, mutate, selectExpr =>
-            {
-                AST.Predicate predicate = AST.Predicate.ParsePredicate(condition);
-                selectExpr.AddWhere(predicate);
-            });
-            walker.Walk(stmt);
+            WhereClauseAppender.AddCondition(stmt, condition, targetTable, traverse, mutate, allowLeadingWhereKeyword);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends a WHERE condition with parameter values to SELECT statements within this statement.
+        /// Variables in the condition that collide with existing variables in the statement
+        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
+        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
+        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
+        public static Stmt AddCondition(this Stmt stmt, string condition,
+            IEnumerable<object> values,
+            out IReadOnlyDictionary<string, object> parameters)
+        {
+            return AddCondition(stmt, condition, values, QueryScope.OutermostQuery, out parameters);
+        }
+
+        /// <summary>
+        /// Appends a WHERE condition with parameter values to SELECT statements within this statement.
+        /// Variables in the condition that collide with existing variables in the statement
+        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
+        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
+        /// <param name="target">Which query levels receive the condition.</param>
+        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
+        public static Stmt AddCondition(this Stmt stmt, string condition,
+            IEnumerable<object> values,
+            QueryScope target,
+            out IReadOnlyDictionary<string, object> parameters)
+        {
+            (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
+                = ConditionParameterResolver.Resolve(stmt, condition, values);
+            parameters = resolvedParams;
+            WhereClauseAppender.AddCondition(stmt, resolvedCondition, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends a WHERE condition to SELECT statements, but only for tables where
+        /// the <paramref name="shouldApply"/> callback returns true.
+        /// Unprefixed column references are automatically prefixed with the table alias/name.
+        /// If ALL columns are already prefixed, falls back to regular AddCondition behavior.
+        /// Defaults to all query levels (outermost + subqueries + CTEs).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate to append (e.g. <c>"TenantId = 1"</c>).</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
+        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
+            ShouldApply shouldApply,
+            QueryScope target = QueryScope.All)
+        {
+            ConditionalConditionAppender.AddCondition(stmt, condition, shouldApply, target);
+            return stmt;
+        }
+
+        /// <summary>
+        /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
+        /// where the <paramref name="shouldApply"/> callback returns true.
+        /// Variables in the condition that collide with existing variables in the statement
+        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
+        /// Unprefixed column references are automatically prefixed with the table alias/name.
+        /// Defaults to all query levels (outermost + subqueries + CTEs).
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
+        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
+        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
+        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
+            IEnumerable<object> values,
+            ShouldApply shouldApply,
+            out IReadOnlyDictionary<string, object> parameters)
+        {
+            return AddConditionWhen(stmt, condition, values, shouldApply, QueryScope.All, out parameters);
+        }
+
+        /// <summary>
+        /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
+        /// where the <paramref name="shouldApply"/> callback returns true.
+        /// Variables in the condition that collide with existing variables in the statement
+        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
+        /// Unprefixed column references are automatically prefixed with the table alias/name.
+        /// </summary>
+        /// <param name="stmt">The statement to modify.</param>
+        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
+        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
+        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
+        /// <param name="target">Which query levels receive the condition.</param>
+        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
+        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
+        /// <remarks>This method mutates the statement in place.</remarks>
+        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
+        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
+            IEnumerable<object> values,
+            ShouldApply shouldApply,
+            QueryScope target,
+            out IReadOnlyDictionary<string, object> parameters)
+        {
+            (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
+                = ConditionParameterResolver.Resolve(stmt, condition, values);
+            parameters = resolvedParams;
+            ConditionalConditionAppender.AddCondition(stmt, resolvedCondition, shouldApply, target);
             return stmt;
         }
 
@@ -136,51 +258,6 @@ namespace TSQL.StandardLibrary.Visitors
             throw new ArgumentException("Cannot add INTO to this query expression; no SelectExpression found.");
         }
 
-        /// <summary>
-        /// Appends a WHERE condition with parameter values to SELECT statements within this statement.
-        /// Variables in the condition that collide with existing variables in the statement
-        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
-        /// </summary>
-        /// <param name="stmt">The statement to modify.</param>
-        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
-        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
-        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
-        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
-        /// <remarks>This method mutates the statement in place.</remarks>
-        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
-        public static Stmt AddCondition(this Stmt stmt, string condition,
-            IEnumerable<object> values,
-            out IReadOnlyDictionary<string, object> parameters)
-        {
-            return AddCondition(stmt, condition, values, QueryScope.OutermostQuery, out parameters);
-        }
-
-        /// <summary>
-        /// Appends a WHERE condition with parameter values to SELECT statements within this statement.
-        /// Variables in the condition that collide with existing variables in the statement
-        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
-        /// </summary>
-        /// <param name="stmt">The statement to modify.</param>
-        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
-        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
-        /// <param name="target">Which query levels receive the condition.</param>
-        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
-        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
-        /// <remarks>This method mutates the statement in place.</remarks>
-        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
-        public static Stmt AddCondition(this Stmt stmt, string condition,
-            IEnumerable<object> values,
-            QueryScope target,
-            out IReadOnlyDictionary<string, object> parameters)
-        {
-            (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
-                = ConditionParameterResolver.Resolve(stmt, condition, values);
-            parameters = resolvedParams;
-            WhereClauseAppender.AddCondition(stmt, resolvedCondition, target);
-            return stmt;
-        }
 
         /// <summary>
         /// Parameterizes all non-NULL literals in this statement, replacing them with
@@ -196,83 +273,6 @@ namespace TSQL.StandardLibrary.Visitors
             IEnumerable<string> reservedNames = null)
         {
             parameters = LiteralParameterizer.Parameterize(stmt, reservedNames);
-            return stmt;
-        }
-
-        /// <summary>
-        /// Appends a WHERE condition to SELECT statements, but only for tables where
-        /// the <paramref name="shouldApply"/> callback returns true.
-        /// Unprefixed column references are automatically prefixed with the table alias/name.
-        /// If ALL columns are already prefixed, falls back to regular AddCondition behavior.
-        /// Defaults to all query levels (outermost + subqueries + CTEs).
-        /// </summary>
-        /// <param name="stmt">The statement to modify.</param>
-        /// <param name="condition">A SQL predicate to append (e.g. <c>"TenantId = 1"</c>).</param>
-        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
-        /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
-        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
-        /// <remarks>This method mutates the statement in place.</remarks>
-        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
-            ShouldApply shouldApply,
-            QueryScope target = QueryScope.All)
-        {
-            ConditionalConditionAppender.AddCondition(stmt, condition, shouldApply, target);
-            return stmt;
-        }
-
-        /// <summary>
-        /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
-        /// where the <paramref name="shouldApply"/> callback returns true.
-        /// Variables in the condition that collide with existing variables in the statement
-        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
-        /// Unprefixed column references are automatically prefixed with the table alias/name.
-        /// Defaults to all query levels (outermost + subqueries + CTEs).
-        /// </summary>
-        /// <param name="stmt">The statement to modify.</param>
-        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
-        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
-        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
-        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
-        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
-        /// <remarks>This method mutates the statement in place.</remarks>
-        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
-        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
-            IEnumerable<object> values,
-            ShouldApply shouldApply,
-            out IReadOnlyDictionary<string, object> parameters)
-        {
-            return AddConditionWhen(stmt, condition, values, shouldApply, QueryScope.All, out parameters);
-        }
-
-        /// <summary>
-        /// Appends a WHERE condition with parameter values to SELECT statements, but only for tables
-        /// where the <paramref name="shouldApply"/> callback returns true.
-        /// Variables in the condition that collide with existing variables in the statement
-        /// are automatically renamed. The final parameter dictionary is returned via <paramref name="parameters"/>.
-        /// Unprefixed column references are automatically prefixed with the table alias/name.
-        /// </summary>
-        /// <param name="stmt">The statement to modify.</param>
-        /// <param name="condition">A SQL predicate containing @-prefixed variables (e.g. <c>"TenantId = @TenantId"</c>).</param>
-        /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
-        /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
-        /// <param name="target">Which query levels receive the condition.</param>
-        /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
-        /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
-        /// <remarks>This method mutates the statement in place.</remarks>
-        /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> count does not match the number of variables in the condition.</exception>
-        public static Stmt AddConditionWhen(this Stmt stmt, string condition,
-            IEnumerable<object> values,
-            ShouldApply shouldApply,
-            QueryScope target,
-            out IReadOnlyDictionary<string, object> parameters)
-        {
-            (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
-                = ConditionParameterResolver.Resolve(stmt, condition, values);
-            parameters = resolvedParams;
-            ConditionalConditionAppender.AddCondition(stmt, resolvedCondition, shouldApply, target);
             return stmt;
         }
 
@@ -346,12 +346,16 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="stmt">The statement to modify.</param>
         /// <param name="condition">A SQL predicate to append (e.g. <c>"COUNT(*) > 10"</c>).</param>
         /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <param name="allowLeadingHavingKeyword">
+        /// When true (the default), a leading HAVING keyword is silently consumed if present.
+        /// This allows callers to pass either <c>HAVING COUNT(*) > 5</c> or <c>COUNT(*) > 5</c>.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
-        public static Stmt AddHaving(this Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery)
+        public static Stmt AddHaving(this Stmt stmt, string condition, QueryScope target = QueryScope.OutermostQuery, bool allowLeadingHavingKeyword = true)
         {
-            HavingAppender.AddHaving(stmt, condition, target);
+            HavingAppender.AddHaving(stmt, condition, target, allowLeadingHavingKeyword);
             return stmt;
         }
 
@@ -367,14 +371,18 @@ namespace TSQL.StandardLibrary.Visitors
         /// Defaults to <see cref="QueryScope.All"/>.</param>
         /// <param name="mutate">Which query-level categories are eligible for mutation.
         /// Defaults to <see cref="QueryScope.All"/>.</param>
+        /// <param name="allowLeadingHavingKeyword">
+        /// When true (the default), a leading HAVING keyword is silently consumed if present.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddHaving(this Stmt stmt, string condition, string targetTable,
             QueryScope traverse = QueryScope.All,
-            QueryScope mutate = QueryScope.All)
+            QueryScope mutate = QueryScope.All,
+            bool allowLeadingHavingKeyword = true)
         {
-            HavingAppender.AddHaving(stmt, condition, targetTable, traverse, mutate);
+            HavingAppender.AddHaving(stmt, condition, targetTable, traverse, mutate, allowLeadingHavingKeyword);
             return stmt;
         }
 

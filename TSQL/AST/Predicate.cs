@@ -19,6 +19,32 @@ namespace TSQL.AST
             return result;
         }
 
+        /// <summary>
+        /// Parses a SQL WHERE condition, silently consuming a leading WHERE keyword if present.
+        /// This allows callers to pass either <c>WHERE x = 1</c> or <c>x = 1</c>.
+        /// </summary>
+        /// <param name="sql">The SQL text to parse.</param>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Predicate ParseWhereCondition(string sql)
+        {
+            Predicate result = Parser.CreateParser(sql).ParseSearchConditionWithClause(TokenType.WHERE);
+            BuildTokenChain(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Parses a SQL HAVING condition, silently consuming a leading HAVING keyword if present.
+        /// This allows callers to pass either <c>HAVING COUNT(*) > 5</c> or <c>COUNT(*) > 5</c>.
+        /// </summary>
+        /// <param name="sql">The SQL text to parse.</param>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Predicate ParseHavingCondition(string sql)
+        {
+            Predicate result = Parser.CreateParser(sql).ParseSearchConditionWithClause(TokenType.HAVING);
+            BuildTokenChain(result);
+            return result;
+        }
+
         public abstract T Accept<T>(Visitor<T> visitor);
 
         private static readonly Dictionary<ComparisonOperator, (TokenType Type, string Lexeme)> ComparisonOpToToken =

@@ -196,5 +196,51 @@ namespace TSQL.Tests
         }
 
         #endregion
+
+        #region allowLeadingHavingKeyword Parameter
+
+        [Fact]
+        public void AddHaving_WithLeadingHavingKeyword_ConsumesKeywordByDefault()
+        {
+            string sql = "SELECT Category, COUNT(*) FROM Products GROUP BY Category";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddHaving("HAVING COUNT(*) > 5");
+
+            Assert.Equal("SELECT Category, COUNT(*) FROM Products GROUP BY Category HAVING COUNT(*) > 5", stmt.ToSource());
+        }
+
+        [Fact]
+        public void AddHaving_WithLeadingHavingKeyword_ThrowsWhenDisabled()
+        {
+            string sql = "SELECT Category, COUNT(*) FROM Products GROUP BY Category";
+            Stmt stmt = Parse(sql);
+
+            Assert.Throws<ParseError>(() => stmt.AddHaving("HAVING COUNT(*) > 5", allowLeadingHavingKeyword: false));
+        }
+
+        [Fact]
+        public void AddHaving_TargetTable_WithLeadingHavingKeyword_ConsumesKeywordByDefault()
+        {
+            string sql = "SELECT Category, COUNT(*) FROM Products GROUP BY Category UNION SELECT Type, COUNT(*) FROM Archive GROUP BY Type";
+            Stmt stmt = Parse(sql);
+
+            stmt.AddHaving("HAVING COUNT(*) > 10", "Products");
+
+            Assert.Equal(
+                "SELECT Category, COUNT(*) FROM Products GROUP BY Category HAVING COUNT(*) > 10 UNION SELECT Type, COUNT(*) FROM Archive GROUP BY Type",
+                stmt.ToSource());
+        }
+
+        [Fact]
+        public void AddHaving_TargetTable_WithLeadingHavingKeyword_ThrowsWhenDisabled()
+        {
+            string sql = "SELECT Category, COUNT(*) FROM Products GROUP BY Category";
+            Stmt stmt = Parse(sql);
+
+            Assert.Throws<ParseError>(() => stmt.AddHaving("HAVING COUNT(*) > 5", "Products", allowLeadingHavingKeyword: false));
+        }
+
+        #endregion
     }
 }

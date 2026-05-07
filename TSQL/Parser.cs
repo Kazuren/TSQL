@@ -419,6 +419,30 @@ namespace TSQL
         public AST.Predicate ParseSearchCondition()
         {
             Reset();
+            return ParseSearchConditionCore();
+        }
+
+        /// <summary>
+        /// Parses a SQL search condition, optionally consuming a leading clause keyword first.
+        /// </summary>
+        /// <param name="clauseKeywordToConsume">
+        /// The clause keyword (WHERE or HAVING) to silently consume if present at the start.
+        /// This allows callers to pass either <c>WHERE x = 1</c> or <c>x = 1</c>.
+        /// </param>
+        internal AST.Predicate ParseSearchConditionWithClause(TokenType clauseKeywordToConsume)
+        {
+            Reset();
+
+            if (Check(clauseKeywordToConsume))
+            {
+                Advance();
+            }
+
+            return ParseSearchConditionCore();
+        }
+
+        private AST.Predicate ParseSearchConditionCore()
+        {
             AST.Predicate predicate = SearchCondition();
 
             if (!IsAtEnd())
