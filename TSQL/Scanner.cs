@@ -704,14 +704,15 @@ namespace TSQL
         private static string DescribeChar(char c)
         {
             string codePoint = $"U+{(int)c:X4}";
+            string charDisplay = char.IsControl(c) ? "" : $"'{c}'";
 
             if (UnicodeCharNames.TryGetValue(c, out string name))
             {
-                return $"{codePoint} {name}";
+                return $"{charDisplay} {codePoint} {name}";
             }
             else
             {
-                return $"{codePoint} ({CharUnicodeInfo.GetUnicodeCategory(c)})";
+                return $"{charDisplay} {codePoint} ({CharUnicodeInfo.GetUnicodeCategory(c)})";
             }
         }
     }

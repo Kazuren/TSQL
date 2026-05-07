@@ -341,7 +341,7 @@
             Assert.Equal(1, ex.Line);
             Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
-            Assert.Equal("Unexpected character: U+0060 (ModifierSymbol)", ex.Message);
+            Assert.Equal("Unexpected character: '`' U+0060 (ModifierSymbol)", ex.Message);
         }
 
         [Fact]
@@ -366,7 +366,7 @@
             var scanner = new Scanner(sql);
 
             ParseError ex = Assert.Throws<ParseError>(() => scanner.ScanTokens());
-            Assert.Equal("Unexpected character: U+00E9 (LowercaseLetter)", ex.Message);
+            Assert.Equal("Unexpected character: 'é' U+00E9 (LowercaseLetter)", ex.Message);
         }
 
         [Fact]
