@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace TSQL.StandardLibrary.Visitors
 {
     public static class StmtExtensions
