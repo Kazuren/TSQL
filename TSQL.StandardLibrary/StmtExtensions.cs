@@ -113,14 +113,19 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="condition">A SQL predicate to append (e.g. <c>"TenantId = 1"</c>).</param>
         /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="target">Which query scopes to modify. Traverses all scopes but only mutates matching ones.</param>
+        /// <param name="allowLeadingWhereKeyword">
+        /// When true (the default), a leading WHERE keyword is silently consumed if present.
+        /// This allows callers to pass either <c>WHERE x = 1</c> or <c>x = 1</c>.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
         public static Stmt AddConditionWhen(this Stmt stmt, string condition,
             ShouldApply shouldApply,
-            QueryScope target = QueryScope.All)
+            QueryScope target = QueryScope.All,
+            bool allowLeadingWhereKeyword = true)
         {
-            ConditionalConditionAppender.AddCondition(stmt, condition, shouldApply, target);
+            ConditionalConditionAppender.AddCondition(stmt, condition, shouldApply, target, allowLeadingWhereKeyword);
             return stmt;
         }
 
@@ -137,6 +142,9 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="values">Parameter values. Each element may be a raw value, a <c>(string name, object value)</c> tuple, or a <see cref="KeyValuePair{TKey,TValue}"/>.</param>
         /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
+        /// <param name="allowLeadingWhereKeyword">
+        /// When true (the default), a leading WHERE keyword is silently consumed if present.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
@@ -144,9 +152,10 @@ namespace TSQL.StandardLibrary.Visitors
         public static Stmt AddConditionWhen(this Stmt stmt, string condition,
             IEnumerable<object> values,
             ShouldApply shouldApply,
-            out IReadOnlyDictionary<string, object> parameters)
+            out IReadOnlyDictionary<string, object> parameters,
+            bool allowLeadingWhereKeyword = true)
         {
-            return AddConditionWhen(stmt, condition, values, shouldApply, QueryScope.All, out parameters);
+            return AddConditionWhen(stmt, condition, values, shouldApply, QueryScope.All, out parameters, allowLeadingWhereKeyword);
         }
 
         /// <summary>
@@ -162,6 +171,9 @@ namespace TSQL.StandardLibrary.Visitors
         /// <param name="shouldApply">Callback that receives a <see cref="ConditionContext"/> and returns true to apply the condition to that table.</param>
         /// <param name="target">Which query levels receive the condition.</param>
         /// <param name="parameters">Receives the resolved parameter name-to-value mapping after any collision renaming.</param>
+        /// <param name="allowLeadingWhereKeyword">
+        /// When true (the default), a leading WHERE keyword is silently consumed if present.
+        /// </param>
         /// <returns>The same <paramref name="stmt"/> instance, for chaining.</returns>
         /// <remarks>This method mutates the statement in place.</remarks>
         /// <exception cref="ParseError">Thrown when <paramref name="condition"/> is not a valid SQL predicate.</exception>
@@ -170,12 +182,13 @@ namespace TSQL.StandardLibrary.Visitors
             IEnumerable<object> values,
             ShouldApply shouldApply,
             QueryScope target,
-            out IReadOnlyDictionary<string, object> parameters)
+            out IReadOnlyDictionary<string, object> parameters,
+            bool allowLeadingWhereKeyword = true)
         {
             (string resolvedCondition, IReadOnlyDictionary<string, object> resolvedParams)
                 = ConditionParameterResolver.Resolve(stmt, condition, values);
             parameters = resolvedParams;
-            ConditionalConditionAppender.AddCondition(stmt, resolvedCondition, shouldApply, target);
+            ConditionalConditionAppender.AddCondition(stmt, resolvedCondition, shouldApply, target, allowLeadingWhereKeyword);
             return stmt;
         }
 

@@ -80,7 +80,8 @@ namespace TSQL.StandardLibrary.Visitors
         /// </remarks>
         public static void AddCondition(Stmt stmt, string condition,
             ShouldApply shouldApply,
-            QueryScope target = QueryScope.All)
+            QueryScope target = QueryScope.All,
+            bool allowLeadingWhereKeyword = true)
         {
             if (target == QueryScope.None)
             {
@@ -93,14 +94,16 @@ namespace TSQL.StandardLibrary.Visitors
             }
 
             // Collect column references from the condition
-            Predicate parsedCondition = Predicate.ParsePredicate(condition);
+            Predicate parsedCondition = allowLeadingWhereKeyword
+                ? Predicate.ParseWhereCondition(condition)
+                : Predicate.ParsePredicate(condition);
             ConditionColumnCollector columnCollector = new ConditionColumnCollector();
             columnCollector.Walk(parsedCondition);
 
             // If ALL columns are already prefixed, fall back to regular AddCondition
             if (columnCollector.UnprefixedColumnNames.Count == 0)
             {
-                WhereClauseAppender.AddCondition(stmt, condition, target);
+                WhereClauseAppender.AddCondition(stmt, condition, target, allowLeadingWhereKeyword);
                 return;
             }
 
@@ -108,7 +111,7 @@ namespace TSQL.StandardLibrary.Visitors
 
             ConditionalWalker walker = new ConditionalWalker(
                 condition, parsedCondition, columnCollector.UnprefixedColumnNames,
-                shouldApply, target, hasMixedPrefixes);
+                shouldApply, target, hasMixedPrefixes, allowLeadingWhereKeyword);
             walker.Walk(stmt);
         }
 
@@ -479,10 +482,12 @@ namespace TSQL.StandardLibrary.Visitors
             private readonly IReadOnlyList<string> _unprefixedColumnNames;
             private readonly ShouldApply _shouldApply;
             private readonly bool _hasMixedPrefixes;
+            private readonly bool _allowLeadingWhereKeyword;
 
             public ConditionalWalker(string condition, Predicate parsedCondition,
                 IReadOnlyList<string> unprefixedColumnNames,
-                ShouldApply shouldApply, QueryScope target, bool hasMixedPrefixes)
+                ShouldApply shouldApply, QueryScope target, bool hasMixedPrefixes,
+                bool allowLeadingWhereKeyword)
                 : base(QueryScope.All, target)
             {
                 _condition = condition;
@@ -490,6 +495,7 @@ namespace TSQL.StandardLibrary.Visitors
                 _unprefixedColumnNames = unprefixedColumnNames;
                 _shouldApply = shouldApply;
                 _hasMixedPrefixes = hasMixedPrefixes;
+                _allowLeadingWhereKeyword = allowLeadingWhereKeyword;
             }
 
             protected override void OnSelect(SelectExpression selectExpr)
@@ -520,7 +526,9 @@ namespace TSQL.StandardLibrary.Visitors
                     if (_shouldApply(context))
                     {
                         // Re-parse for each table (AddWhere mutates)
-                        Predicate freshCondition = Predicate.ParsePredicate(_condition);
+                        Predicate freshCondition = _allowLeadingWhereKeyword
+                            ? Predicate.ParseWhereCondition(_condition)
+                            : Predicate.ParsePredicate(_condition);
                         ColumnPrefixer prefixer = new ColumnPrefixer(effectiveName, _unprefixedColumnNames);
                         prefixer.Walk(freshCondition);
                         selectExpr.AddWhere(freshCondition);
@@ -539,7 +547,9 @@ namespace TSQL.StandardLibrary.Visitors
                 List<(TableReference Table, string EffectiveName)> tables = SelectLevelTableCollector.Collect(selectExpr);
 
                 // Decompose the condition into top-level AND conjuncts and classify them
-                Predicate parsed = Predicate.ParsePredicate(_condition);
+                Predicate parsed = _allowLeadingWhereKeyword
+                    ? Predicate.ParseWhereCondition(_condition)
+                    : Predicate.ParsePredicate(_condition);
                 List<Predicate> conjuncts = FlattenTopLevelAnd(parsed);
 
                 List<string> prefixedOnlySources = new List<string>();
