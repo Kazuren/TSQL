@@ -7,16 +7,18 @@ namespace TSQL
 {
     internal partial class Scanner
     {
-        // Pre-boxed integers 0-127. SQL commonly uses small integer literals (WHERE x = 1,
+        // Pre-boxed whole numbers 0-127. SQL commonly uses small integer literals (WHERE x = 1,
         // TOP 10, NTILE(4), etc.). Caching the boxed values avoids a heap allocation per literal.
-        private static readonly object[] BoxedIntegers = InitBoxedIntegers();
+        // Every WHOLE_NUMBER literal carries a long (a SQL int or bigint), so the cache boxes
+        // longs to keep the token's literal type consistent regardless of magnitude.
+        private static readonly object[] BoxedWholeNumbers = InitBoxedWholeNumbers();
 
-        private static object[] InitBoxedIntegers()
+        private static object[] InitBoxedWholeNumbers()
         {
             object[] cache = new object[128];
             for (int i = 0; i < cache.Length; i++)
             {
-                cache[i] = i;
+                cache[i] = (long)i;
             }
             return cache;
         }
@@ -382,36 +384,40 @@ namespace TSQL
             }
             else
             {
-                // Parse directly from source characters to avoid allocating a Substring
-                // just to pass to int.Parse(). The lexeme is already captured by StringSlice.
+                // Parse directly from source characters to avoid allocating a Substring.
+                // The lexeme is already captured by StringSlice. A whole-number literal may
+                // be a SQL int or bigint, so the value is held as a long; ParseNumberFromSource
+                // throws OverflowException only past long range.
                 int length = _current - _start;
                 long value;
                 try
                 {
-                    value = ParseIntFromSource(_start, length);
+                    value = ParseNumberFromSource(_start, length);
                 }
                 catch (OverflowException)
                 {
                     string literal = _source.Substring(_start, length);
                     throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source);
                 }
-                if (value > int.MaxValue)
+                object boxed;
+                if (value >= 0 && value < BoxedWholeNumbers.Length)
                 {
-                    string literal = _source.Substring(_start, length);
-                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source);
+                    boxed = BoxedWholeNumbers[(int)value];
                 }
-                object boxed = (uint)value < (uint)BoxedIntegers.Length
-                    ? BoxedIntegers[value]
-                    : (object)(int)value;
+                else
+                {
+                    boxed = value;
+                }
                 AddToken(TokenType.WHOLE_NUMBER, boxed);
             }
         }
 
         /// <summary>
-        /// Parses an integer directly from the source string, avoiding the Substring
-        /// allocation that int.Parse() would require.
+        /// Parses a whole number directly from the source string into a long, avoiding the
+        /// Substring allocation that long.Parse() would require. Throws OverflowException
+        /// when the literal exceeds long range.
         /// </summary>
-        private long ParseIntFromSource(int start, int length)
+        private long ParseNumberFromSource(int start, int length)
         {
             long result = 0;
             for (int i = start; i < start + length; i++)

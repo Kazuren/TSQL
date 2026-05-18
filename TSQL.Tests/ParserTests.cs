@@ -307,6 +307,19 @@ namespace TSQL.Tests
         }
 
         [Fact]
+        public void Parse_LiteralNumber_AboveInt32Range_HasLongValue()
+        {
+            // Arrange & Act — int.MaxValue + 1, a SQL bigint literal.
+            long value = (long)int.MaxValue + 1;
+            Stmt.Select select = Stmt.ParseSelect($"SELECT {value} FROM T");
+
+            // Assert
+            SelectColumn item = Assert.IsType<SelectColumn>(SelectExpressionOf(select).Columns[0]);
+            Expr.IntLiteral literal = Assert.IsType<Expr.IntLiteral>(item.Expression);
+            Assert.Equal(value, literal.Value);
+        }
+
+        [Fact]
         public void Parse_LiteralString_HasCorrectStructure()
         {
             // Arrange & Act

@@ -66,8 +66,8 @@ namespace TSQL
         /// <summary>Creates a string literal.</summary>
         public static StringLiteral Literal(string value) => new StringLiteral(value);
 
-        /// <summary>Creates an integer literal.</summary>
-        public static IntLiteral Literal(int value) => new IntLiteral(value);
+        /// <summary>Creates an integer literal (a SQL int or bigint).</summary>
+        public static IntLiteral Literal(long value) => new IntLiteral(value);
 
         /// <summary>Creates a decimal literal.</summary>
         public static DecimalLiteral Literal(decimal value) => new DecimalLiteral(value);
@@ -836,12 +836,16 @@ namespace TSQL
             }
         }
 
+        /// <summary>
+        /// An integer literal. "Int" denotes the SQL integer family: <see cref="Value"/> is a
+        /// <see cref="long"/>, so it covers both SQL <c>int</c> and <c>bigint</c> magnitudes.
+        /// </summary>
         public class IntLiteral : Expr
         {
-            public int Value { get; }
+            public long Value { get; }
             internal Token _token;
 
-            public IntLiteral(int value)
+            public IntLiteral(long value)
             {
                 Value = value;
                 _token = ConcreteToken.WithLeadingSpace(TokenType.WHOLE_NUMBER, value.ToString(), value);
@@ -849,7 +853,7 @@ namespace TSQL
 
             internal IntLiteral(Token token)
             {
-                Value = (int)token.Literal;
+                Value = System.Convert.ToInt64(token.Literal);
                 _token = token;
             }
 

@@ -42,9 +42,9 @@
         {
             return new TheoryData<string, TokenType, object>
             {
-                { "123", TokenType.WHOLE_NUMBER, 123 },
-                { "0", TokenType.WHOLE_NUMBER, 0 },
-                { "999999", TokenType.WHOLE_NUMBER, 999999 },
+                { "123", TokenType.WHOLE_NUMBER, 123L },
+                { "0", TokenType.WHOLE_NUMBER, 0L },
+                { "999999", TokenType.WHOLE_NUMBER, 999999L },
                 { "19.99", TokenType.DECIMAL, 19.99 },
                 { "0.5", TokenType.DECIMAL, 0.5 },
                 { "100.001", TokenType.DECIMAL, 100.001 },
@@ -161,7 +161,7 @@
             var tokens = scanner.ScanTokens();
 
             tokens.Should()
-                .HaveToken(0, TokenType.WHOLE_NUMBER, "1", 1)
+                .HaveToken(0, TokenType.WHOLE_NUMBER, "1", 1L)
                 .HaveToken(1, TokenType.IDENTIFIER, "E")
                 .HaveToken(2, TokenType.EOF, "");
         }
@@ -173,7 +173,7 @@
             var tokens = scanner.ScanTokens();
 
             tokens.Should()
-                .HaveToken(0, TokenType.WHOLE_NUMBER, "1", 1)
+                .HaveToken(0, TokenType.WHOLE_NUMBER, "1", 1L)
                 .HaveToken(1, TokenType.IDENTIFIER, "E")
                 .HaveToken(2, TokenType.PLUS, "+")
                 .HaveToken(3, TokenType.EOF, "");
@@ -406,6 +406,21 @@
             Assert.Equal(7, ex.Column);
             Assert.Equal(sql, ex.SqlText);
             Assert.Equal("Numeric literal too large: 99999999999999999999", ex.Message);
+        }
+
+        [Fact]
+        public void ScanTokens_IntegerAboveInt32Range_ParsesAsWholeNumber()
+        {
+            // int.MaxValue + 1 — exceeds int range but fits in a SQL bigint (long).
+            long value = (long)int.MaxValue + 1;
+            string sql = value.ToString();
+            var scanner = new Scanner(sql);
+
+            var tokens = scanner.ScanTokens();
+
+            tokens.Should()
+                .HaveToken(0, TokenType.WHOLE_NUMBER, sql, value)
+                .HaveToken(1, TokenType.EOF, "");
         }
 
         [Fact]

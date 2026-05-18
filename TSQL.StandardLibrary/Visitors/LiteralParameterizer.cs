@@ -95,7 +95,17 @@ namespace TSQL.StandardLibrary.Visitors
                 }
                 else if (expr is Expr.IntLiteral intLit)
                 {
-                    value = intLit.Value;
+                    // Mirror SQL Server's typing of integer constants: an int when the value
+                    // fits in int range, otherwise a bigint. Keeping the parameter's CLR type
+                    // aligned with the literal avoids a bigint parameter forcing conversions.
+                    if (intLit.Value >= int.MinValue && intLit.Value <= int.MaxValue)
+                    {
+                        value = (int)intLit.Value;
+                    }
+                    else
+                    {
+                        value = intLit.Value;
+                    }
                 }
                 else if (expr is Expr.DecimalLiteral decLit)
                 {

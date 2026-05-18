@@ -254,6 +254,19 @@ namespace TSQL.Tests
         }
 
         [Fact]
+        public void LiteralParameterizer_ParameterizesBigIntLiteral_AsLong()
+        {
+            // A literal beyond int range stays a long parameter (a SQL bigint).
+            long value = (long)int.MaxValue + 1;
+            Stmt.Select stmt = ParseSelect($"SELECT * FROM T WHERE x = {value}");
+            stmt.Parameterize(out IReadOnlyDictionary<string, object>? parameters);
+
+            Assert.Equal("SELECT * FROM T WHERE x = @P0", stmt.ToSource());
+            Assert.Single(parameters);
+            Assert.Equal(value, parameters["@P0"]);
+        }
+
+        [Fact]
         public void LiteralParameterizer_ParameterizesStringLiteral()
         {
             Stmt.Select stmt = ParseSelect("SELECT * FROM T WHERE name = 'hello'");
