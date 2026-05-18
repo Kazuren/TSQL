@@ -212,7 +212,7 @@ namespace TSQL
                     }
                     else
                     {
-                        throw new ParseError($"Unexpected character: {DescribeChar(c)}", _line, ColumnAtStart(), _source);
+                        throw new ParseError($"Unexpected character: {DescribeChar(c)}", _line, ColumnAtStart(), 1, _source);
                     }
                     break;
             }
@@ -269,7 +269,7 @@ namespace TSQL
 
             if (IsAtEnd())
             {
-                throw new ParseError("Unterminated multi-line comment.", _line, ColumnAtStart(), _source);
+                throw new ParseError("Unterminated multi-line comment.", _line, ColumnAtStart(), "/*".Length, _source);
             }
 
             // Consume the closing "*/" of the multi-line comment
@@ -379,7 +379,7 @@ namespace TSQL
                 }
                 catch (OverflowException ex)
                 {
-                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source, ex);
+                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), literal.Length, _source, ex);
                 }
             }
             else
@@ -394,10 +394,10 @@ namespace TSQL
                 {
                     value = ParseNumberFromSource(_start, length);
                 }
-                catch (OverflowException)
+                catch (OverflowException ex)
                 {
                     string literal = _source.Substring(_start, length);
-                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), _source);
+                    throw new ParseError($"Numeric literal too large: {literal}", _line, ColumnAtStart(), length, _source, ex);
                 }
                 object boxed;
                 if (value >= 0 && value < BoxedWholeNumbers.Length)
@@ -493,7 +493,7 @@ namespace TSQL
 
             if (IsAtEnd())
             {
-                throw new ParseError(unterminatedError, _line, ColumnAtStart(), _source);
+                throw new ParseError(unterminatedError, _line, ColumnAtStart(), 1, _source);
             }
 
             // Consume the closing delimiter

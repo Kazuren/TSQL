@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using TSQL.AST;
 using static TSQL.Expr;
 
@@ -238,6 +239,9 @@ namespace TSQL
         /// <summary>0-based column number within the line where the error occurred, or null if unavailable.</summary>
         public int? Column { get; }
 
+        /// <summary>Width, in characters, of the offending text, or null if unavailable.</summary>
+        public int? Length { get; }
+
         /// <summary>The original SQL text being parsed, or null if unavailable.</summary>
         public string SqlText { get; }
 
@@ -249,23 +253,101 @@ namespace TSQL
         /// <param name="message">A description of the parse error.</param>
         /// <param name="line">1-based line number where the error occurred.</param>
         /// <param name="column">0-based column offset within the line.</param>
+        /// <param name="length">Width, in characters, of the offending text.</param>
         /// <param name="sqlText">The original SQL text being parsed.</param>
-        internal ParseError(string message, int line, int column, string sqlText)
-            : this(message, line, column, sqlText, null)
+        internal ParseError(string message, int line, int column, int length, string sqlText)
+            : this(message, line, column, length, sqlText, null)
         {
         }
 
         /// <param name="message">A description of the parse error.</param>
         /// <param name="line">1-based line number where the error occurred.</param>
         /// <param name="column">0-based column offset within the line.</param>
+        /// <param name="length">Width, in characters, of the offending text.</param>
         /// <param name="sqlText">The original SQL text being parsed.</param>
         /// <param name="innerException">The exception that caused this parse error, if any.</param>
-        internal ParseError(string message, int line, int column, string sqlText, Exception innerException)
+        internal ParseError(string message, int line, int column, int length, string sqlText, Exception innerException)
             : base(message, innerException)
         {
             Line = line;
             Column = column;
+            Length = length;
             SqlText = sqlText;
+        }
+
+        /// <summary>
+        /// Renders the error as a caret diagnostic — message, location, the offending
+        /// source line, and a caret underline — followed by the stack trace and inner
+        /// exception. Falls back to the base exception text when no location is available.
+        /// </summary>
+        public override string ToString()
+        {
+            if (Line is null || Column is null || SqlText is null)
+            {
+                return base.ToString();
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append(GetType()).Append(": ").Append(Message).Append('\n');
+            sb.Append(RenderCaretDiagnostic());
+            if (InnerException != null)
+            {
+                sb.Append('\n').Append(" ---> ").Append(InnerException);
+            }
+            if (StackTrace != null)
+            {
+                sb.Append('\n').Append(StackTrace);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Builds the location line, the offending source line, and the caret underline.
+        /// Clamps the column and caret span so they never run past the source line.
+        /// </summary>
+        private string RenderCaretDiagnostic()
+        {
+            string[] lines = SqlText.Split('\n');
+            int lineIndex = Line.Value - 1;
+            string sourceLine;
+            if (lineIndex >= 0 && lineIndex < lines.Length)
+            {
+                sourceLine = lines[lineIndex].TrimEnd('\r');
+            }
+            else
+            {
+                sourceLine = string.Empty;
+            }
+
+            int column = Column.Value;
+            if (column < 0)
+            {
+                column = 0;
+            }
+            else if (column > sourceLine.Length)
+            {
+                column = sourceLine.Length;
+            }
+
+            int span = Length ?? 1;
+            if (span < 1)
+            {
+                span = 1;
+            }
+            if (column + span > sourceLine.Length)
+            {
+                span = Math.Max(1, sourceLine.Length - column);
+            }
+
+            string lineNumber = Line.Value.ToString();
+            string gutter = new string(' ', lineNumber.Length + 2);
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append("  --> line ").Append(Line.Value).Append(", column ").Append(column + 1).Append('\n');
+            sb.Append(gutter).Append('|').Append('\n');
+            sb.Append(' ').Append(lineNumber).Append(" | ").Append(sourceLine).Append('\n');
+            sb.Append(gutter).Append("| ").Append(new string(' ', column)).Append(new string('^', span));
+            return sb.ToString();
         }
     }
 
@@ -4805,7 +4887,7 @@ namespace TSQL
                 int endColumn = sourceToken.EndColumn;
                 string where = token.Type == TokenType.EOF ? "at end" : $"at '{sourceToken.Lexeme}', column {startColumn}:{endColumn}. Token: {sourceToken.Type}";
 
-                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}", line, startColumn, sourceToken.Source);
+                return new ParseError($"[line {line}] Error {where}. {message}\nIn: {sourceToken.Source}", line, startColumn, sourceToken.Lexeme.Length, sourceToken.Source);
             }
             else
             {
