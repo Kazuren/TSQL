@@ -168,6 +168,35 @@ namespace TSQL
         }
 
         /// <summary>
+        /// Creates a deep copy of this list: every item is cloned with <paramref name="cloneItem"/>
+        /// and every separator token with <paramref name="cloneToken"/>, preserving exact positions.
+        /// </summary>
+        internal SyntaxElementList<T> CloneWith(Func<T, T> cloneItem, Func<Token, Token> cloneToken)
+        {
+            SyntaxElementList<T> clone = new SyntaxElementList<T>();
+
+            if (_items != null)
+            {
+                clone._items = new List<T>(_items.Count);
+                foreach (T item in _items)
+                {
+                    clone._items.Add(cloneItem(item));
+                }
+            }
+
+            if (_separators != null)
+            {
+                clone._separators = new List<Token>(_separators.Count);
+                foreach (Token separator in _separators)
+                {
+                    clone._separators.Add(separator == null ? null : cloneToken(separator));
+                }
+            }
+
+            return clone;
+        }
+
+        /// <summary>
         /// Returns true if any item in the list is of the specified type.
         /// </summary>
         public bool Any<TResult>() where TResult : class

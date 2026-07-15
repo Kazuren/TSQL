@@ -388,6 +388,18 @@ namespace TSQL
             return result;
         }
 
+        public OrderByItem(Expr expression, SortDirection direction = SortDirection.Ascending)
+        {
+            _expression = expression;
+            Direction = direction;
+            if (direction == SortDirection.Descending)
+            {
+                _orderToken = ConcreteToken.WithLeadingSpace(TokenType.DESC, "DESC");
+            }
+        }
+
+        internal OrderByItem() { }
+
         private Expr _expression;
         public Expr Expression
         {
@@ -915,6 +927,85 @@ namespace TSQL
             }
         }
 
+        /// <summary>
+        /// Appends an ORDER BY item for the given expression. The expression is cloned,
+        /// so it is safe to pass a node that already lives in this tree (e.g. a SELECT
+        /// column's expression).
+        /// </summary>
+        public void AddOrderBy(Expr expression, SortDirection direction = SortDirection.Ascending)
+        {
+            if (expression == null)
+            {
+                return;
+            }
+
+            AddOrderBy(new OrderByItem(expression, direction));
+        }
+
+        /// <summary>
+        /// Parses a SQL fragment like "a DESC, b" and appends the resulting ORDER BY items.
+        /// </summary>
+        /// <exception cref="ParseError">Thrown when the source is not valid SQL.</exception>
+        public void AddOrderBy(string source)
+        {
+            if (string.IsNullOrEmpty(source))
+            {
+                return;
+            }
+
+            AddOrderBy(OrderByItem.ParseOrderByItems(source));
+        }
+
+        /// <summary>
+        /// Appends the given ORDER BY items. Items are cloned, so callers can reuse them freely.
+        /// </summary>
+        public void AddOrderBy(params OrderByItem[] items)
+        {
+            AddOrderBy((System.Collections.Generic.IEnumerable<OrderByItem>)items);
+        }
+
+        /// <summary>
+        /// Appends the given ORDER BY items. Items are cloned, so callers can reuse them freely.
+        /// </summary>
+        public void AddOrderBy(System.Collections.Generic.IEnumerable<OrderByItem> items)
+        {
+            if (items == null)
+            {
+                return;
+            }
+
+            SyntaxElementList<OrderByItem> list = new SyntaxElementList<OrderByItem>();
+            foreach (OrderByItem item in items)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+
+                OrderByItem clone = Cloner.CloneOrderByItem(item);
+
+                // Items after the first sit behind a fabricated comma; make sure they
+                // don't merge into it when the cloned item carries no leading trivia.
+                if (list.Count > 0)
+                {
+                    Token first = FirstTokenOf(clone);
+                    if (first != null && first.LeadingTrivia.Count == 0)
+                    {
+                        first.AddLeadingTrivia(Whitespace.Space);
+                    }
+                }
+
+                list.Append(clone);
+            }
+
+            if (list.Count == 0)
+            {
+                return;
+            }
+
+            AddOrderBy(list);
+        }
+
         public void ClearOrderBy()
         {
             OrderBy = null;
@@ -1017,7 +1108,8 @@ namespace TSQL
 
         public TopClause Top { get; set; }
 
-        private SyntaxElementList<SelectItem> _columns;
+        // Internal so the Cloner can install a cloned column list directly.
+        internal SyntaxElementList<SelectItem> _columns;
         public new SyntaxElementList<SelectItem> Columns => _columns;
         internal override IReadOnlySyntaxElementList<SelectItem> GetColumnsCore() => _columns;
         internal Expr.ObjectIdentifier _into;

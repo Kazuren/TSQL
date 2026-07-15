@@ -72,7 +72,9 @@ namespace TSQL
 
         public class Select : Stmt
         {
-            private Cte _cteStmt;
+            // Internal so the Cloner can assign without the CteStmt setter's
+            // leading-space adjustment, which would alter cloned trivia.
+            internal Cte _cteStmt;
             public Cte CteStmt
             {
                 get => _cteStmt;

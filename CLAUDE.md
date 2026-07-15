@@ -47,6 +47,7 @@ This is a T-SQL parser library targeting .NET Standard 2.0 for broad compatibili
 - `QueryHint` (`AST/QueryHint.cs`) - OPTION clause and all query hint types
 - `Predicate` (`AST/Predicate.cs`) - WHERE clause predicates: comparison, LIKE, BETWEEN, IN, EXISTS, etc.
 - `SyntaxElementList<T>` - Generic list that preserves separator tokens for exact source regeneration
+- `Cloner` (`AST/CloneVisitor.cs`) - Structural deep clone over the whole AST, exposed as the public `Clone<T>()` extension (`SyntaxElementCloneExtensions`). Clones rebuild every node with fresh tokens (sharing only immutable trivia), so a clone is fully independent of the original — this is what lets `QueryExpression.AddOrderBy(Expr/OrderByItem...)` safely accept nodes that already live in the target tree. When adding a new AST node type or token field, extend `Cloner` accordingly; the `CloneTests` round-trip tests over a large set of sample statements (`Clone().ToSource() == source`) catch missed fields.
 
 ### Visitor Pattern
 
