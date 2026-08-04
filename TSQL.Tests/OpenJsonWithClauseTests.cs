@@ -11,6 +11,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a, b FROM OPENJSON(@p) WITH (a INT '$.id', b NVARCHAR(50) '$.name')")]
         [InlineData("SELECT a FROM OPENJSON(@p) WITH (a NVARCHAR(MAX) '$.child' AS JSON)")]
         [InlineData("SELECT v FROM OPENJSON(@p, '$.rows') WITH (v INT '$')")]
+        [InlineData("SELECT v FROM OPENJSON(@p) WITH (v INT)")]
         public void OpenJsonWithClause_RoundTrips(string sql)
         {
             Assert.Equal(sql, RoundTrip(sql));
