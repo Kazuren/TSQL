@@ -423,6 +423,14 @@ namespace TSQL
             return insertStmt;
         }
 
+        public Stmt.Delete ParseDelete()
+        {
+            Reset();
+            Stmt.Delete deleteStmt = DeleteStatement(null);
+            ExpectEnd();
+            return deleteStmt;
+        }
+
         internal SelectItem ParseSelectItem()
         {
             Reset();
@@ -666,6 +674,10 @@ namespace TSQL
             {
                 return InsertStatement(cte);
             }
+            else if (Check(TokenType.DELETE))
+            {
+                return DeleteStatement(cte);
+            }
             else
             {
                 return SelectStatementWithCte(cte);
@@ -901,6 +913,45 @@ namespace TSQL
             insertStmt.ColumnList = columnList;
 
             return insertStmt;
+        }
+
+        /// <summary>
+        /// DELETE [TOP (n) [PERCENT]] [FROM] target [FROM table_sources] [WHERE search_condition]
+        /// </summary>
+        private Stmt.Delete DeleteStatement(Cte cte)
+        {
+            Token deleteToken = Consume(TokenType.DELETE, "Expected DELETE");
+
+            TopClause top = null;
+            if (Match(TokenType.TOP, out Token topKeyword))
+            {
+                top = ParseTopClause(topKeyword);
+            }
+
+            // FROM is optional before the target in T-SQL
+            Token fromToken = null;
+            Match(TokenType.FROM, out fromToken);
+
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ObjectIdentifier target = ObjectIdentifier(parts);
+
+            Stmt.Delete deleteStmt = new Stmt.Delete(target);
+            deleteStmt._deleteToken = deleteToken;
+            deleteStmt.Top = top;
+            deleteStmt._fromToken = fromToken;
+            deleteStmt.CteStmt = cte;
+
+            // Second FROM: table_sources used to drive the delete via joins,
+            // e.g. DELETE FROM T FROM T INNER JOIN U ON T.id = U.id
+            deleteStmt.From = FromClause();
+
+            if (Match(TokenType.WHERE, out Token whereToken))
+            {
+                deleteStmt._whereToken = whereToken;
+                deleteStmt.Where = SearchCondition();
+            }
+
+            return deleteStmt;
         }
 
         /// <summary>
@@ -1408,7 +1459,7 @@ namespace TSQL
 
         private static readonly HashSet<TokenType> StatementStartTokens = new HashSet<TokenType>
         {
-            TokenType.SELECT, TokenType.INSERT, TokenType.WITH,
+            TokenType.SELECT, TokenType.INSERT, TokenType.DELETE, TokenType.WITH,
             TokenType.EXEC, TokenType.EXECUTE, TokenType.DROP,
             TokenType.DECLARE, TokenType.SET, TokenType.IF,
             TokenType.BEGIN

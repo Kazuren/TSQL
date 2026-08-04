@@ -134,6 +134,7 @@ namespace TSQL.Tests
         [InlineData("INSERT INTO T DEFAULT VALUES")]
         [InlineData("INSERT INTO #Temp (col1, col2) SELECT a, b FROM T")]
         [InlineData("INSERT INTO #Temp EXEC sp_GetData @Param1, @Param2")]
+        [InlineData("DELETE FROM T WHERE a = 1")]
         [InlineData("DECLARE @X INT = 1, @Y INT = 2")]
         [InlineData("DECLARE @T TABLE (ID INT IDENTITY(1, 1) NOT NULL, Name NVARCHAR(255))")]
         [InlineData("DROP TABLE IF EXISTS dbo.T1, dbo.T2")]

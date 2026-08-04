@@ -36,6 +36,16 @@ namespace TSQL
             return result;
         }
 
+        /// <summary>Parses a SQL DELETE statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be a DELETE statement.</param>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Delete ParseDelete(string sql)
+        {
+            Delete result = Parser.CreateParser(sql).ParseDelete();
+            BuildTokenChain(result);
+            return result;
+        }
+
         /// <summary>Parses a SQL DROP statement from the given string.</summary>
         /// <param name="sql">The SQL text to parse. Must be a DROP statement.</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
@@ -61,6 +71,7 @@ namespace TSQL
         {
             T VisitSelectStmt(Stmt.Select stmt);
             T VisitInsertStmt(Stmt.Insert stmt);
+            T VisitDeleteStmt(Stmt.Delete stmt);
             T VisitDropStmt(Stmt.Drop stmt);
             T VisitExecuteStmt(Stmt.Execute stmt);
             T VisitExecuteStringStmt(Stmt.ExecuteString stmt);
@@ -227,6 +238,103 @@ namespace TSQL
                 }
 
                 Source.WriteTo(sb);
+            }
+        }
+
+        public class Delete : Stmt
+        {
+            public Cte CteStmt { get; set; }
+            public TopClause Top { get; set; }
+            public Expr.ObjectIdentifier Target { get; }
+            public FromClause From { get; set; }
+            public AST.Predicate Where { get; set; }
+
+            internal Token _deleteToken;
+            internal Token _fromToken;
+            internal Token _whereToken;
+
+            public Delete(Expr.ObjectIdentifier target)
+            {
+                Target = target;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitDeleteStmt(this);
+            }
+
+            internal override IEnumerable<Token> DescendantTokens()
+            {
+                if (CteStmt != null)
+                {
+                    foreach (Token token in CteStmt.DescendantTokens())
+                        yield return token;
+                }
+
+                yield return _deleteToken;
+
+                if (Top != null)
+                {
+                    foreach (Token token in Top.DescendantTokens())
+                        yield return token;
+                }
+
+                if (_fromToken != null)
+                {
+                    yield return _fromToken;
+                }
+
+                foreach (Token token in Target.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (From != null)
+                {
+                    foreach (Token token in From.DescendantTokens())
+                        yield return token;
+                }
+
+                if (_whereToken != null)
+                {
+                    yield return _whereToken;
+
+                    foreach (Token token in Where.DescendantTokens())
+                        yield return token;
+                }
+            }
+
+            internal override void WriteTo(StringBuilder sb)
+            {
+                if (CteStmt != null)
+                {
+                    CteStmt.WriteTo(sb);
+                }
+
+                _deleteToken.AppendTo(sb);
+
+                if (Top != null)
+                {
+                    Top.WriteTo(sb);
+                }
+
+                if (_fromToken != null)
+                {
+                    _fromToken.AppendTo(sb);
+                }
+
+                Target.WriteTo(sb);
+
+                if (From != null)
+                {
+                    From.WriteTo(sb);
+                }
+
+                if (_whereToken != null)
+                {
+                    _whereToken.AppendTo(sb);
+                    Where.WriteTo(sb);
+                }
             }
         }
 

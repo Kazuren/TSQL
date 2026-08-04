@@ -1507,6 +1507,22 @@ namespace TSQL
             }
         }
 
+        Stmt Stmt.Visitor<Stmt>.VisitDeleteStmt(Stmt.Delete stmt)
+        {
+            Stmt.Delete clone = new Stmt.Delete(CloneObjectIdentifier(stmt.Target));
+            clone.CteStmt = CloneCte(stmt.CteStmt);
+            clone.Top = CloneTopClause(stmt.Top);
+            clone._deleteToken = CloneToken(stmt._deleteToken);
+            clone._fromToken = CloneToken(stmt._fromToken);
+            clone.From = CloneFromClause(stmt.From);
+            if (stmt.Where != null)
+            {
+                clone.Where = ClonePredicate(stmt.Where);
+                clone._whereToken = CloneToken(stmt._whereToken);
+            }
+            return clone;
+        }
+
         Stmt Stmt.Visitor<Stmt>.VisitDropStmt(Stmt.Drop stmt)
         {
             Stmt.Drop clone = new Stmt.Drop(stmt.ObjectType, stmt.IfExists, CloneList(stmt.Targets, CloneObjectIdentifier));
