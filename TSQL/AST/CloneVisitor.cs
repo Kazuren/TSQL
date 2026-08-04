@@ -93,6 +93,7 @@ namespace TSQL
                 case InsertSource insertSource: return CloneInsertSource(insertSource);
                 case ExecuteArgument executeArgument: return CloneExecuteArgument(executeArgument);
                 case VariableDeclaration variableDeclaration: return CloneVariableDeclaration(variableDeclaration);
+                case UpdateAssignment updateAssignment: return CloneUpdateAssignment(updateAssignment);
                 default:
                     throw new NotSupportedException($"Cloning is not supported for {element.GetType().Name}.");
             }
@@ -1520,6 +1521,29 @@ namespace TSQL
                 clone.Where = ClonePredicate(stmt.Where);
                 clone._whereToken = CloneToken(stmt._whereToken);
             }
+            return clone;
+        }
+
+        Stmt Stmt.Visitor<Stmt>.VisitUpdateStmt(Stmt.Update stmt)
+        {
+            Stmt.Update clone = new Stmt.Update(CloneObjectIdentifier(stmt.Target), CloneList(stmt.Assignments, CloneUpdateAssignment));
+            clone.CteStmt = CloneCte(stmt.CteStmt);
+            clone.Top = CloneTopClause(stmt.Top);
+            clone._updateToken = CloneToken(stmt._updateToken);
+            clone._setToken = CloneToken(stmt._setToken);
+            clone.From = CloneFromClause(stmt.From);
+            if (stmt.Where != null)
+            {
+                clone.Where = ClonePredicate(stmt.Where);
+                clone._whereToken = CloneToken(stmt._whereToken);
+            }
+            return clone;
+        }
+
+        private static UpdateAssignment CloneUpdateAssignment(UpdateAssignment assignment)
+        {
+            UpdateAssignment clone = new UpdateAssignment(CloneColumnIdentifier(assignment.Column), CloneExpr(assignment.Value));
+            clone._equalsToken = CloneToken(assignment._equalsToken);
             return clone;
         }
 

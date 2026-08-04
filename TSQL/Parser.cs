@@ -431,6 +431,14 @@ namespace TSQL
             return deleteStmt;
         }
 
+        public Stmt.Update ParseUpdate()
+        {
+            Reset();
+            Stmt.Update updateStmt = UpdateStatement(null);
+            ExpectEnd();
+            return updateStmt;
+        }
+
         internal SelectItem ParseSelectItem()
         {
             Reset();
@@ -677,6 +685,10 @@ namespace TSQL
             else if (Check(TokenType.DELETE))
             {
                 return DeleteStatement(cte);
+            }
+            else if (Check(TokenType.UPDATE))
+            {
+                return UpdateStatement(cte);
             }
             else
             {
@@ -952,6 +964,62 @@ namespace TSQL
             }
 
             return deleteStmt;
+        }
+
+        /// <summary>
+        /// UPDATE [TOP (n) [PERCENT]] target SET col = expr ("," col = expr)* [FROM table_sources] [WHERE search_condition]
+        /// </summary>
+        private Stmt.Update UpdateStatement(Cte cte)
+        {
+            Token updateToken = Consume(TokenType.UPDATE, "Expected UPDATE");
+
+            TopClause top = null;
+            if (Match(TokenType.TOP, out Token topKeyword))
+            {
+                top = ParseTopClause(topKeyword);
+            }
+
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ObjectIdentifier target = ObjectIdentifier(parts);
+
+            Token setToken = Consume(TokenType.SET, "Expected SET");
+
+            SyntaxElementList<UpdateAssignment> assignments = new SyntaxElementList<UpdateAssignment>();
+            assignments.Append(ParseUpdateAssignment());
+
+            while (Match(TokenType.COMMA, out Token comma))
+            {
+                assignments.Append(ParseUpdateAssignment(), comma);
+            }
+
+            Stmt.Update updateStmt = new Stmt.Update(target, assignments);
+            updateStmt._updateToken = updateToken;
+            updateStmt.Top = top;
+            updateStmt._setToken = setToken;
+            updateStmt.CteStmt = cte;
+
+            updateStmt.From = FromClause();
+
+            if (Match(TokenType.WHERE, out Token whereToken))
+            {
+                updateStmt._whereToken = whereToken;
+                updateStmt.Where = SearchCondition();
+            }
+
+            return updateStmt;
+        }
+
+        private UpdateAssignment ParseUpdateAssignment()
+        {
+            IdentifierPartsBuffer parts = CollectIdentifierParts();
+            Expr.ColumnIdentifier column = ColumnIdentifier(parts);
+
+            Token equalsToken = Consume(TokenType.EQUAL, "Expected '=' in SET clause");
+            Expr value = Expression();
+
+            UpdateAssignment assignment = new UpdateAssignment(column, value);
+            assignment._equalsToken = equalsToken;
+            return assignment;
         }
 
         /// <summary>
@@ -1459,7 +1527,7 @@ namespace TSQL
 
         private static readonly HashSet<TokenType> StatementStartTokens = new HashSet<TokenType>
         {
-            TokenType.SELECT, TokenType.INSERT, TokenType.DELETE, TokenType.WITH,
+            TokenType.SELECT, TokenType.INSERT, TokenType.DELETE, TokenType.UPDATE, TokenType.WITH,
             TokenType.EXEC, TokenType.EXECUTE, TokenType.DROP,
             TokenType.DECLARE, TokenType.SET, TokenType.IF,
             TokenType.BEGIN

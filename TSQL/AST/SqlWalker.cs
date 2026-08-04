@@ -104,6 +104,35 @@ namespace TSQL
             }
         }
 
+        protected virtual void VisitUpdate(Stmt.Update stmt)
+        {
+            WalkCte(stmt.CteStmt);
+
+            if (stmt.Top != null)
+            {
+                Walk(stmt.Top.Expression);
+            }
+
+            foreach (UpdateAssignment assignment in stmt.Assignments)
+            {
+                Walk(assignment.Column);
+                Walk(assignment.Value);
+            }
+
+            if (stmt.From != null)
+            {
+                foreach (TableSource tableSource in stmt.From.TableSources)
+                {
+                    Walk(tableSource);
+                }
+            }
+
+            if (stmt.Where != null)
+            {
+                Walk(stmt.Where);
+            }
+        }
+
         protected virtual void VisitDrop(Stmt.Drop stmt)
         {
             foreach (Expr.ObjectIdentifier target in stmt.Targets)
@@ -628,6 +657,7 @@ namespace TSQL
         object Stmt.Visitor<object>.VisitSelectStmt(Stmt.Select stmt) { VisitSelect(stmt); return null; }
         object Stmt.Visitor<object>.VisitInsertStmt(Stmt.Insert stmt) { VisitInsert(stmt); return null; }
         object Stmt.Visitor<object>.VisitDeleteStmt(Stmt.Delete stmt) { VisitDelete(stmt); return null; }
+        object Stmt.Visitor<object>.VisitUpdateStmt(Stmt.Update stmt) { VisitUpdate(stmt); return null; }
         object Stmt.Visitor<object>.VisitDropStmt(Stmt.Drop stmt) { VisitDrop(stmt); return null; }
         object Stmt.Visitor<object>.VisitExecuteStmt(Stmt.Execute stmt) { VisitExecute(stmt); return null; }
         object Stmt.Visitor<object>.VisitExecuteStringStmt(Stmt.ExecuteString stmt) { VisitExecuteString(stmt); return null; }

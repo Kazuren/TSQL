@@ -46,6 +46,16 @@ namespace TSQL
             return result;
         }
 
+        /// <summary>Parses a SQL UPDATE statement from the given string.</summary>
+        /// <param name="sql">The SQL text to parse. Must be an UPDATE statement.</param>
+        /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
+        public static Update ParseUpdate(string sql)
+        {
+            Update result = Parser.CreateParser(sql).ParseUpdate();
+            BuildTokenChain(result);
+            return result;
+        }
+
         /// <summary>Parses a SQL DROP statement from the given string.</summary>
         /// <param name="sql">The SQL text to parse. Must be a DROP statement.</param>
         /// <exception cref="ParseError">Thrown when the SQL is not valid.</exception>
@@ -72,6 +82,7 @@ namespace TSQL
             T VisitSelectStmt(Stmt.Select stmt);
             T VisitInsertStmt(Stmt.Insert stmt);
             T VisitDeleteStmt(Stmt.Delete stmt);
+            T VisitUpdateStmt(Stmt.Update stmt);
             T VisitDropStmt(Stmt.Drop stmt);
             T VisitExecuteStmt(Stmt.Execute stmt);
             T VisitExecuteStringStmt(Stmt.ExecuteString stmt);
@@ -324,6 +335,106 @@ namespace TSQL
                 }
 
                 Target.WriteTo(sb);
+
+                if (From != null)
+                {
+                    From.WriteTo(sb);
+                }
+
+                if (_whereToken != null)
+                {
+                    _whereToken.AppendTo(sb);
+                    Where.WriteTo(sb);
+                }
+            }
+        }
+
+        public class Update : Stmt
+        {
+            public Cte CteStmt { get; set; }
+            public TopClause Top { get; set; }
+            public Expr.ObjectIdentifier Target { get; }
+            public SyntaxElementList<UpdateAssignment> Assignments { get; }
+            public FromClause From { get; set; }
+            public AST.Predicate Where { get; set; }
+
+            internal Token _updateToken;
+            internal Token _setToken;
+            internal Token _whereToken;
+
+            public Update(Expr.ObjectIdentifier target, SyntaxElementList<UpdateAssignment> assignments)
+            {
+                Target = target;
+                Assignments = assignments;
+            }
+
+            public override T Accept<T>(Visitor<T> visitor)
+            {
+                return visitor.VisitUpdateStmt(this);
+            }
+
+            internal override IEnumerable<Token> DescendantTokens()
+            {
+                if (CteStmt != null)
+                {
+                    foreach (Token token in CteStmt.DescendantTokens())
+                        yield return token;
+                }
+
+                yield return _updateToken;
+
+                if (Top != null)
+                {
+                    foreach (Token token in Top.DescendantTokens())
+                        yield return token;
+                }
+
+                foreach (Token token in Target.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                yield return _setToken;
+
+                foreach (Token token in Assignments.DescendantTokens())
+                {
+                    yield return token;
+                }
+
+                if (From != null)
+                {
+                    foreach (Token token in From.DescendantTokens())
+                        yield return token;
+                }
+
+                if (_whereToken != null)
+                {
+                    yield return _whereToken;
+
+                    foreach (Token token in Where.DescendantTokens())
+                        yield return token;
+                }
+            }
+
+            internal override void WriteTo(StringBuilder sb)
+            {
+                if (CteStmt != null)
+                {
+                    CteStmt.WriteTo(sb);
+                }
+
+                _updateToken.AppendTo(sb);
+
+                if (Top != null)
+                {
+                    Top.WriteTo(sb);
+                }
+
+                Target.WriteTo(sb);
+
+                _setToken.AppendTo(sb);
+
+                Assignments.WriteTo(sb);
 
                 if (From != null)
                 {
@@ -1684,6 +1795,42 @@ namespace TSQL
             _leftParen.AppendTo(sb);
             Columns.WriteTo(sb);
             _rightParen.AppendTo(sb);
+        }
+    }
+
+    #endregion
+
+    #region UPDATE Supporting Types
+
+    public class UpdateAssignment : SyntaxElement
+    {
+        public Expr.ColumnIdentifier Column { get; }
+        public Expr Value { get; }
+
+        internal Token _equalsToken;
+
+        public UpdateAssignment(Expr.ColumnIdentifier column, Expr value)
+        {
+            Column = column;
+            Value = value;
+        }
+
+        internal override IEnumerable<Token> DescendantTokens()
+        {
+            foreach (Token token in Column.DescendantTokens())
+                yield return token;
+
+            yield return _equalsToken;
+
+            foreach (Token token in Value.DescendantTokens())
+                yield return token;
+        }
+
+        internal override void WriteTo(StringBuilder sb)
+        {
+            Column.WriteTo(sb);
+            _equalsToken.AppendTo(sb);
+            Value.WriteTo(sb);
         }
     }
 
