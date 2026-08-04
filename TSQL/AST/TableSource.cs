@@ -673,6 +673,7 @@ namespace TSQL
     public class RowsetFunctionReference : TableSource
     {
         public Expr.FunctionCall FunctionCall { get; }
+        public RowsetSchemaDeclaration WithClause { get; set; }
 
         public RowsetFunctionReference(Expr.FunctionCall functionCall)
         {
@@ -688,6 +689,9 @@ namespace TSQL
         {
             foreach (Token token in FunctionCall.DescendantTokens())
                 yield return token;
+            if (WithClause != null)
+                foreach (Token token in WithClause.DescendantTokens())
+                    yield return token;
             if (Alias != null)
                 foreach (Token token in ((SyntaxElement)Alias).DescendantTokens())
                     yield return token;
@@ -696,6 +700,8 @@ namespace TSQL
         internal override void WriteTo(StringBuilder sb)
         {
             FunctionCall.WriteTo(sb);
+            if (WithClause != null)
+                WithClause.WriteTo(sb);
             if (Alias != null)
                 ((SyntaxElement)Alias).WriteTo(sb);
         }
@@ -925,6 +931,87 @@ namespace TSQL
                 _repeatLeftParen.AppendTo(sb);
                 RepeatSeed.WriteTo(sb);
                 _repeatRightParen.AppendTo(sb);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The WITH ( … ) schema declaration on a rowset function, e.g.
+    /// <c>OPENJSON(@p) WITH (v INT '$')</c>.
+    /// </summary>
+    public class RowsetSchemaDeclaration : SyntaxElement
+    {
+        public SyntaxElementList<RowsetColumnDef> Columns { get; }
+
+        internal Token _withKeyword;
+        internal Token _leftParen;
+        internal Token _rightParen;
+
+        public RowsetSchemaDeclaration(SyntaxElementList<RowsetColumnDef> columns)
+        {
+            Columns = columns;
+        }
+
+        internal override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _withKeyword;
+            yield return _leftParen;
+            foreach (Token token in Columns.DescendantTokens())
+                yield return token;
+            yield return _rightParen;
+        }
+
+        internal override void WriteTo(StringBuilder sb)
+        {
+            _withKeyword.AppendTo(sb);
+            _leftParen.AppendTo(sb);
+            Columns.WriteTo(sb);
+            _rightParen.AppendTo(sb);
+        }
+    }
+
+    /// <summary>One column in a <see cref="RowsetSchemaDeclaration"/>: name, type, optional JSON path, optional AS JSON.</summary>
+    public class RowsetColumnDef : SyntaxElement
+    {
+        public string Name { get => _name.Lexeme; }
+        public DataType DataType { get; }
+        public string ColumnPath { get => (string)_columnPath?.Literal; }
+        public bool AsJson { get => _asKeyword != null; }
+
+        internal Token _name;
+        internal Token _columnPath;
+        internal Token _asKeyword;
+        internal Token _jsonKeyword;
+
+        public RowsetColumnDef(DataType dataType)
+        {
+            DataType = dataType;
+        }
+
+        internal override IEnumerable<Token> DescendantTokens()
+        {
+            yield return _name;
+            foreach (Token token in DataType.DescendantTokens())
+                yield return token;
+            if (_columnPath != null)
+                yield return _columnPath;
+            if (_asKeyword != null)
+            {
+                yield return _asKeyword;
+                yield return _jsonKeyword;
+            }
+        }
+
+        internal override void WriteTo(StringBuilder sb)
+        {
+            _name.AppendTo(sb);
+            DataType.WriteTo(sb);
+            if (_columnPath != null)
+                _columnPath.AppendTo(sb);
+            if (_asKeyword != null)
+            {
+                _asKeyword.AppendTo(sb);
+                _jsonKeyword.AppendTo(sb);
             }
         }
     }

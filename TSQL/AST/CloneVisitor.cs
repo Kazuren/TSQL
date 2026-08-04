@@ -933,7 +933,32 @@ namespace TSQL
         TableSource TableSource.Visitor<TableSource>.VisitRowsetFunctionReference(RowsetFunctionReference source)
         {
             RowsetFunctionReference clone = new RowsetFunctionReference(CloneFunctionCall(source.FunctionCall));
+            clone.WithClause = CloneRowsetSchemaDeclaration(source.WithClause);
             clone.Alias = CloneAlias(source.Alias);
+            return clone;
+        }
+
+        private static RowsetSchemaDeclaration CloneRowsetSchemaDeclaration(RowsetSchemaDeclaration declaration)
+        {
+            if (declaration == null)
+            {
+                return null;
+            }
+
+            RowsetSchemaDeclaration clone = new RowsetSchemaDeclaration(CloneList(declaration.Columns, CloneRowsetColumnDef));
+            clone._withKeyword = CloneToken(declaration._withKeyword);
+            clone._leftParen = CloneToken(declaration._leftParen);
+            clone._rightParen = CloneToken(declaration._rightParen);
+            return clone;
+        }
+
+        private static RowsetColumnDef CloneRowsetColumnDef(RowsetColumnDef columnDef)
+        {
+            RowsetColumnDef clone = new RowsetColumnDef(CloneDataType(columnDef.DataType));
+            clone._name = CloneToken(columnDef._name);
+            clone._columnPath = CloneToken(columnDef._columnPath);
+            clone._asKeyword = CloneToken(columnDef._asKeyword);
+            clone._jsonKeyword = CloneToken(columnDef._jsonKeyword);
             return clone;
         }
 

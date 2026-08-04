@@ -1974,6 +1974,7 @@ namespace TSQL
             {
                 Expr.FunctionCall functionCall = FinishCall(objectId);
                 RowsetFunctionReference rowsetRef = new RowsetFunctionReference(functionCall);
+                rowsetRef.WithClause = ParseRowsetSchemaDeclaration();
                 rowsetRef.Alias = Alias();
                 return rowsetRef;
             }
@@ -2378,6 +2379,7 @@ namespace TSQL
             Expr.FunctionCall functionCall = FinishCall(functionId);
 
             RowsetFunctionReference rowsetRef = new RowsetFunctionReference(functionCall);
+            rowsetRef.WithClause = ParseRowsetSchemaDeclaration();
             rowsetRef.Alias = Alias();
 
             return rowsetRef;
@@ -3253,6 +3255,63 @@ namespace TSQL
             }
 
             return colDef;
+        }
+
+        /// <summary>
+        /// rowset_schema_declaration -> "WITH" "(" column_def ("," column_def)* ")"
+        /// column_def -> IDENTIFIER data_type STRING? ("AS" "JSON")?
+        ///
+        /// Only valid after a rowset function. Table hints (FROM T WITH (NOLOCK)) are
+        /// not reachable here because SQL Server permits hints on tables and views only.
+        /// Returns null when no WITH clause follows.
+        /// </summary>
+        private RowsetSchemaDeclaration ParseRowsetSchemaDeclaration()
+        {
+            if (!Check(TokenType.WITH))
+            {
+                return null;
+            }
+
+            Token withKeyword = Advance();
+            Token leftParen = Consume(TokenType.LEFT_PAREN, "Expected ( after WITH");
+
+            SyntaxElementList<RowsetColumnDef> columns = new SyntaxElementList<RowsetColumnDef>();
+            columns.Append(ParseRowsetColumnDef());
+            while (Check(TokenType.COMMA))
+            {
+                Token comma = Advance();
+                columns.Append(ParseRowsetColumnDef(), comma);
+            }
+
+            Token rightParen = Consume(TokenType.RIGHT_PAREN, "Expected ) after WITH column list");
+
+            RowsetSchemaDeclaration declaration = new RowsetSchemaDeclaration(columns);
+            declaration._withKeyword = withKeyword;
+            declaration._leftParen = leftParen;
+            declaration._rightParen = rightParen;
+            return declaration;
+        }
+
+        private RowsetColumnDef ParseRowsetColumnDef()
+        {
+            Token name = ConsumeIdentifierOrContextualKeyword("Expected column name");
+            DataType dataType = ParseDataType();
+
+            RowsetColumnDef columnDef = new RowsetColumnDef(dataType);
+            columnDef._name = name;
+
+            if (Check(TokenType.STRING))
+            {
+                columnDef._columnPath = Advance();
+            }
+
+            if (Check(TokenType.AS))
+            {
+                columnDef._asKeyword = Advance();
+                columnDef._jsonKeyword = Consume(TokenType.JSON, "Expected JSON after AS");
+            }
+
+            return columnDef;
         }
 
         private Expr.FunctionCall FinishCall(ObjectIdentifier callee)

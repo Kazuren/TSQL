@@ -86,6 +86,7 @@ namespace TSQL.Tests
         [InlineData("SELECT a FROM (VALUES (1, 'x'), (2, 'y')) AS t(id, name)")]
         [InlineData("SELECT a FROM MyFunction(1, 2) AS f")]
         [InlineData("SELECT a FROM OPENQUERY(LinkedServer, 'SELECT 1') AS oq")]
+        [InlineData("SELECT a FROM OPENJSON(@p) WITH (a INT '$.id', b NVARCHAR(50) '$.name' AS JSON) AS oj")]
         [InlineData("SELECT a FROM T WITH (NOLOCK, NOWAIT)")]
         [InlineData("SELECT a FROM T WITH (INDEX(1))")]
         [InlineData("SELECT a FROM T AS t TABLESAMPLE (10 PERCENT)")]
