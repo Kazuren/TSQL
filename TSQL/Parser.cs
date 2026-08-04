@@ -151,6 +151,7 @@ namespace TSQL
 
         table_source_primary ->
             named_table_source
+            | table_valued_function_source
             | subquery_table_source
             | variable_table_source
             | values_table_source
@@ -158,11 +159,17 @@ namespace TSQL
             | "(" table_source_item ")"
 
         named_table_source -> fully_qualified_identifier (for_system_time)? (("AS")? IDENTIFIER)? (tablesample_clause)? (with_hints)?
+        table_valued_function_source -> fully_qualified_identifier "(" expression_list ")" (rowset_schema_declaration)? (("AS")? IDENTIFIER)?
         subquery_table_source -> "(" query_expression ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
         variable_table_source -> VARIABLE (("AS")? IDENTIFIER)?
         values_table_source -> "(" "VALUES" values_row ("," values_row)* ")" (("AS")? IDENTIFIER)? ( "(" IDENTIFIER ("," IDENTIFIER)* ")" )?
         values_row -> "(" expression ("," expression)* ")"
-        rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (("AS")? IDENTIFIER)?
+        rowset_function_source -> ("OPENROWSET" | "OPENQUERY" | "OPENDATASOURCE") "(" expression_list ")" (rowset_schema_declaration)? (("AS")? IDENTIFIER)?
+
+        // Only legal after a rowset function or table-valued function (e.g. OPENJSON, OPENROWSET(BULK ...)).
+        // A "WITH (" after a plain table or view is a table hint list instead -- see with_hints.
+        rowset_schema_declaration -> "WITH" "(" rowset_column_def ("," rowset_column_def)* ")"
+        rowset_column_def -> IDENTIFIER data_type (STRING)? ("AS" "JSON")?
 
     --- Joins ---
 
